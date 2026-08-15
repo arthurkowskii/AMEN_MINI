@@ -12,6 +12,7 @@ struct WavData {
     bool valid() const { return sampleRate > 0 && channels > 0 && !samples.empty(); }
 };
 
-// Charge un WAV PCM 16-bit. Renvoie un WavData invalide si le fichier
-// n'est pas un WAV PCM 16-bit lisible.
+// Charge un WAV (PCM 8/16/24/32-bit ou float 32) et renvoie les échantillons
+// convertis en int16. Renvoie un WavData invalide si le fichier est illisible
+// ou d'un format inconnu.
 WavData wav_load(const std::string& path);
