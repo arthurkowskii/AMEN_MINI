@@ -1,5 +1,9 @@
 # AMEN_MINI — Roadmap firmware (todo exécutable)
 
+## Goal — la vision de fin
+
+AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle le découpe automatiquement, et on le joue live — 12 pads de chops, 8 pads d'effets (reverse, stutter, tape stop…), modes one-shot / loop / granulaire / slice-sync, le tout calé sur un tempo global réglable avec 7 encodeurs et un séquenceur 16 pas. À la rentrée (début septembre), la machine doit tourner debout sur une Teensy 4.1 : son dans le casque sans PC, zéro latence perceptible, chaque geste = un son — et une démo de 30-60 s qui montre le trajet complet : break → auto-chop → jeu live → effets → séquenceur.
+
 <callout icon="🎯" color="blue_bg">
 	COMMENT UTILISER CETTE PAGE : chaque chapitre (J1-J14) est autonome : objectif, fichiers, spec, définition de fait, vérification. Un agent (opencode, Claude, Boris) peut en prendre un et l'exécuter sans autre contexte. Quand un chapitre est terminé : push sur dev, puis mets à jour son statut ici (tag ✅ + hash du commit).
 </callout>
