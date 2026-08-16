@@ -16,6 +16,8 @@ public:
 private:
     friend class VoiceManager;
 
+    static constexpr std::size_t kSpeedRampFrames = 128;
+
     bool renderAdditive(float* outL, float* outR, int numFrames);
 
     PcmView pcm_;
@@ -23,5 +25,8 @@ private:
     std::size_t endFrame_ = 0;
     double pos_ = 0.0;
     float speed_ = 1.0f;
+    float targetSpeed_ = 1.0f;
+    float speedIncrement_ = 0.0f;
+    std::size_t speedRampRemaining_ = 0;
     bool playing_ = false;
 };

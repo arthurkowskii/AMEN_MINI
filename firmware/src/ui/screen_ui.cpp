@@ -11,7 +11,8 @@ struct Glyph {
 
 // Compact 3x5 font: narrow enough to preserve a 32x32 artwork area.
 constexpr Glyph kGlyphs[] = {
-    {' ', {0, 0, 0, 0, 0}},       {'-', {0, 0, 7, 0, 0}},
+    {' ', {0, 0, 0, 0, 0}},       {'%', {5, 1, 2, 4, 5}},
+    {'-', {0, 0, 7, 0, 0}},
     {'.', {0, 0, 0, 0, 2}},       {'/', {1, 1, 2, 4, 4}},
     {'_', {0, 0, 0, 0, 7}},       {'+', {0, 2, 7, 2, 0}},
     {'0', {7, 5, 5, 5, 7}},       {'1', {2, 6, 2, 2, 7}},
@@ -123,8 +124,9 @@ void ScreenUi::setPerformance(const char* breakName, int bpm, PlaybackMode mode)
 }
 
 void ScreenUi::showParameter(const char* name, int value, int minimum, int maximum,
-                             std::uint64_t nowMs) {
+                              std::uint64_t nowMs, const char* suffix) {
     copyLabel(parameterName_, name);
+    copyLabel(parameterSuffix_, suffix);
     if (minimum > maximum) {
         std::swap(minimum, maximum);
     }
@@ -255,9 +257,10 @@ void ScreenUi::drawText(int x, int y, const char* text, int scale) {
     }
 }
 
-void ScreenUi::drawNumberRight(int right, int y, int value, int scale) {
+void ScreenUi::drawNumberRight(int right, int y, int value, int scale,
+                               const char* suffix) {
     char text[16]{};
-    std::snprintf(text, sizeof(text), "%d", value);
+    std::snprintf(text, sizeof(text), "%d%s", value, suffix == nullptr ? "" : suffix);
     int length = 0;
     while (text[length] != '\0') {
         ++length;
@@ -297,7 +300,7 @@ void ScreenUi::drawParameter() {
 
     drawVerticalLine(33, 0, kHeight);
     drawText(38, 2, parameterName_.data());
-    drawNumberRight(126, 9, parameterValue_, 3);
+    drawNumberRight(126, 9, parameterValue_, 3, parameterSuffix_.data());
     drawRect(38, 24, 60, 6);
     if (progress > 0) {
         fillRect(39, 25, progress, 4);

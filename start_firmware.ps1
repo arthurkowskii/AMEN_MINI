@@ -71,7 +71,8 @@ $WavFull = (Resolve-Path $Wav).Path
 Write-Host "echantillon charge : $WavFull" -ForegroundColor Green
 
 Write-Host "sequenceur pret."
-Write-Host "touches : 1-5 vitesse | espace retrigger | m mode | e effet | [/] intensite | -/+ BPM" -ForegroundColor Cyan
+Write-Host "touches : z/x vitesse -/+5% | c vitesse 100% | espace retrigger | m mode | e effet" -ForegroundColor Cyan
+Write-Host "          [/] intensite | -/+ BPM" -ForegroundColor Cyan
 Write-Host "          b browser | j/k naviguer | entree charger | retour remonter | q quitter" -ForegroundColor Cyan
 Write-Host ""
 

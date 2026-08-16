@@ -25,7 +25,17 @@ void SamplePlayer::stop() {
 }
 
 void SamplePlayer::setSpeed(float speed) {
-    speed_ = speed;
+    targetSpeed_ = speed;
+    if (!playing_ || !std::isfinite(speed) || speed <= 0.0f || speed == speed_) {
+        speed_ = speed;
+        speedIncrement_ = 0.0f;
+        speedRampRemaining_ = 0;
+        return;
+    }
+
+    speedRampRemaining_ = kSpeedRampFrames;
+    speedIncrement_ = (targetSpeed_ - speed_) /
+                      static_cast<float>(speedRampRemaining_);
 }
 
 bool SamplePlayer::render(float* outL, float* outR, int numFrames) {
@@ -70,6 +80,11 @@ bool SamplePlayer::renderAdditive(float* outL, float* outR, int numFrames) {
         }
 
         pos_ += speed_;
+        if (speedRampRemaining_ > 0) {
+            speed_ += speedIncrement_;
+            --speedRampRemaining_;
+            if (speedRampRemaining_ == 0) speed_ = targetSpeed_;
+        }
         if (pos_ >= static_cast<double>(endFrame_)) playing_ = false;
     }
     return playing_;

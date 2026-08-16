@@ -1,7 +1,7 @@
 // AMEN_MINI — Player temps réel PC (J2).
 // Le PC joue le rôle du Teensy : la lib audio appelle render() comme le
 // callback du codec le fera. Clavier :
-//   1..5  = vitesse 0.5 / 0.75 / 1.0 / 1.5 / 2.0
+//   z/x/c = vitesse -5 % / +5 % / retour a 100 %
 //   space = retrigger depuis le début
 //   m     = mode du chop sélectionné
 //   e     = effet affiché, [/] = intensité
@@ -39,16 +39,16 @@ namespace {
 constexpr uint32_t kOutputSampleRate = VoiceManager::kDefaultOutputSampleRate;
 constexpr VoiceManager::PadId kSpacePadId = 0;
 VoiceManager g_voices{kOutputSampleRate};
-std::atomic<float> g_speed{1.0f};
+std::atomic<int> g_speedPercent{100};
 std::atomic<bool> g_running{true};
 std::mutex g_audioMutex;
-const float kSpeeds[] = {0.5f, 0.75f, 1.0f, 1.5f, 2.0f};
 const char* kEffects[] = {"TRANCE GATE", "DISPERSER", "RESONATOR"};
 
 struct UiSimulation {
     int bpm = 145;
     int effect = 0;
     int effectAmount = 5;
+    int speedPercent = 100;
     PlaybackMode mode = PlaybackMode::OneShot;
 };
 
@@ -131,6 +131,14 @@ void load_browser_selection(ScreenUi& screen, AppState& state) {
                 state.wav.sampleRate, kOutputSampleRate);
 }
 
+void set_speed_percent(int speedPercent, ScreenUi& screen, UiSimulation& simulation,
+                       std::uint64_t time) {
+    simulation.speedPercent = std::clamp(speedPercent, 25, 400);
+    g_speedPercent.store(simulation.speedPercent);
+    screen.showParameter("SPEED", simulation.speedPercent, 25, 400, time, "%");
+    std::printf("vitesse : %d%%\n", simulation.speedPercent);
+}
+
 void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& state) {
     const std::uint64_t time = now_ms();
     if (c == 'q' || c == 27) {
@@ -159,14 +167,17 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
                 refresh_browser(screen, state);
             }
         }
-    } else if (c >= '1' && c <= '5') {
-        g_speed.store(kSpeeds[c - '1']);
-        screen.showParameter("SPEED", static_cast<int>(g_speed.load() * 10.0f), 0, 20, time);
-        std::printf("vitesse : %.2f\n", g_speed.load());
+    } else if (c == 'z') {
+        set_speed_percent(simulation.speedPercent - 5, screen, simulation, time);
+    } else if (c == 'x') {
+        set_speed_percent(simulation.speedPercent + 5, screen, simulation, time);
+    } else if (c == 'c') {
+        set_speed_percent(100, screen, simulation, time);
     } else if (c == ' ') {
         std::lock_guard<std::mutex> lock(g_audioMutex);
         const PcmView pcm = state.wav.view();
-        g_voices.trigger(kSpacePadId, pcm, 0, pcm.frameCount(), g_speed.load());
+        const float speed = static_cast<float>(simulation.speedPercent) / 100.0f;
+        g_voices.trigger(kSpacePadId, pcm, 0, pcm.frameCount(), speed);
         std::printf("retrigger\n");
     } else if (c == 'm') {
         simulation.mode = next_mode(simulation.mode);
@@ -195,6 +206,14 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     // Never wait from the real-time thread while the UI swaps sample ownership.
     std::unique_lock<std::mutex> lock(g_audioMutex, std::try_to_lock);
     if (!lock.owns_lock()) return;
+
+    static int appliedSpeedPercent = 100;
+    const int targetSpeedPercent = g_speedPercent.load();
+    if (targetSpeedPercent != appliedSpeedPercent) {
+        const float speed = static_cast<float>(targetSpeedPercent) / 100.0f;
+        g_voices.setPadSpeed(kSpacePadId, speed);
+        appliedSpeedPercent = targetSpeedPercent;
+    }
 
     constexpr std::size_t kRenderBlock = 512;
     std::array<float, kRenderBlock> tmpL{};
@@ -301,7 +320,7 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "impossible d'ouvrir l'apercu OLED\n");
     }
 
-    std::printf("1-5 vitesse | espace retrigger | b browser | j/k naviguer | entree charger | retour remonter | q quitter\n");
+    std::printf("z/x vitesse -/+5%% | c 100%% | espace retrigger | b browser | j/k naviguer | entree charger | retour remonter | q quitter\n");
     key_loop(screen, preview, state);
 
     ma_device_uninit(&device);

@@ -85,6 +85,19 @@ int main() {
     assert(std::any_of(screen.buffer().begin(), screen.buffer().end(),
                        [](std::uint8_t byte) { return byte != 0; }));
 
+    screen.showPerformance();
+    screen.showParameter("speed", 100, 25, 400, 6000, "%");
+    screen.render(6000);
+    const ScreenUi::Buffer percentValue = screen.buffer();
+    screen.showParameter("speed", 100, 25, 400, 6000);
+    screen.render(6000);
+    assert(screen.buffer() != percentValue);
+
+    screen.showParameter("speed", 400, 25, 400, 6000, "%");
+    screen.render(6000);
+    assert(std::any_of(screen.buffer().begin(), screen.buffer().end(),
+                       [](std::uint8_t byte) { return byte != 0; }));
+
     assert(!screen.pixel(-1, 0));
     assert(!screen.pixel(ScreenUi::kWidth, 0));
     std::printf("screen_ui: ok\n");

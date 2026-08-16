@@ -6,12 +6,14 @@
 bool VoiceManager::trigger(PadId padId, PcmView pcm, std::size_t startFrame,
                            std::size_t endFrame, float userSpeed) {
     if (!pcm.valid() || startFrame >= endFrame || endFrame > pcm.frameCount() ||
-        outputSampleRate_ == 0 || !std::isfinite(userSpeed) || userSpeed <= 0.0f) {
+        outputSampleRate_ == 0 || !std::isfinite(userSpeed) ||
+        userSpeed < kMinUserSpeed || userSpeed > kMaxUserSpeed) {
         return false;
     }
 
-    const float sourceStep = userSpeed * static_cast<float>(pcm.sampleRate) /
-                             static_cast<float>(outputSampleRate_);
+    const float sourceRateRatio = static_cast<float>(pcm.sampleRate) /
+                                  static_cast<float>(outputSampleRate_);
+    const float sourceStep = userSpeed * sourceRateRatio;
     if (!std::isfinite(sourceStep) || sourceStep <= 0.0f) return false;
 
     Voice* selected = nullptr;
@@ -42,7 +44,25 @@ bool VoiceManager::trigger(PadId padId, PcmView pcm, std::size_t startFrame,
     selected->player.trigger();
     selected->padId = padId;
     selected->age = nextAge_++;
+    selected->sourceRateRatio = sourceRateRatio;
     return true;
+}
+
+bool VoiceManager::setPadSpeed(PadId padId, float userSpeed) {
+    if (!std::isfinite(userSpeed) || userSpeed < kMinUserSpeed ||
+        userSpeed > kMaxUserSpeed) {
+        return false;
+    }
+
+    for (Voice& voice : voices_) {
+        if (!voice.player.isPlaying() || voice.padId != padId) continue;
+
+        const float sourceStep = userSpeed * voice.sourceRateRatio;
+        if (!std::isfinite(sourceStep) || sourceStep <= 0.0f) return false;
+        voice.player.setSpeed(sourceStep);
+        return true;
+    }
+    return false;
 }
 
 void VoiceManager::render(float* outL, float* outR, int numFrames) {

@@ -31,6 +31,15 @@ WavData makeSegmentedWav() {
     return wav;
 }
 
+WavData makeLongSegmentedWav() {
+    WavData wav;
+    wav.sampleRate = 48000;
+    wav.channels = 1;
+    wav.samples.insert(wav.samples.end(), 400, 1000);
+    wav.samples.insert(wav.samples.end(), 400, 2000);
+    return wav;
+}
+
 void testViewAndRanges() {
     WavData wav = makeSegmentedWav();
     const PcmView first = wav.view();
@@ -175,6 +184,75 @@ void testNativeSampleRatesAndUserSpeed() {
             "user speed must multiply the sample-rate source step");
 }
 
+void testLiveSpeedChangeKeepsPlaybackPosition() {
+    WavData wav;
+    wav.sampleRate = 48000;
+    wav.channels = 1;
+    for (int frame = 0; frame < 300; ++frame) {
+        wav.samples.push_back(static_cast<int16_t>(frame * 100));
+    }
+
+    VoiceManager manager(48000);
+    require(manager.trigger(9, wav.view(), 0, wav.view().frameCount(), 1.0f),
+            "ramp sample must trigger");
+
+    float left[10]{};
+    float right[10]{};
+    manager.render(left, right, 10);
+    require(manager.setPadSpeed(9, 2.0f), "active pad speed must update");
+
+    float nextLeft = 0.0f;
+    float nextRight = 0.0f;
+    manager.render(&nextLeft, &nextRight, 1);
+    require(near(nextLeft, 1000.0f / 32768.0f),
+            "live speed change must continue from the current playback position");
+}
+
+void testLiveSpeedRampConvergesAfter128Frames() {
+    WavData wav;
+    wav.sampleRate = 48000;
+    wav.channels = 1;
+    for (int frame = 0; frame < 400; ++frame) {
+        wav.samples.push_back(static_cast<int16_t>(frame * 50));
+    }
+
+    SamplePlayer player;
+    player.setSample(wav.view(), 0, wav.view().frameCount());
+    player.setSpeed(1.0f);
+    player.trigger();
+
+    float initialLeft = 0.0f;
+    float initialRight = 0.0f;
+    player.render(&initialLeft, &initialRight, 1);
+    player.setSpeed(2.0f);
+
+    float left[130]{};
+    float right[130]{};
+    player.render(left, right, 130);
+    require(near(left[0], 50.0f / 32768.0f),
+            "speed ramp must start from the current speed");
+    require(near(left[64], 4037.5f / 32768.0f),
+            "speed ramp must progress linearly at its midpoint");
+    require(near(left[128], 9625.0f / 32768.0f),
+            "speed ramp must reach its target after 128 frames");
+    require(near(left[129], 9725.0f / 32768.0f),
+            "speed must remain at the target after the ramp");
+}
+
+void testLiveSpeedChangeOnlyAffectsSelectedPad() {
+    WavData wav = makeLongSegmentedWav();
+    VoiceManager manager(48000);
+    require(manager.trigger(7, wav.view(), 0, 400, 1.0f), "first pad must trigger");
+    require(manager.trigger(8, wav.view(), 400, 800, 1.0f), "second pad must trigger");
+    require(manager.setPadSpeed(8, 4.0f), "selected pad speed must update");
+
+    float left[160]{};
+    float right[160]{};
+    manager.render(left, right, 160);
+    require(near(left[159], 1000.0f / 32768.0f),
+            "unselected pad must keep playing at its previous speed");
+}
+
 void testInvalidRatesAndSpeeds() {
     WavData wav = makeSegmentedWav();
     VoiceManager invalidOutput(0);
@@ -192,6 +270,28 @@ void testInvalidRatesAndSpeeds() {
     require(!manager.trigger(0, wav.view(), 0, 20,
                              std::numeric_limits<float>::infinity()),
             "non-finite user speed must be rejected");
+    require(!manager.trigger(0, wav.view(), 0, 20, 0.20f),
+            "speed below the performance range must be rejected");
+    require(!manager.trigger(0, wav.view(), 0, 20, 4.05f),
+            "speed above the performance range must be rejected");
+
+    require(manager.trigger(3, wav.view(), 0, 20, 1.0f),
+            "valid speed must still trigger");
+    require(!manager.setPadSpeed(3, 0.20f), "low live speed must be rejected");
+    require(!manager.setPadSpeed(3, std::numeric_limits<float>::infinity()),
+            "non-finite live speed must be rejected");
+    require(!manager.setPadSpeed(99, 1.0f), "inactive pad must not report an update");
+
+    manager.stopAll();
+    require(manager.trigger(4, wav.view(), 0, 20, VoiceManager::kMinUserSpeed),
+            "minimum performance speed must be accepted");
+    require(manager.setPadSpeed(4, VoiceManager::kMaxUserSpeed),
+            "maximum live speed must be accepted");
+    manager.stopAll();
+    require(manager.trigger(5, wav.view(), 0, 20, VoiceManager::kMaxUserSpeed),
+            "maximum performance speed must be accepted");
+    require(manager.setPadSpeed(5, VoiceManager::kMinUserSpeed),
+            "minimum live speed must be accepted");
 }
 }  // namespace
 
@@ -201,6 +301,9 @@ int main() {
     testClampAndZeroFill();
     testPadRetriggerAndDistinctPadMix();
     testNativeSampleRatesAndUserSpeed();
+    testLiveSpeedChangeKeepsPlaybackPosition();
+    testLiveSpeedRampConvergesAfter128Frames();
+    testLiveSpeedChangeOnlyAffectsSelectedPad();
     testInvalidRatesAndSpeeds();
     std::cout << "All portable audio engine tests passed\n";
     return 0;
