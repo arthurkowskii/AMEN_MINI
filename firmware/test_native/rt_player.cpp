@@ -2,7 +2,7 @@
 // Le PC joue le rôle du Teensy : la lib audio appelle render() comme le
 // callback du codec le fera. Le clavier simule la face avant de la machine :
 //   numpad 1-6  = pads voix : appui = joue le break, maintien = navigateur SD
-//   numpad 7-9  = pads FX : maintien = écran FX (BLANK par défaut)
+//   numpad 7-9  = pads FX : maintien = active le FX assigné
 //   F1-F7       = sélectionne l'encodeur actif (E1..E7)
 //   flèches     = tournent l'encodeur sélectionné
 //   entrée      = clique l'encodeur sélectionné
@@ -17,6 +17,7 @@
 #include "sample_catalog_scanner.h"
 #include "screen_preview.h"
 #include "screen_ui.h"
+#include "fx/live_repeat.h"
 #include "voice_manager.h"
 #include "wav_loader.h"
 
@@ -40,19 +41,37 @@
 namespace {
 constexpr uint32_t kOutputSampleRate = VoiceManager::kDefaultOutputSampleRate;
 VoiceManager g_voices{kOutputSampleRate};
+constexpr std::size_t kRepeatBufferFrames =
+    LiveRepeat::requiredBufferFrames(kOutputSampleRate);
+std::array<float, kRepeatBufferFrames> g_repeatHistoryL{};
+std::array<float, kRepeatBufferFrames> g_repeatHistoryR{};
+std::array<float, kRepeatBufferFrames> g_repeatFrozenL{};
+std::array<float, kRepeatBufferFrames> g_repeatFrozenR{};
+LiveRepeat g_repeat{kOutputSampleRate,
+                    g_repeatHistoryL.data(),
+                    g_repeatHistoryR.data(),
+                    g_repeatFrozenL.data(),
+                    g_repeatFrozenR.data(),
+                    kRepeatBufferFrames};
 std::atomic<int> g_speedPercent{100};
 std::atomic<int> g_lastPadId{0};
+std::atomic<int> g_repeatAmountPercent{100};
+std::atomic<int> g_repeatDivision{0};
+std::atomic<int> g_bpm{145};
+std::atomic<bool> g_repeatActive{false};
 std::atomic<bool> g_running{true};
 std::mutex g_audioMutex;
 constexpr int kFxCount = 3;
-const char* kFxNames[] = {"BLANK", "TRANCE GATE", "DISPERSER", "RESONATOR"};
-const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 EFFECT", "E4 SPEED",
+constexpr int kRepeatFx = 1;
+const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE"};
+const char* kDivisionNames[] = {"1/4", "1/8", "1/16", "1/32"};
+const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
                                "E5 MODE", "E6 J10", "E7 BPM"};
 
 struct UiSimulation {
     int bpm = 145;
-    int effect = 0;
-    int effectAmount = 5;
+    int effectAmount = 100;
+    int repeatDivision = 0;
     int speedPercent = 100;
     PlaybackMode mode = PlaybackMode::OneShot;
     int lastPadId = 0;
@@ -150,6 +169,19 @@ void set_speed_percent(int speedPercent, ScreenUi& screen, UiSimulation& simulat
     std::printf("vitesse : %d%%\n", simulation.speedPercent);
 }
 
+RepeatDivision repeat_division(int index) {
+    switch (index) {
+        case 1:
+            return RepeatDivision::Eighth;
+        case 2:
+            return RepeatDivision::Sixteenth;
+        case 3:
+            return RepeatDivision::ThirtySecond;
+        default:
+            return RepeatDivision::Quarter;
+    }
+}
+
 #ifdef _WIN32
 const char* mode_label(PlaybackMode mode) {
     switch (mode) {
@@ -206,15 +238,19 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
             break;
         case 2:
             simulation.effectAmount =
-                std::clamp(simulation.effectAmount + direction, 0, 10);
-            screen.showParameter(kFxNames[1 + simulation.effect],
-                                 simulation.effectAmount, 0, 10, time);
+                std::clamp(simulation.effectAmount + direction * 5, 0, 100);
+            g_repeatAmountPercent.store(simulation.effectAmount);
+            screen.showParameter("FX AMOUNT", simulation.effectAmount, 0, 100, time, "%");
+            std::printf("repeat amount : %d%%\n", simulation.effectAmount);
             break;
         case 3:
-            simulation.effect =
-                (simulation.effect + kFxCount + direction) % kFxCount;
-            screen.showParameter(kFxNames[1 + simulation.effect],
-                                 simulation.effectAmount, 0, 10, time);
+            simulation.repeatDivision =
+                (simulation.repeatDivision + direction + 4) % 4;
+            g_repeatDivision.store(simulation.repeatDivision);
+            screen.showParameter(kDivisionNames[simulation.repeatDivision],
+                                  simulation.repeatDivision, 0, 3, time);
+            std::printf("repeat division : %s\n",
+                        kDivisionNames[simulation.repeatDivision]);
             break;
         case 4:
             set_speed_percent(simulation.speedPercent + 5 * direction, screen,
@@ -230,6 +266,7 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
             break;
         case 7:
             simulation.bpm = std::clamp(simulation.bpm + direction, 20, 300);
+            g_bpm.store(simulation.bpm);
             screen.showParameter("BPM", simulation.bpm, 20, 300, time);
             break;
         default:
@@ -243,6 +280,7 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
         case 1:
             if (simulation.heldFxPad >= 0) {
                 simulation.fxAssign[simulation.heldFxPad] = simulation.fxCandidate;
+                g_repeatActive.store(simulation.fxCandidate == kRepeatFx);
                 screen.showFxPad(7 + simulation.heldFxPad,
                                  kFxNames[simulation.fxCandidate], 1);
                 std::printf("pad %d : FX = %s\n", 7 + simulation.heldFxPad,
@@ -287,6 +325,7 @@ void voice_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation,
 void fx_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation) {
     simulation.heldFxPad = pad;
     simulation.fxCandidate = simulation.fxAssign[pad];
+    g_repeatActive.store(simulation.fxCandidate == kRepeatFx);
     screen.showFxPad(7 + pad, kFxNames[simulation.fxCandidate],
                      simulation.selectedEncoder);
     std::printf("pad %d : %s\n", 7 + pad, kFxNames[simulation.fxCandidate]);
@@ -295,6 +334,7 @@ void fx_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation) {
 void fx_pad_up(int pad, ScreenUi& screen, UiSimulation& simulation,
                AppState& state) {
     if (simulation.heldFxPad != pad) return;
+    g_repeatActive.store(false);
     simulation.heldFxPad = -1;
     if (state.browserActive) {
         refresh_browser(screen, state);
@@ -442,21 +482,24 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
     } else if (c == 'm') {
         simulation.mode = next_mode(simulation.mode);
     } else if (c == 'e') {
-        simulation.effect = (simulation.effect + 1) % kFxCount;
-        screen.showParameter(kFxNames[1 + simulation.effect],
-                             simulation.effectAmount, 0, 10, time);
+        simulation.repeatDivision = (simulation.repeatDivision + 1) % 4;
+        g_repeatDivision.store(simulation.repeatDivision);
+        screen.showParameter(kDivisionNames[simulation.repeatDivision],
+                             simulation.repeatDivision, 0, 3, time);
     } else if (c == '[') {
-        simulation.effectAmount = std::max(0, simulation.effectAmount - 1);
-        screen.showParameter(kFxNames[1 + simulation.effect],
-                             simulation.effectAmount, 0, 10, time);
+        simulation.effectAmount = std::max(0, simulation.effectAmount - 5);
+        g_repeatAmountPercent.store(simulation.effectAmount);
+        screen.showParameter("FX AMOUNT", simulation.effectAmount, 0, 100, time, "%");
     } else if (c == ']') {
-        simulation.effectAmount = std::min(10, simulation.effectAmount + 1);
-        screen.showParameter(kFxNames[1 + simulation.effect],
-                             simulation.effectAmount, 0, 10, time);
+        simulation.effectAmount = std::min(100, simulation.effectAmount + 5);
+        g_repeatAmountPercent.store(simulation.effectAmount);
+        screen.showParameter("FX AMOUNT", simulation.effectAmount, 0, 100, time, "%");
     } else if (c == '-') {
         simulation.bpm = std::max(20, simulation.bpm - 1);
+        g_bpm.store(simulation.bpm);
     } else if (c == '+' || c == '=') {
         simulation.bpm = std::min(300, simulation.bpm + 1);
+        g_bpm.store(simulation.bpm);
     }
 }
 
@@ -495,11 +538,36 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     if (!lock.owns_lock()) return;
 
     static int appliedSpeedPercent = 100;
+    static int appliedAmountPercent = -1;
+    static int appliedDivision = -1;
+    static int appliedBpm = -1;
+    static bool appliedRepeatActive = false;
     const int targetSpeedPercent = g_speedPercent.load();
     if (targetSpeedPercent != appliedSpeedPercent) {
         const float speed = static_cast<float>(targetSpeedPercent) / 100.0f;
         g_voices.setPadSpeed(g_lastPadId.load(), speed);
         appliedSpeedPercent = targetSpeedPercent;
+    }
+
+    const int targetAmountPercent = g_repeatAmountPercent.load();
+    if (targetAmountPercent != appliedAmountPercent) {
+        g_repeat.setAmount(static_cast<float>(targetAmountPercent) / 100.0f);
+        appliedAmountPercent = targetAmountPercent;
+    }
+    const int targetDivision = g_repeatDivision.load();
+    if (targetDivision != appliedDivision) {
+        g_repeat.setDivision(repeat_division(targetDivision));
+        appliedDivision = targetDivision;
+    }
+    const int targetBpm = g_bpm.load();
+    if (targetBpm != appliedBpm) {
+        g_repeat.setBpm(static_cast<float>(targetBpm));
+        appliedBpm = targetBpm;
+    }
+    const bool targetRepeatActive = g_repeatActive.load();
+    if (targetRepeatActive != appliedRepeatActive) {
+        g_repeat.setActive(targetRepeatActive);
+        appliedRepeatActive = targetRepeatActive;
     }
 
     constexpr std::size_t kRenderBlock = 512;
@@ -509,6 +577,7 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     while (rendered < frames) {
         const std::size_t count = std::min<std::size_t>(kRenderBlock, frames - rendered);
         g_voices.render(tmpL.data(), tmpR.data(), static_cast<int>(count));
+        g_repeat.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         for (std::size_t i = 0; i < count; ++i) {
             dst[(rendered + i) * 2] = tmpL[i];
             dst[(rendered + i) * 2 + 1] = tmpR[i];
@@ -565,8 +634,8 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "impossible d'ouvrir l'apercu OLED\n");
     }
 
-    std::printf("numpad 1-6 : pads voix (maintien = navigateur SD) | numpad 7-9 : pads FX | F1-F7 : encodeurs\n");
-    std::printf("fleches : tourner l'encodeur selectionne | entree : cliquer | espace : retrigger | retour : parent | q : quitter\n");
+    std::printf("numpad 1-6 : pads voix (maintien = navigateur SD) | numpad 7-9 : pads FX (maintien = activation)\n");
+    std::printf("F1-F7 : encodeurs | E2 amount | E3 division Repeat | E7 BPM | entree : clic | q : quitter\n");
     key_loop(screen, preview, state);
 
     ma_device_uninit(&device);

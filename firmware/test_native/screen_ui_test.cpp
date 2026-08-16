@@ -13,7 +13,7 @@ int main() {
     assert(std::any_of(performance.begin(), performance.end(),
                        [](std::uint8_t byte) { return byte != 0; }));
 
-    screen.showParameter("disperser", 7, 0, 10, 100);
+    screen.showParameter("repeat", 7, 0, 10, 100);
     screen.render(1099);
     assert(screen.buffer() != performance);
 
@@ -110,7 +110,7 @@ int main() {
     screen.render(7000);
     assert(screen.buffer() != fxBlank);
 
-    screen.showFxPad(7, "RESONATOR", 1);
+    screen.showFxPad(7, "REVERSE", 1);
     screen.render(7000);
     assert(screen.buffer() != fxBlank);
 

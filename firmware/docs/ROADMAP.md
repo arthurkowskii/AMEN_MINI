@@ -16,7 +16,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - Format interne : **int16 partout** (WavData.samples = vector<int16_t>), stéréo conservée à la fréquence native du WAV ; sortie moteur à 44,1 kHz.
   Les buffers de sortie render() sont des floats dans [-1, 1] (division par 32768).
 - Tests PC : `firmware/test_native/` — miniaudio (header-only) dans `test_native/third_party/`.
-  Compile + écoute Windows : `g++ -std=c++17 -O2 test_native/rt_player.cpp test_native/sample_catalog_scanner.cpp test_native/screen_preview.cpp src/browser/sample_catalog.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp src/engine/voice_manager.cpp src/ui/screen_ui.cpp -I src/browser -I src/engine -I src/ui -I test_native -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm -lgdi32 -luser32` puis `amen_rt.exe test_native/test.wav` (numpad 1-6 = pads voix, maintien = navigateur SD ; numpad 7-9 = pads FX, maintien = écran FX avec BLANK par défaut ; F1-F7 = sélection de l'encodeur, flèches = tourner l'encodeur sélectionné, Entrée = cliquer ; E1 = navigation duale — voix = carte SD, FX = liste des effets, clic = charger/assigner, BLANK désassigne ; E2 = intensité effet, E3 = cycle effet, E4 = vitesse ±5 % avec clic = 100 %, E5 = mode, E6 = réservé J10, E7 = BPM ; espace = retrigger du dernier pad, Retour arrière = dossier parent, q = quitter). Le visualiseur reproduit le framebuffer OLED 128×32 dans une fenêtre 640×160 ; les illustrations sont encore des emplacements réservés.
+  Compile + écoute Windows : `g++ -std=c++17 -O2 test_native/rt_player.cpp test_native/sample_catalog_scanner.cpp test_native/screen_preview.cpp src/browser/sample_catalog.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp src/engine/voice_manager.cpp src/engine/fx/live_repeat.cpp src/ui/screen_ui.cpp -I src/browser -I src/engine -I src/ui -I test_native -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm -lgdi32 -luser32` puis `amen_rt.exe test_native/test.wav`. Les contrôles détaillés et à jour sont dans `docs/CONTROLS.md`.
 - Le moteur ne touche JAMAIS au matériel. Tout ce qui est Teensy (SD, PSRAM, GPIO, Audio Library) vit dans la couche Teensy (firmware.ino + src/teensy/).
 - Définition de fait globale : compile sans warning (g++ -Wall -Wextra) + vérification numérique/écoute + push sur dev.
 
@@ -92,14 +92,21 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : changer le BPM recalcule les retrigs en live ; le morph glisse d'une slice à l'autre sans saut.
 - Vérification : écoute au métronome (BPM 80-140) + vérif des périodes de retrig par analyse.
 
-## J10 — Effets expérimentaux jouables [À FAIRE] — P1
+## J10 — Live FX Repeat V1 [IMPLÉMENTÉ — ÉCOUTE À TESTER] — P1
 
-- Objectif septembre : trois familles originales et fiables plutôt que huit effets génériques — trance gate, disperser de phase all-pass et résonateur harmonique accordable. Les 8 pads fx pourront rappeler des variantes/presets ; le mapping final dépendra des tests d'écoute.
-- Fichiers : `src/engine/fx/` (un fichier par famille), intégration dans le mix, paramètres exposés à l'UI.
-- Spec : trance gate = pattern synchronisé au BPM, profondeur et transitions lissées ; disperser = cascade de filtres all-pass sans traitement FFT, quantité/fréquence/spread/mix ; résonateur = banque de filtres accordée sur une fondamentale et une gamme choisies, decay/couleur/mix. Pad fx maintenu = effet actif et les 4 encodeurs du haut pilotent ses paramètres. Relâchement sans clic via rampes courtes.
-- DoD : les trois familles produisent des résultats clairement distincts, expressifs sur un Amen Break, sans dropout ni clic d'activation. L'utilisation CPU maximale est mesurée sur Teensy avant d'ajouter une quatrième famille.
-- Vérification : tests numériques des enveloppes/filtres + écoute dans `rt_player` + `AudioProcessorUsageMax()` sur Teensy.
-- Après septembre / R&D : spectral gate STFT et frequency stretching conscient de la fondamentale. Ne pas en faire une dépendance de la démo tant que latence, suivi de fondamentale et coût CPU ne sont pas mesurés.
+- Liste verrouillée : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`. Reverse et Trance Gate restent assignables sans DSP pour l'instant.
+- Fichiers : `src/engine/fx/live_repeat.h/.cpp`, test ciblé `test_native/live_repeat_test.cpp`, intégration après le mix global de `VoiceManager` dans `rt_player`.
+- Spec Repeat : le maintien du pad capture et boucle l'audio immédiatement antérieur à l'appui. E2 règle le dry/wet (100 % par défaut). E3 sélectionne dynamiquement `1/4`, `1/8`, `1/16`, `1/32` (défaut `1/4`). E7 recalcule la longueur au BPM live. E4 reste exclusivement la vitesse sample.
+- Temps réel : `LiveRepeat` n'alloue aucune mémoire et reçoit de l'appelant quatre buffers float (historique/copie gelée stéréo) avec leur capacité. `requiredBufferFrames(sampleRate)` dimensionne le pire cas `1/4` à 20 BPM ; la future couche Teensy pourra fournir ces zones depuis la PSRAM. Activation, relâchement, amount et changement de longueur utilisent des transitions de 128 frames, et chaque couture périodique est lissée sans changer la période BPM. Le segment initial reste intact pendant un maintien prolongé.
+- Vérification native : `g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic test_native/live_repeat_test.cpp src/engine/fx/live_repeat.cpp -I src/engine -o live_repeat_test.exe` puis exécuter le test. Les tests numériques et le build Windows passent, mais le Repeat n'a pas encore été testé à l'écoute par Arthur. Le lancement de `start_firmware.ps1` vérifie uniquement que le harness démarre, pas la qualité sonore de l'effet.
+- Reste matériel : brancher le même processeur après le mix dans le futur `AudioStream`, allouer ses quatre buffers en PSRAM, mesurer `AudioProcessorUsageMax()` et écouter les transitions sur Teensy. Aucune mesure Teensy n'a encore été réalisée.
+
+### Checkpoint 16/08/2026 — Live FX Repeat V1
+
+- Direction Live FX mise à jour : `REPEAT`, `REVERSE`, `TRANCE GATE` ; Disperser et Resonator sont retirés. Reverse et Trance Gate restent sans DSP.
+- Repeat implémenté après le mix global : capture de l'audio précédant l'appui, défaut `1/4` et 100 % wet, E2 = dry/wet, E3 = `1/4` / `1/8` / `1/16` / `1/32`, E7 = BPM live.
+- Contrôles centralisés dans `docs/CONTROLS.md`. Le processeur reçoit des buffers externes pour permettre leur futur placement en PSRAM et n'alloue rien pendant le traitement.
+- Vérifié uniquement par tests automatisés natifs, compilation du harness et démarrage de `start_firmware.ps1`. **Non testé à l'écoute et non testé sur Teensy : validation fonctionnelle en attente.**
 
 ## J11 — Séquenceur minimal [À FAIRE] — P2
 
@@ -121,7 +128,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 - Objectif : les 7 encodeurs en pages (pad / globale / browser) + USB-MIDI.
 - Fichiers : logique portable `src/ui/` et `src/browser/`, backends PC `test_native/screen_preview.cpp` et `sample_catalog_scanner.cpp`, futur backend OLED/SD/MIDI sous `src/teensy/`.
-- Spec contrôles : les 4 encodeurs du haut sont contextuels ; les encodeurs latéraux gardent Mode et BPM (le rôle Browser est porté par E1). Mode cible le dernier chop joué ; chaque chop mémorise son mode (one-shot / loop / granular / slice-sync) et une pression sur Mode applique le mode courant aux 12 chops. Pad fx maintenu : E1 navigue la liste des FX (clic = assigne, BLANK désassigne) et les autres encodeurs du haut pilotent les paramètres de l'effet. E1 sur une voice : navigation SD (clic = charger). Shift = couche secondaire (volume, tap tempo, etc.). USB-MIDI : notes sur les pads (canal configurable), CC sur les encodeurs.
+- Spec contrôles : E1 porte la navigation duale (voice = SD, FX = liste et assignation). E2 règle l'amount dry/wet du Repeat, E3 sa division, E4 reste la vitesse sample, E5 le mode, E6 est réservé et E7 le BPM. Mode cible le dernier chop joué ; chaque chop mémorise son mode. Shift = couche secondaire (volume, tap tempo, etc.). USB-MIDI : notes sur les pads (canal configurable), CC sur les encodeurs. Voir `docs/CONTROLS.md`.
 - Spec écran : framebuffer monochrome 128×32 portable. Au repos : nom du break, BPM et mode du chop sélectionné. Tout changement de paramètre ouvre un overlay pendant 1 s, avec zone 32×32 réservée au symbole/illustration, nom technique lisible et valeur forte. Direction artistique : anges, ailes, croix et auréoles ; 3 états visuels (calme / tendu / furieux) et micro-animations ponctuelles, à produire après validation fonctionnelle. Les pages utilitaires (browser, erreurs) privilégient la lisibilité.
 - Spec browser : la racine et chaque dossier affichent leurs WAV directs et uniquement les sous-dossiers ayant au moins un WAV descendant. L'arborescence et la casse d'affichage de la carte sont conservées ; comparaisons et extension `.wav` sont insensibles à la casse. La sélection charge un seul WAV à la fois sans dupliquer le PCM entre les pads/voix.
 - DoD : le visualiseur PC suit les contrôles et revient à l'écran Performance 1 s après un overlay ; on navigue dans la SD depuis le browser et on charge un break sans reboot ; le BPM se règle live ; un DAW reçoit les notes.
@@ -145,10 +152,10 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 ### Checkpoint 16/08/2026 (session 2) — simulation face avant PC
 
 - Commit fonctionnel : `fe80716` (`feat: simulate front-panel pads, fx pads and encoders`) sur `dev`.
-- Concept verrouillé (à reprendre par le prochain agent) : la face avant se simule au clavier — numpad 1-6 = pads voix (appui = trigger du break, maintien = navigateur SD), numpad 7-9 = pads FX (maintien = écran FX, BLANK par défaut). Les 7 encodeurs physiques sont accessibles via F1-F7 ; les flèches tournent l'encodeur sélectionné, Entrée le clique. E1 = encodeur de navigation fixe : sur une voice il navigue la carte SD (clic = entrer dans un dossier / charger), sur un pad FX il navigue la liste des FX (clic = assigne, naviguer vers BLANK désassigne). Rôles des autres encodeurs : E2 = intensité effet, E3 = cycle effet, E4 = vitesse ±5 % (clic = 100 %), E5 = mode (clic = applique aux 12 chops), E6 = réservé J10, E7 = BPM. Les anciennes touches placeholder (z/x/c, m, e, [/], -/+, b, j/k) sont supprimées du chemin Windows ; le chemin POSIX garde les touches héritées.
+- Face avant PC : numpad 1-6 = pads voix (appui = trigger du break, maintien = navigateur SD), numpad 7-9 = pads FX (maintien = activation). F1-F7 sélectionnent l'encodeur, les flèches le tournent et Entrée le clique. E1 navigue/assigne, E2 règle le dry/wet Repeat, E3 sa division, E4 la vitesse sample, E5 le mode, E6 est réservé et E7 règle le BPM. `docs/CONTROLS.md` remplace ce checkpoint comme source détaillée des contrôles.
 - Le maintien des pads est réel sous Windows (polling `GetAsyncKeyState` sur VK_NUMPAD1..9, indépendant du NumLock, front détecté toutes les 10 ms) ; l'écran « PAD n » (`ScreenUi::showFxPad`) affiche le nom du FX en grand et un hint dépendant de l'encodeur sélectionné (E1 = « E1 NAV CLIC ASSIGN », sinon « F1 POUR E1 »).
 - Le sim PC est une réduction de la machine : 6 pads voix au lieu de 12 chops (J5 pas fait — tous déclenchent le break entier) et 3 pads FX au lieu de 8 ; le pool reste à 4 voix avec vol de la plus ancienne (J3). Le mapping physique E1-E7 sur le panneau reste à confirmer une fois le câblage défini.
-- Prochaines étapes : la priorité reste J12/J4 (couche `src/teensy/`, `WavReader` SD, arène PSRAM) comme indiqué au checkpoint précédent. Côté interaction, le chantier logique suivant est J5 (slices — les pads voix jouent des chops distincts), puis J10 (DSP des 3 familles FX branchées sur les pads FX et les encodeurs E2-E4).
+- Prochaines étapes : la priorité reste J12/J4 (couche `src/teensy/`, `WavReader` SD, arène PSRAM) comme indiqué au checkpoint précédent. Côté interaction, le chantier logique suivant est J5 (slices — les pads voix jouent des chops distincts). Le Repeat natif est prêt ; Reverse et Trance Gate restent sans DSP.
 
 ## J14 — Polish, démo, git [À FAIRE] — P1
 
@@ -158,5 +165,5 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 ## Priorités
 
-- P1 (chemin critique démo) : J3, J4, J5, J7, J10 limité aux 3 familles validées, J12, J13, J14.
+- P1 (chemin critique démo) : J3, J4, J5, J7, J10 Repeat V1, J12, J13, J14.
 - P2 (glisse après rentrée si retard, la démo tient quand même) : J6, J8, J9, J11 et effets R&D de J10.

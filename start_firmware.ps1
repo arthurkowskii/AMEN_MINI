@@ -74,13 +74,13 @@ Write-Host "sequenceur pret."
 Write-Host ""
 Write-Host "  CONTROLES" -ForegroundColor Yellow
 Write-Host "  pads voix   numpad 1-6   appui = joue le break | maintien = navigateur SD" -ForegroundColor Cyan
-Write-Host "  pads FX     numpad 7-9   maintien = ecran FX (BLANK par defaut)" -ForegroundColor Cyan
+Write-Host "  pads FX     numpad 7-9   maintien = active le FX assigne" -ForegroundColor Cyan
 Write-Host "  encodeurs   F1-F7        selectionner l'encodeur actif" -ForegroundColor Cyan
 Write-Host "              fleches H/B  tourner l'encodeur selectionne" -ForegroundColor Cyan
 Write-Host "              entree       cliquer l'encodeur selectionne" -ForegroundColor Cyan
 Write-Host "  roles       E1 NAV : voix = carte SD, FX = liste d'effets, clic = charger/assigner" -ForegroundColor Cyan
-Write-Host "              E2 intensite | E3 effet | E4 vitesse (+/-5%, clic = 100%)" -ForegroundColor Cyan
-Write-Host "              E5 mode | E6 reserve J10 | E7 BPM" -ForegroundColor Cyan
+Write-Host "              E2 Repeat dry/wet | E3 division 1/4-1/32 | E4 vitesse sample" -ForegroundColor Cyan
+Write-Host "              E5 mode | E6 reserve | E7 BPM (recalcule Repeat en live)" -ForegroundColor Cyan
 Write-Host "  divers      espace = retrigger dernier pad | retour = dossier parent | q = quitter" -ForegroundColor Cyan
 Write-Host ""
 
