@@ -66,7 +66,7 @@ std::mutex g_audioMutex;
 constexpr int kFxCount = 3;
 constexpr int kRepeatFx = 1;
 const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE"};
-const char* kDivisionNames[] = {"1/4", "1/8", "1/16", "1/32"};
+const char* kDivisionNames[] = {"1/4", "1/8", "1/12", "1/16", "1/24", "1/32"};
 const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
                                "E5 MODE", "E6 J10", "E7 BPM"};
 
@@ -227,8 +227,12 @@ RepeatDivision repeat_division(int index) {
         case 1:
             return RepeatDivision::Eighth;
         case 2:
-            return RepeatDivision::Sixteenth;
+            return RepeatDivision::EighthTriplet;
         case 3:
+            return RepeatDivision::Sixteenth;
+        case 4:
+            return RepeatDivision::SixteenthTriplet;
+        case 5:
             return RepeatDivision::ThirtySecond;
         default:
             return RepeatDivision::Quarter;
@@ -289,10 +293,10 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
             break;
         case 3:
             simulation.repeatDivision =
-                (simulation.repeatDivision + direction + 4) % 4;
+                (simulation.repeatDivision + direction + 6) % 6;
             g_repeatDivision.store(simulation.repeatDivision);
             screen.showParameter(kDivisionNames[simulation.repeatDivision],
-                                  simulation.repeatDivision, 0, 3, time);
+                                  simulation.repeatDivision, 0, 5, time);
             std::printf("repeat division : %s\n",
                         kDivisionNames[simulation.repeatDivision]);
             break;
@@ -588,10 +592,10 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
         simulation.pads[simulation.lastPadId].mode =
             next_mode(simulation.pads[simulation.lastPadId].mode);
     } else if (c == 'e') {
-        simulation.repeatDivision = (simulation.repeatDivision + 1) % 4;
+        simulation.repeatDivision = (simulation.repeatDivision + 1) % 6;
         g_repeatDivision.store(simulation.repeatDivision);
         screen.showParameter(kDivisionNames[simulation.repeatDivision],
-                             simulation.repeatDivision, 0, 3, time);
+                             simulation.repeatDivision, 0, 5, time);
     } else if (c == '[') {
         simulation.effectAmount = std::max(0, simulation.effectAmount - 5);
         g_repeatAmountPercent.store(simulation.effectAmount);

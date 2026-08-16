@@ -86,6 +86,36 @@ void testDivisionAndBpmChangeLive() {
     require(near(bpmL[159], bpmL[184]), "BPM change must settle to the recalculated period");
 }
 
+void testTripletDivisions() {
+    RepeatFixture fixture;
+    LiveRepeat& repeat = fixture.repeat;
+    repeat.setBpm(60.0f);
+    fillHistory(repeat);
+    repeat.setAmount(1.0f);
+    repeat.setActive(true);
+    float settleL[160]{};
+    float settleR[160]{};
+    repeat.process(settleL, settleR, 160);
+
+    repeat.setDivision(RepeatDivision::EighthTriplet);
+    float triplet8L[200]{};
+    float triplet8R[200]{};
+    repeat.process(triplet8L, triplet8R, 200);
+    require(repeat.loopFrames() == 33,
+            "1/12 (eighth triplet) must loop a third of a beat");
+    require(near(triplet8L[159], triplet8L[192]),
+            "1/12 must settle to its exact triplet period");
+
+    repeat.setDivision(RepeatDivision::SixteenthTriplet);
+    float triplet16L[200]{};
+    float triplet16R[200]{};
+    repeat.process(triplet16L, triplet16R, 200);
+    require(repeat.loopFrames() == 17,
+            "1/24 (sixteenth triplet) must loop a sixth of a beat");
+    require(near(triplet16L[159], triplet16L[176]),
+            "1/24 must settle to its exact triplet period");
+}
+
 void testActivationAmountAndReleaseRamps() {
     RepeatFixture fixture;
     LiveRepeat& repeat = fixture.repeat;
@@ -173,6 +203,7 @@ void testEveryLoopWrapIsSmoothed() {
 int main() {
     testCapturesAudioBeforePress();
     testDivisionAndBpmChangeLive();
+    testTripletDivisions();
     testActivationAmountAndReleaseRamps();
     testLongHoldDoesNotOverwriteCapturedLoop();
     testInsufficientHistoryUsesAvailableAudio();

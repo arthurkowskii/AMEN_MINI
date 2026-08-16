@@ -80,7 +80,7 @@ Write-Host "  encodeurs   F1-F7        selectionner l'encodeur actif" -Foregroun
 Write-Host "              fleches H/B  tourner l'encodeur selectionne" -ForegroundColor Cyan
 Write-Host "              entree       cliquer l'encodeur selectionne" -ForegroundColor Cyan
 Write-Host "  roles       E1 NAV : voix = carte SD, FX = liste d'effets, clic = charger/assigner" -ForegroundColor Cyan
-Write-Host "              E2 Repeat dry/wet | E3 division 1/4-1/32 | E7 BPM (recalcule Repeat en live)" -ForegroundColor Cyan
+Write-Host "              E2 Repeat dry/wet | E3 division 1/4-1/32 + triplets 1/12, 1/24 | E7 BPM (recalcule Repeat en live)" -ForegroundColor Cyan
 Write-Host "              E4 vitesse du pad TENU (clic = 100%) | E5 mode du pad TENU (clic = ONE SHOT)" -ForegroundColor Cyan
 Write-Host "  divers      espace = retrigger dernier pad (sa propre vitesse) | retour = parent | q = quitter" -ForegroundColor Cyan
 Write-Host ""

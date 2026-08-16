@@ -52,7 +52,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : sur PC rien ne change ; sur Teensy, un sketch de test charge un WAV depuis la SD dans la PSRAM et mesure la mémoire libre (RAM interne quasi intacte, PSRAM consommée).
 - Vérification : compile arduino-cli + test réel quand le matériel arrive (sinon : vérification du code + bench RAM sur PC simulé).
 
-## J5 — Slices : découpe + mapping 12 pads [À FAIRE] — P1
+## J5 — Slices : découpe + mapping 12 pads [SUSPENDU] -  P1
 
 - Objectif : découper le break en 12 morceaux jouables depuis les pads.
 - Fichiers : `src/engine/slicer.h` + `slicer.cpp` (découpe), extension SamplePlayer (startFrame/endFrame), test_native.
@@ -176,10 +176,11 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis d'Arthur :
 
-### ✅ ADOPTÉ — Triplets sur E3 (P1 démo)
+### ✅ ADOPTÉ — Triplets sur E3 (P1 démo) — IMPLÉMENTÉ
 
 - La division Repeat passe de `1/4 · 1/8 · 1/16 · 1/32` à `+ 1/12 · 1/24` (roll triplet, geste signature du breakbeat).
-- Coût très faible (un rapport de frames de plus dans `LiveRepeat`). Jouable pour la démo de septembre.
+- Implémenté : 2 valeurs d'enum `EighthTriplet`/`SixteenthTriplet` (scale ×2/3), noms et cycles E3/Linux passés à 6, buffer inchangé (pire cas = `1/4` à 20 BPM), crossfades live existants. Test moteur : 1/12 = 33 frames et 1/24 = 17 frames @ BPM 60 (fixture 100 Hz), périodes exactes.
+- À valider à l'écoute par Arthur.
 
 ### ✅ ADOPTÉ — Skip Back V1 (P2, après démo)
 
@@ -211,3 +212,11 @@ Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis 
 
 - P1 (chemin critique démo) : J3, J4, J5, J7, J10 Repeat V1 + **Triplets E3**, J12, J13, J14.
 - P2 (glisse après rentrée si retard, la démo tient quand même) : J8, J9, J11, **Skip Back 15 s**, **Checkpoint**, effets R&D de J10, recherches suspendues (J6, loop bed, fill).
+
+### Checkpoint 16/08/2026 (session 4) — Triplets Repeat
+
+- Commit : `feat: triplet repeat divisions` sur `dev` (hash à reporter après push).
+- `LiveRepeat` : enum `RepeatDivision` + `EighthTriplet` (1/12) et `SixteenthTriplet` (1/24), `divisionScale()` = 0,5×2/3 et 0,25×2/3. `requiredBufferFrames` inchangé (le pire cas reste `1/4` à 20 BPM) → aucune réserve PSRAM supplémentaire.
+- Harness : `kDivisionNames` à 6 entrées, `repeat_division()` à 6 cases, cycles E3 (Windows) et touche `e` (Linux) modulo 6, overlay `0..5`.
+- Test moteur : `testTripletDivisions` — 1/12 → 33 frames et 1/24 → 17 frames @ BPM 60 (fixture 100 Hz), périodes stabilisées exactes. Tous les tests Live Repeat passent.
+- Vérifié : test natif strict (-Wall -Wextra -Wpedantic), compile harness, smoke run, `start_firmware.ps1`. **Non encore validé à l'écoute par Arthur.**

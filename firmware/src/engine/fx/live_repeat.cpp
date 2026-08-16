@@ -10,8 +10,12 @@ float divisionScale(RepeatDivision division) {
             return 1.0f;
         case RepeatDivision::Eighth:
             return 0.5f;
+        case RepeatDivision::EighthTriplet:
+            return 1.0f / 3.0f;
         case RepeatDivision::Sixteenth:
             return 0.25f;
+        case RepeatDivision::SixteenthTriplet:
+            return 1.0f / 6.0f;
         case RepeatDivision::ThirtySecond:
             return 0.125f;
     }

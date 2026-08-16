@@ -6,7 +6,9 @@
 enum class RepeatDivision : std::uint8_t {
     Quarter,
     Eighth,
+    EighthTriplet,     // 1/12 — croche tripletée (0,5 x 2/3)
     Sixteenth,
+    SixteenthTriplet,  // 1/24 — double-croche tripletée (0,25 x 2/3)
     ThirtySecond,
 };
 

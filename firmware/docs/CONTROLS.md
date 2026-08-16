@@ -15,7 +15,7 @@ Ce document est la source claire des controles de performance actuels. Le harnes
 
 - `E1 NAV` : sur un pad voix maintenu, navigue dans la SD et le clic entre/charge. Sur un pad FX maintenu, navigue dans la liste FX et le clic assigne.
 - `E2 AMOUNT` : mix dry/wet du Repeat, de 0 a 100 %. La valeur par defaut est 100 %.
-- `E3 DIVISION` : longueur du Repeat, choix live `1/4`, `1/8`, `1/16`, `1/32`. La valeur par defaut est `1/4`.
+- `E3 DIVISION` : longueur du Repeat, choix live `1/4`, `1/8`, `1/12`, `1/16`, `1/24`, `1/32` (les `1/12` et `1/24` sont les triplets de croche et de double-croche — le stutter swingue). La valeur par defaut est `1/4`.
 - `E4 SPEED` : vitesse du pad voix **tenu** (plus jamais le "dernier joue"), de 25 a 400 % par pas de 5 %. Appliquee en direct a la voix active du pad (rampe de 128 frames, sans retrigger) et memorisee pour son prochain trigger. Le clic remet **ce pad** a 100 %. Sans pad tenu : hint `E4 TENIR PAD`, aucun effet.
 - `E5 MODE` : mode de lecture du pad voix **tenu** (`ONE SHOT` / `LOOP` / `GRANULAR` / `SLICE SYNC`). Le clic remet ce pad en `ONE SHOT`. Sans pad tenu : hint `E5 TENIR PAD`, aucun effet.
 - `E6 J10` : reserve.
