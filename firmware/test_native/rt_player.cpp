@@ -106,6 +106,7 @@ int main(int argc, char** argv) {
     g_player.setSample(wav);
 
     ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
+
     cfg.playback.format = ma_format_f32;
     cfg.playback.channels = 2;
     cfg.sampleRate = wav.sampleRate;
