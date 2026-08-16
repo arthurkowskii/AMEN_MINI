@@ -117,7 +117,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : compile arduino-cli (`arduino-cli compile --fqbn teensy:avr:teensy41 firmware`) ; sur matériel : son dans le casque, pads déclenchent les voix, encodeurs changent le pitch.
 - Vérification : compile + test réel (matériel attendu fin août).
 
-## J13 — UI pages + USB-MIDI [EN COURS — catalogue/browser PC] — P1
+## J13 — UI pages + USB-MIDI [EN COURS — catalogue/browser + face avant PC] — P1
 
 - Objectif : les 7 encodeurs en pages (pad / globale / browser) + USB-MIDI.
 - Fichiers : logique portable `src/ui/` et `src/browser/`, backends PC `test_native/screen_preview.cpp` et `sample_catalog_scanner.cpp`, futur backend OLED/SD/MIDI sous `src/teensy/`.
@@ -141,6 +141,14 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - Lecture multi-fréquence : `VoiceManager` convertit la vitesse utilisateur en pas source (`speed * sampleRate / outputSampleRate`) ; les WAV mono/stéréo restent en PCM16 à leur fréquence native, sans resampling au chargement ni travail supplémentaire dans le callback.
 - Vitesse performative : plage 25-400 % par pas de 5 %, affichage en pourcentage et rampe de 128 frames. Un changement vise la voix active du dernier pad joué, conserve sa position de lecture et devient la vitesse initiale de son prochain trigger.
 - Retrigger par pad : `VoiceManager::trigger(PadId, ...)` remplace la voix active du même pad au lieu de l'empiler. Les tests couvrent le remplacement par une autre plage, le mix de deux pads distincts et le vol de voix après quatre identités distinctes.
+
+### Checkpoint 16/08/2026 (session 2) — simulation face avant PC
+
+- Commit fonctionnel : `fe80716` (`feat: simulate front-panel pads, fx pads and encoders`) sur `dev`.
+- Concept verrouillé (à reprendre par le prochain agent) : la face avant se simule au clavier — numpad 1-6 = pads voix (appui = trigger du break, maintien = navigateur SD), numpad 7-9 = pads FX (maintien = écran FX, BLANK par défaut). Les 7 encodeurs physiques sont accessibles via F1-F7 ; les flèches tournent l'encodeur sélectionné, Entrée le clique. E1 = encodeur de navigation fixe : sur une voice il navigue la carte SD (clic = entrer dans un dossier / charger), sur un pad FX il navigue la liste des FX (clic = assigne, naviguer vers BLANK désassigne). Rôles des autres encodeurs : E2 = intensité effet, E3 = cycle effet, E4 = vitesse ±5 % (clic = 100 %), E5 = mode (clic = applique aux 12 chops), E6 = réservé J10, E7 = BPM. Les anciennes touches placeholder (z/x/c, m, e, [/], -/+, b, j/k) sont supprimées du chemin Windows ; le chemin POSIX garde les touches héritées.
+- Le maintien des pads est réel sous Windows (polling `GetAsyncKeyState` sur VK_NUMPAD1..9, indépendant du NumLock, front détecté toutes les 10 ms) ; l'écran « PAD n » (`ScreenUi::showFxPad`) affiche le nom du FX en grand et un hint dépendant de l'encodeur sélectionné (E1 = « E1 NAV CLIC ASSIGN », sinon « F1 POUR E1 »).
+- Le sim PC est une réduction de la machine : 6 pads voix au lieu de 12 chops (J5 pas fait — tous déclenchent le break entier) et 3 pads FX au lieu de 8 ; le pool reste à 4 voix avec vol de la plus ancienne (J3). Le mapping physique E1-E7 sur le panneau reste à confirmer une fois le câblage défini.
+- Prochaines étapes : la priorité reste J12/J4 (couche `src/teensy/`, `WavReader` SD, arène PSRAM) comme indiqué au checkpoint précédent. Côté interaction, le chantier logique suivant est J5 (slices — les pads voix jouent des chops distincts), puis J10 (DSP des 3 familles FX branchées sur les pads FX et les encodeurs E2-E4).
 
 ## J14 — Polish, démo, git [À FAIRE] — P1
 
