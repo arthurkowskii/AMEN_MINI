@@ -63,6 +63,44 @@ void copyLabel(std::array<char, Size>& destination, const char* source) {
     }
 }
 
+template <std::size_t Size>
+void copyBrowserLabel(std::array<char, Size>& destination, const char* source,
+                      bool directory) {
+    destination.fill('\0');
+    if (source == nullptr || source[0] == '\0') {
+        source = "UNNAMED";
+    }
+
+    std::size_t sourceLength = 0;
+    while (source[sourceLength] != '\0') {
+        ++sourceLength;
+    }
+
+    const std::size_t suffixLength = directory ? 1U : 0U;
+    const std::size_t available = Size - 1U - suffixLength;
+    const bool truncated = sourceLength > available;
+    const std::size_t textLength = truncated && available >= 2U
+        ? available - 2U
+        : std::min(sourceLength, available);
+
+    for (std::size_t index = 0; index < textLength; ++index) {
+        char character = source[index];
+        if (character >= 'a' && character <= 'z') {
+            character = static_cast<char>(character - 'a' + 'A');
+        }
+        destination[index] = character;
+    }
+
+    std::size_t end = textLength;
+    if (truncated && available >= 2U) {
+        destination[end++] = '.';
+        destination[end++] = '.';
+    }
+    if (directory) {
+        destination[end] = '/';
+    }
+}
+
 const char* modeName(PlaybackMode mode) {
     switch (mode) {
         case PlaybackMode::OneShot:
@@ -96,9 +134,46 @@ void ScreenUi::showParameter(const char* name, int value, int minimum, int maxim
     overlayUntilMs_ = nowMs + kOverlayDurationMs;
 }
 
+void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
+                           std::size_t count, std::size_t selectedIndex) {
+    copyBrowserLabel(browserFolder_,
+                     folderName == nullptr || folderName[0] == '\0'
+                         ? "ROOT"
+                         : folderName,
+                     false);
+    browserLineCount_ = 0;
+    browserSelectedLine_ = 0;
+    browserActive_ = true;
+
+    if (lines == nullptr || count == 0U) {
+        return;
+    }
+
+    const std::size_t selected = std::min(selectedIndex, count - 1U);
+    const std::size_t first = count <= browserLines_.size()
+        ? 0U
+        : std::min(selected == 0U ? 0U : selected - 1U,
+                   count - browserLines_.size());
+    browserLineCount_ = std::min(count, browserLines_.size());
+    browserSelectedLine_ = selected - first;
+
+    for (std::size_t index = 0; index < browserLineCount_; ++index) {
+        const BrowserLine& source = lines[first + index];
+        browserLines_[index].directory = source.directory;
+        copyBrowserLabel(browserLines_[index].name, source.name, source.directory);
+    }
+}
+
+void ScreenUi::showPerformance() {
+    browserActive_ = false;
+    overlayUntilMs_ = 0;
+}
+
 void ScreenUi::render(std::uint64_t nowMs) {
     clear();
-    if (nowMs < overlayUntilMs_) {
+    if (browserActive_) {
+        drawBrowser();
+    } else if (nowMs < overlayUntilMs_) {
         drawParameter();
     } else {
         drawPerformance();
@@ -205,11 +280,13 @@ void ScreenUi::drawParameter() {
     drawRect(0, 0, 32, 32);
     drawText(10, 9, "ART");
 
-    const int range = parameterMaximum_ - parameterMinimum_;
-    const int progress = range == 0 ? 0 :
-        (parameterValue_ - parameterMinimum_) * 58 / range;
+    const std::int64_t range = static_cast<std::int64_t>(parameterMaximum_) -
+                               parameterMinimum_;
+    const std::int64_t offset = static_cast<std::int64_t>(parameterValue_) -
+                                parameterMinimum_;
+    const int progress = range == 0 ? 0 : static_cast<int>(offset * 58 / range);
     const int visualState = range == 0 ? 0 :
-        (parameterValue_ - parameterMinimum_) * 3 / (range + 1);
+        static_cast<int>(offset * 3 / (range + 1));
     for (int state = 0; state < 3; ++state) {
         if (state <= visualState) {
             fillRect(8 + state * 6, 23, 4, 4);
@@ -224,5 +301,23 @@ void ScreenUi::drawParameter() {
     drawRect(38, 24, 60, 6);
     if (progress > 0) {
         fillRect(39, 25, progress, 4);
+    }
+}
+
+void ScreenUi::drawBrowser() {
+    drawText(1, 1, browserFolder_.data());
+    drawHorizontalLine(0, 7, kWidth);
+
+    if (browserLineCount_ == 0U) {
+        drawText(7, 14, "EMPTY");
+        return;
+    }
+
+    constexpr int kLineY[] = {10, 18, 26};
+    for (std::size_t index = 0; index < browserLineCount_; ++index) {
+        if (index == browserSelectedLine_) {
+            fillRect(1, kLineY[index] - 1, 3, 7);
+        }
+        drawText(7, kLineY[index], browserLines_[index].name.data());
     }
 }

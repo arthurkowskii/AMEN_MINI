@@ -30,6 +30,9 @@ $srcs = @(
     Get-Item firmware/test_native/rt_player.cpp
     Get-Item firmware/test_native/screen_preview.cpp
     Get-Item firmware/test_native/screen_preview.h
+    Get-Item firmware/test_native/sample_catalog_scanner.cpp
+    Get-Item firmware/test_native/sample_catalog_scanner.h
+    Get-ChildItem firmware/src/browser -Recurse -Include *.cpp, *.h
     Get-ChildItem firmware/src/engine -Recurse -Include *.cpp, *.h
     Get-ChildItem firmware/src/ui -Recurse -Include *.cpp, *.h
 )
@@ -46,7 +49,7 @@ if ($needsBuild) {
     }
     $cppFiles = $srcs | Where-Object { $_.Extension -eq ".cpp" } | ForEach-Object { $_.FullName }
     $build = & g++ -std=c++17 -O2 -Wno-stringop-overflow -Wno-stringop-overread `
-        -I firmware/src/engine -I firmware/src/ui -I firmware/test_native `
+        -I firmware/src/browser -I firmware/src/engine -I firmware/src/ui -I firmware/test_native `
         -I firmware/test_native/third_party `
         @cppFiles `
         -o firmware/amen_rt.exe @libs 2>&1
@@ -68,7 +71,8 @@ $WavFull = (Resolve-Path $Wav).Path
 Write-Host "echantillon charge : $WavFull" -ForegroundColor Green
 
 Write-Host "sequenceur pret."
-Write-Host "touches : 1-5 vitesse | espace retrigger | m mode | e effet | [/] intensite | -/+ BPM | q quitter" -ForegroundColor Cyan
+Write-Host "touches : 1-5 vitesse | espace retrigger | m mode | e effet | [/] intensite | -/+ BPM" -ForegroundColor Cyan
+Write-Host "          b browser | j/k naviguer | entree charger | retour remonter | q quitter" -ForegroundColor Cyan
 Write-Host ""
 
 Set-Location firmware

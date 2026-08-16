@@ -1,12 +1,27 @@
 #include "sample_player.h"
 
-void SamplePlayer::setSample(const WavData& wav) {
-    wav_ = &wav;
+#include <algorithm>
+#include <cmath>
+
+void SamplePlayer::setSample(PcmView pcm, std::size_t startFrame, std::size_t endFrame) {
+    pcm_ = pcm;
+    startFrame_ = startFrame;
+    endFrame_ = endFrame;
+    playing_ = false;
+
+    if (!pcm_.valid() || startFrame_ >= endFrame_ || endFrame_ > pcm_.frameCount()) {
+        startFrame_ = 0;
+        endFrame_ = 0;
+    }
 }
 
 void SamplePlayer::trigger() {
-    pos_ = 0.0f;
-    playing_ = true;
+    pos_ = static_cast<double>(startFrame_);
+    playing_ = endFrame_ > startFrame_ && std::isfinite(speed_) && speed_ > 0.0f;
+}
+
+void SamplePlayer::stop() {
+    playing_ = false;
 }
 
 void SamplePlayer::setSpeed(float speed) {
@@ -14,35 +29,48 @@ void SamplePlayer::setSpeed(float speed) {
 }
 
 bool SamplePlayer::render(float* outL, float* outR, int numFrames) {
-    if (!playing_ || !wav_) {
-        for (int i = 0; i < numFrames; ++i)
-            outL[i] = outR[i] = 0.0f;
+    if (numFrames <= 0) return playing_;
+
+    std::fill_n(outL, numFrames, 0.0f);
+    std::fill_n(outR, numFrames, 0.0f);
+
+    return renderAdditive(outL, outR, numFrames);
+}
+
+bool SamplePlayer::renderAdditive(float* outL, float* outR, int numFrames) {
+    if (numFrames <= 0) return playing_;
+
+    if (!playing_ || !std::isfinite(speed_) || speed_ <= 0.0f) {
+        playing_ = false;
         return false;
     }
 
-    const auto& samples = wav_->samples;
-    int ch = wav_->channels;
-    int totalFrames = (int)samples.size() / ch;
-
     for (int i = 0; i < numFrames; ++i) {
-        if (pos_ >= totalFrames) {
+        if (pos_ >= static_cast<double>(endFrame_)) {
             playing_ = false;
             break;
         }
 
-        int i0 = (int)pos_;
-        float t = pos_ - i0;
-        int i1 = (i0 + 1 < totalFrames) ? i0 + 1 : i0;
+        const std::size_t i0 = static_cast<std::size_t>(pos_);
+        const float t = static_cast<float>(pos_ - static_cast<double>(i0));
+        const std::size_t i1 = (i0 + 1 < endFrame_) ? i0 + 1 : i0;
+        const std::size_t channels = pcm_.channels;
 
-        outL[i] = (samples[i0 * ch] * (1.0f - t) + samples[i1 * ch] * t) / 32768.0f;
+        const float left = (pcm_.samples[i0 * channels] * (1.0f - t) +
+                            pcm_.samples[i1 * channels] * t) /
+                           32768.0f;
+        outL[i] += left;
 
-        if (ch == 2) {
-            outR[i] = (samples[i0 * ch + 1] * (1.0f - t) + samples[i1 * ch + 1] * t) / 32768.0f;
+        if (channels > 1) {
+            outR[i] += (pcm_.samples[i0 * channels + 1] * (1.0f - t) +
+                        pcm_.samples[i1 * channels + 1] * t) /
+                       32768.0f;
         } else {
-            outR[i] = outL[i];
+            outR[i] += left;
         }
 
         pos_ += speed_;
+        if (pos_ >= static_cast<double>(endFrame_)) playing_ = false;
     }
     return playing_;
 }

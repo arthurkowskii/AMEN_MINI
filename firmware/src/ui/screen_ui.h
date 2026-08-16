@@ -2,6 +2,7 @@
 #define SCREEN_UI_H
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 enum class PlaybackMode {
@@ -20,9 +21,17 @@ public:
 
     using Buffer = std::array<std::uint8_t, kBufferSize>;
 
+    struct BrowserLine {
+        const char* name;
+        bool directory;
+    };
+
     void setPerformance(const char* breakName, int bpm, PlaybackMode mode);
     void showParameter(const char* name, int value, int minimum, int maximum,
                        std::uint64_t nowMs);
+    void showBrowser(const char* folderName, const BrowserLine* lines,
+                     std::size_t count, std::size_t selectedIndex);
+    void showPerformance();
     void render(std::uint64_t nowMs);
 
     const Buffer& buffer() const;
@@ -40,16 +49,27 @@ private:
     void drawNumberRight(int right, int y, int value, int scale);
     void drawPerformance();
     void drawParameter();
+    void drawBrowser();
+
+    struct StoredBrowserLine {
+        std::array<char, 31> name{};
+        bool directory = false;
+    };
 
     Buffer buffer_{};
     std::array<char, 22> breakName_{};
     std::array<char, 17> parameterName_{};
+    std::array<char, 32> browserFolder_{};
+    std::array<StoredBrowserLine, 3> browserLines_{};
     int bpm_ = 120;
     PlaybackMode mode_ = PlaybackMode::OneShot;
     int parameterValue_ = 0;
     int parameterMinimum_ = 0;
     int parameterMaximum_ = 10;
     std::uint64_t overlayUntilMs_ = 0;
+    std::size_t browserLineCount_ = 0;
+    std::size_t browserSelectedLine_ = 0;
+    bool browserActive_ = false;
 };
 
 #endif

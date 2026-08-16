@@ -16,7 +16,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - Format interne : **int16 partout** (WavData.samples = vector<int16_t>), stéréo conservée, WAV 44,1 kHz.
   Les buffers de sortie render() sont des floats dans [-1, 1] (division par 32768).
 - Tests PC : `firmware/test_native/` — miniaudio (header-only) dans `test_native/third_party/`.
-  Compile + écoute Windows : `g++ -std=c++17 -O2 test_native/rt_player.cpp test_native/screen_preview.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp src/ui/screen_ui.cpp -I src/engine -I src/ui -I test_native -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm -lgdi32 -luser32` puis `amen_rt.exe test_native/test.wav` (touches 1-5 = vitesse, espace = retrig, m = mode, e = effet, [/] = intensité, -/+ = BPM, q = quitter). Le visualiseur reproduit le framebuffer OLED 128×32 dans une fenêtre 640×160 ; les illustrations sont encore des emplacements réservés.
+  Compile + écoute Windows : `g++ -std=c++17 -O2 test_native/rt_player.cpp test_native/sample_catalog_scanner.cpp test_native/screen_preview.cpp src/browser/sample_catalog.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp src/engine/voice_manager.cpp src/ui/screen_ui.cpp -I src/browser -I src/engine -I src/ui -I test_native -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm -lgdi32 -luser32` puis `amen_rt.exe test_native/test.wav` (touches 1-5 = vitesse, espace = retrig, m = mode, e puis [/] = effet, -/+ = BPM, b = browser, j/k = navigation, Entrée = charger, Retour arrière = dossier parent, q = quitter). Le visualiseur reproduit le framebuffer OLED 128×32 dans une fenêtre 640×160 ; les illustrations sont encore des emplacements réservés.
 - Le moteur ne touche JAMAIS au matériel. Tout ce qui est Teensy (SD, PSRAM, GPIO, Audio Library) vit dans la couche Teensy (firmware.ino + src/teensy/).
 - Définition de fait globale : compile sans warning (g++ -Wall -Wextra) + vérification numérique/écoute + push sur dev.
 
@@ -36,7 +36,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : vérifié numériquement sur test.wav (1 s, 440 Hz stéréo) : speed 0,5 → 220 Hz / 2,0 s ; 1,0 → 440 Hz / 1,0 s ; 2,0 → 880 Hz / 0,5 s. Le player PC complet compile.
 - Vérification : analyse par zero-crossing (fréquence) + comptage de frames rendues (durée), pour les 3 vitesses.
 
-## J3 — Pool de 4 voix [À FAIRE] — P1
+## J3 — Pool de 4 voix [EN COURS — moteur natif] — P1
 
 - Objectif : 4 SamplePlayer simultanés — le sampler devient polyphonique tout en conservant de la marge CPU pour les effets.
 - Fichiers : `src/engine/voice_manager.h` + `voice_manager.cpp` + test dans test_native/.
@@ -44,11 +44,11 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : 4 déclenchements simultanés s'entendent additionnés sans saturation ni artefact ; un 5e vole proprement la voix la plus ancienne.
 - Vérification : test PC qui déclenche 4 voix à des positions décalées, mesure que le mix ne dépasse pas [-1,1] et vérifie que le 5e trigger vole la bonne voix ; écoute via rt_player étendu (touches = pads).
 
-## J4 — PSRAM (mémoire Teensy) [À FAIRE] — P1
+## J4 — PSRAM (mémoire Teensy) [EN COURS — API buffer externe] — P1
 
 - Objectif : les échantillons chargés vivent en PSRAM (8 Mo) sur Teensy, pas en RAM interne (1 Mo).
 - Fichiers : couche Teensy `src/teensy/` (allocateur) ; le moteur ne change pas.
-- Spec : sur Teensy, le vector de WavData doit être alloué via extmem_malloc (PSRAM). 1 s stéréo 16-bit = 176 Ko ; un break 6 s ≈ 1 Mo → ~45 s de stéréo dans 8 Mo. Pattern : custom allocator (std::pmr ou allocator template) injecté au chargement — le code du moteur reste identique PC/Teensy.
+- Spec : le chargeur commence par `wav_probe()`, calcule la taille PCM16 finale, puis `wav_decode()` écrit sans allocation dans un buffer fourni par la plateforme. Sur Teensy, ce buffer est une grande zone allouée une seule fois via `extmem_malloc` ; sur PC, `WavData` reste propriétaire de son vector. 1 s stéréo 16-bit = 176 Ko ; un break 6 s ≈ 1 Mo → ~45 s de stéréo dans 8 Mo. Les voix consomment une `PcmView` non propriétaire et ne dépendent pas du type d'allocation.
 - DoD : sur PC rien ne change ; sur Teensy, un sketch de test charge un WAV depuis la SD dans la PSRAM et mesure la mémoire libre (RAM interne quasi intacte, PSRAM consommée).
 - Vérification : compile arduino-cli + test réel quand le matériel arrive (sinon : vérification du code + bench RAM sur PC simulé).
 
@@ -117,14 +117,26 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : compile arduino-cli (`arduino-cli compile --fqbn teensy:avr:teensy41 firmware`) ; sur matériel : son dans le casque, pads déclenchent les voix, encodeurs changent le pitch.
 - Vérification : compile + test réel (matériel attendu fin août).
 
-## J13 — UI pages + USB-MIDI [EN COURS — visualiseur PC] — P1
+## J13 — UI pages + USB-MIDI [EN COURS — catalogue/browser PC] — P1
 
 - Objectif : les 7 encodeurs en pages (pad / globale / browser) + USB-MIDI.
-- Fichiers : logique portable `src/ui/`, backend PC `test_native/screen_preview.cpp`, futur backend OLED et MIDI sous `src/teensy/`.
+- Fichiers : logique portable `src/ui/` et `src/browser/`, backends PC `test_native/screen_preview.cpp` et `sample_catalog_scanner.cpp`, futur backend OLED/SD/MIDI sous `src/teensy/`.
 - Spec contrôles : les 4 encodeurs du haut sont contextuels ; les 3 latéraux gardent les rôles Mode / Browser / BPM. Mode cible le dernier chop joué ; chaque chop mémorise son mode (one-shot / loop / granular / slice-sync) et une pression sur Mode applique le mode courant aux 12 chops. Pad fx maintenu = les 4 encodeurs du haut contrôlent cet effet. Shift = couche secondaire (volume, tap tempo, etc.). USB-MIDI : notes sur les pads (canal configurable), CC sur les encodeurs.
 - Spec écran : framebuffer monochrome 128×32 portable. Au repos : nom du break, BPM et mode du chop sélectionné. Tout changement de paramètre ouvre un overlay pendant 1 s, avec zone 32×32 réservée au symbole/illustration, nom technique lisible et valeur forte. Direction artistique : anges, ailes, croix et auréoles ; 3 états visuels (calme / tendu / furieux) et micro-animations ponctuelles, à produire après validation fonctionnelle. Les pages utilitaires (browser, erreurs) privilégient la lisibilité.
+- Spec browser : la racine et chaque dossier affichent leurs WAV directs et uniquement les sous-dossiers ayant au moins un WAV descendant. L'arborescence et la casse d'affichage de la carte sont conservées ; comparaisons et extension `.wav` sont insensibles à la casse. La sélection charge un seul WAV à la fois sans dupliquer le PCM entre les pads/voix.
 - DoD : le visualiseur PC suit les contrôles et revient à l'écran Performance 1 s après un overlay ; on navigue dans la SD depuis le browser et on charge un break sans reboot ; le BPM se règle live ; un DAW reçoit les notes.
 - Vérification : `g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic test_native/screen_ui_test.cpp src/ui/screen_ui.cpp -I src/ui -o screen_ui_test.exe` puis `.\screen_ui_test.exe` + visualiseur PC + test réel sur matériel.
+
+### Checkpoint 16/08/2026 — fondation sample browser
+
+- Livré côté portable/PC : `PcmView` non propriétaire, `SamplePlayer` à plage `[startFrame, endFrame)`, pool fixe de 4 voix partageant le même PCM, `wav_probe()` + `wav_decode()` vers un buffer externe sans allocation, catalogue hiérarchique FAT case-insensitive, scanner récursif PC, écran browser 128×32 et chargement d'un WAV sélectionné sans redémarrage.
+- Tests ajoutés : `voice_manager_test.cpp`, `wav_loader_reader_test.cpp`, `sample_catalog_test.cpp`, `sample_catalog_scanner_test.cpp` et extension de `screen_ui_test.cpp`. Les tests natifs stricts, les cinq formats WAV, la compilation hôte `-DARDUINO`, le harness Windows et `start_firmware.ps1` passent.
+- Limite importante : aucune allocation PSRAM réelle ni lecture SD Teensy n'existe encore. Le PC utilise toujours `WavData::samples` et le scanner `std::filesystem`. Il ne faut pas considérer J4 ou J12 terminés.
+- Prochaine étape obligatoire : créer la couche `src/teensy/` et le vrai point d'entrée firmware. Implémenter un `WavReader` autour de `File`, initialiser le lecteur intégré avec `SD.begin(BUILTIN_SDCARD)`, puis fournir au catalogue les chemins WAV récursifs de la carte.
+- PSRAM : vérifier `external_psram_size`, appeler `extmem_malloc()` une seule fois au démarrage pour réserver la grande zone PCM16, tester le pointeur et sa capacité, puis appeler `wav_probe()` avant `wav_decode()` directement dans cette zone. Ne jamais allouer, libérer, scanner la SD ou convertir dans le callback audio.
+- Remplacement d'un break : arrêter les voix, vérifier format/taille, décoder le nouveau fichier, construire la `PcmView`, puis réaffecter les plages des pads. Un même PCM doit rester partageable par plusieurs pads/voix avec des `startFrame/endFrame` différents, sans copie.
+- Intégration matérielle restante : objet `AudioStream` vers SGTL5000/I2S, OLED réel, encodeur Browser, matrice de pads, mapping des 12 slices, gestion d'erreurs SD/PSRAM et mesures `AudioProcessorUsageMax()`/mémoire sur Teensy.
+- Risques connus à traiter : le 5e trigger vole actuellement la voix la plus ancienne sans crossfade ; ajouter une transition courte et faire une écoute dédiée avant de marquer J3 terminé. Le chargement PC conserve temporairement ancien et nouveau `WavData`, alors que le backend Teensy à zone PSRAM unique devra choisir une politique explicite en cas d'échec de chargement.
 
 ## J14 — Polish, démo, git [À FAIRE] — P1
 
