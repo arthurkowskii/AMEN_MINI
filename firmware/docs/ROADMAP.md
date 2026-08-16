@@ -13,7 +13,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - Repo : github.com/arthurkowskii/AMEN_MINI — on travaille sur la branche **dev** (jamais main).
   Récupérer : `git fetch origin && git switch dev && git pull`
 - Moteur portable : `firmware/src/engine/` — C++17 pur, ZÉRO include Arduino, doit compiler sur PC (g++) ET Teensy (arduino-cli, FQBN `teensy:avr:teensy41`).
-- Format interne : **int16 partout** (WavData.samples = vector<int16_t>), stéréo conservée, WAV 44,1 kHz.
+- Format interne : **int16 partout** (WavData.samples = vector<int16_t>), stéréo conservée à la fréquence native du WAV ; sortie moteur à 44,1 kHz.
   Les buffers de sortie render() sont des floats dans [-1, 1] (division par 32768).
 - Tests PC : `firmware/test_native/` — miniaudio (header-only) dans `test_native/third_party/`.
   Compile + écoute Windows : `g++ -std=c++17 -O2 test_native/rt_player.cpp test_native/sample_catalog_scanner.cpp test_native/screen_preview.cpp src/browser/sample_catalog.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp src/engine/voice_manager.cpp src/ui/screen_ui.cpp -I src/browser -I src/engine -I src/ui -I test_native -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm -lgdi32 -luser32` puis `amen_rt.exe test_native/test.wav` (touches 1-5 = vitesse, espace = retrig, m = mode, e puis [/] = effet, -/+ = BPM, b = browser, j/k = navigation, Entrée = charger, Retour arrière = dossier parent, q = quitter). Le visualiseur reproduit le framebuffer OLED 128×32 dans une fenêtre 640×160 ; les illustrations sont encore des emplacements réservés.
@@ -40,8 +40,8 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 - Objectif : 4 SamplePlayer simultanés — le sampler devient polyphonique tout en conservant de la marge CPU pour les effets.
 - Fichiers : `src/engine/voice_manager.h` + `voice_manager.cpp` + test dans test_native/.
-- Spec : pool de 4 voix, chacune = un SamplePlayer + son état (occupée/libre). Les voix référencent les échantillons partagés sans les copier : la durée du break pèse sur la PSRAM, tandis que le nombre de voix actives pèse sur le CPU. Allocation : première voix libre ; si toutes occupées : vol de voix (la plus ancienne). Mixage : somme des render() de toutes les voix dans le même buffer ; clipping : clamp final à [-1, 1] (ou soft clip). trigger(pad) doit pouvoir retrigger la MÊME voix en jouant un second son (retrig + mélange, pas de coupure sèche).
-- DoD : 4 déclenchements simultanés s'entendent additionnés sans saturation ni artefact ; un 5e vole proprement la voix la plus ancienne.
+- Spec : pool de 4 voix, chacune = un SamplePlayer + son état (occupée/libre) et son `PadId`. Les voix référencent les échantillons partagés sans les copier : la durée du break pèse sur la PSRAM, tandis que le nombre de voix actives pèse sur le CPU. Un nouveau trigger du même pad arrête/remplace immédiatement sa voix active ; des pads différents restent polyphoniques. Allocation : première voix libre ; si quatre pads distincts sont actifs : vol de la voix la plus ancienne. Mixage : somme des render() de toutes les voix dans le même buffer ; clipping final à [-1, 1].
+- DoD : 4 pads distincts s'entendent additionnés sans saturation ; retrigger un même pad ne double pas son son ; un 5e pad distinct vole proprement la voix la plus ancienne.
 - Vérification : test PC qui déclenche 4 voix à des positions décalées, mesure que le mix ne dépasse pas [-1,1] et vérifie que le 5e trigger vole la bonne voix ; écoute via rt_player étendu (touches = pads).
 
 ## J4 — PSRAM (mémoire Teensy) [EN COURS — API buffer externe] — P1
@@ -138,6 +138,8 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - Remplacement d'un break : arrêter les voix, vérifier format/taille, décoder le nouveau fichier, construire la `PcmView`, puis réaffecter les plages des pads. Un même PCM doit rester partageable par plusieurs pads/voix avec des `startFrame/endFrame` différents, sans copie.
 - Intégration matérielle restante : objet `AudioStream` vers SGTL5000/I2S, OLED réel, encodeur Browser, matrice de pads, mapping des 12 slices, gestion d'erreurs SD/PSRAM et mesures `AudioProcessorUsageMax()`/mémoire sur Teensy.
 - Risques connus à traiter : le 5e trigger vole actuellement la voix la plus ancienne sans crossfade ; ajouter une transition courte et faire une écoute dédiée avant de marquer J3 terminé. Le chargement PC conserve temporairement ancien et nouveau `WavData`, alors que le backend Teensy à zone PSRAM unique devra choisir une politique explicite en cas d'échec de chargement.
+- Lecture multi-fréquence : `VoiceManager` convertit la vitesse utilisateur en pas source (`speed * sampleRate / outputSampleRate`) ; les WAV mono/stéréo restent en PCM16 à leur fréquence native, sans resampling au chargement ni travail supplémentaire dans le callback.
+- Retrigger par pad : `VoiceManager::trigger(PadId, ...)` remplace la voix active du même pad au lieu de l'empiler. Les tests couvrent le remplacement par une autre plage, le mix de deux pads distincts et le vol de voix après quatre identités distinctes.
 
 ## J14 — Polish, démo, git [À FAIRE] — P1
 

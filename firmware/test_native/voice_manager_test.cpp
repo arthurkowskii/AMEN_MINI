@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace {
 constexpr float kTolerance = 0.00001f;
@@ -61,7 +62,8 @@ void testFourVoicesAndOldestSteal() {
     VoiceManager manager;
 
     for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
-        require(manager.trigger(pcm, voice * 4, voice * 4 + 4, 1.0f),
+        require(manager.trigger(static_cast<VoiceManager::PadId>(voice), pcm,
+                                voice * 4, voice * 4 + 4, 1.0f),
                 "four voices must trigger");
     }
 
@@ -72,9 +74,11 @@ void testFourVoicesAndOldestSteal() {
 
     manager.stopAll();
     for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
-        manager.trigger(pcm, voice * 4, voice * 4 + 4, 1.0f);
+        manager.trigger(static_cast<VoiceManager::PadId>(voice), pcm,
+                        voice * 4, voice * 4 + 4, 1.0f);
     }
-    require(manager.trigger(pcm, 16, 20, 1.0f), "fifth voice must trigger by stealing");
+    require(manager.trigger(4, pcm, 16, 20, 1.0f),
+            "fifth voice must trigger by stealing");
     manager.render(left, right, 1);
     require(near(left[0], 14000.0f / 32768.0f), "fifth voice must steal the oldest voice");
 }
@@ -87,7 +91,7 @@ void testClampAndZeroFill() {
 
     VoiceManager manager;
     for (std::size_t i = 0; i < VoiceManager::kVoiceCount; ++i) {
-        manager.trigger(loud.view(), 0, 2, 1.0f);
+        manager.trigger(static_cast<VoiceManager::PadId>(i), loud.view(), 0, 2, 1.0f);
     }
     float left[1] = {9.0f};
     float right[1] = {9.0f};
@@ -96,7 +100,7 @@ void testClampAndZeroFill() {
 
     manager.stopAll();
     for (std::size_t i = 0; i < VoiceManager::kVoiceCount; ++i) {
-        manager.trigger(loud.view(), 2, 4, 1.0f);
+        manager.trigger(static_cast<VoiceManager::PadId>(i), loud.view(), 2, 4, 1.0f);
     }
     manager.render(left, right, 1);
     require(left[0] == -1.0f && right[0] == -1.0f, "negative mix must clamp to minus one");
@@ -116,12 +120,88 @@ void testClampAndZeroFill() {
     manager.render(left, right, 1);
     require(left[0] == 0.0f && right[0] == 0.0f, "stopped manager must output silence");
 }
+
+void testPadRetriggerAndDistinctPadMix() {
+    WavData wav = makeSegmentedWav();
+    const PcmView pcm = wav.view();
+    VoiceManager manager(48000);
+
+    require(manager.trigger(7, pcm, 0, 4, 1.0f), "first pad range must trigger");
+    require(manager.trigger(7, pcm, 4, 8, 1.0f), "same pad must retrigger");
+
+    float left = 0.0f;
+    float right = 0.0f;
+    manager.render(&left, &right, 1);
+    require(near(left, 2000.0f / 32768.0f),
+            "same pad retrigger must replace the previous range");
+
+    manager.stopAll();
+    require(manager.trigger(7, pcm, 0, 4, 1.0f), "first distinct pad must trigger");
+    require(manager.trigger(8, pcm, 4, 8, 1.0f), "second distinct pad must trigger");
+    manager.render(&left, &right, 1);
+    require(near(left, 3000.0f / 32768.0f), "distinct pad IDs must mix together");
+}
+
+std::size_t renderedFrames(uint32_t sourceSampleRate, std::size_t sourceFrames,
+                           float userSpeed, uint32_t outputSampleRate = 44100) {
+    WavData wav;
+    wav.sampleRate = sourceSampleRate;
+    wav.channels = 1;
+    wav.samples.assign(sourceFrames, 1000);
+
+    VoiceManager manager(outputSampleRate);
+    const PcmView pcm = wav.view();
+    require(manager.trigger(0, pcm, 0, pcm.frameCount(), userSpeed),
+            "valid sample-rate conversion must trigger");
+
+    std::size_t audibleFrames = 0;
+    for (;;) {
+        float left = 0.0f;
+        float right = 0.0f;
+        manager.render(&left, &right, 1);
+        if (left == 0.0f && right == 0.0f) break;
+        ++audibleFrames;
+        require(audibleFrames <= sourceFrames * 4, "converted playback must terminate");
+    }
+    return audibleFrames;
+}
+
+void testNativeSampleRatesAndUserSpeed() {
+    require(renderedFrames(48000, 48000, 1.0f) == 44100,
+            "48000 frames at 48 kHz must last 44100 output frames");
+    require(renderedFrames(44100, 44100, 1.0f) == 44100,
+            "44.1 kHz PCM must keep one source frame per output frame");
+    require(renderedFrames(48000, 48000, 2.0f) == 22050,
+            "user speed must multiply the sample-rate source step");
+}
+
+void testInvalidRatesAndSpeeds() {
+    WavData wav = makeSegmentedWav();
+    VoiceManager invalidOutput(0);
+    const PcmView pcm = wav.view();
+    require(!invalidOutput.trigger(0, pcm, 0, pcm.frameCount(), 1.0f),
+            "zero output sample rate must be rejected");
+
+    VoiceManager manager;
+    wav.sampleRate = 0;
+    require(!manager.trigger(0, wav.view(), 0, 20, 1.0f),
+            "zero source sample rate must be rejected");
+    wav.sampleRate = 48000;
+    require(!manager.trigger(0, wav.view(), 0, 20, 0.0f),
+            "zero user speed must be rejected");
+    require(!manager.trigger(0, wav.view(), 0, 20,
+                             std::numeric_limits<float>::infinity()),
+            "non-finite user speed must be rejected");
+}
 }  // namespace
 
 int main() {
     testViewAndRanges();
     testFourVoicesAndOldestSteal();
     testClampAndZeroFill();
+    testPadRetriggerAndDistinctPadMix();
+    testNativeSampleRatesAndUserSpeed();
+    testInvalidRatesAndSpeeds();
     std::cout << "All portable audio engine tests passed\n";
     return 0;
 }

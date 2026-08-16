@@ -3,18 +3,31 @@
 #include <algorithm>
 #include <cmath>
 
-bool VoiceManager::trigger(PcmView pcm, std::size_t startFrame, std::size_t endFrame,
-                           float speed) {
+bool VoiceManager::trigger(PadId padId, PcmView pcm, std::size_t startFrame,
+                           std::size_t endFrame, float userSpeed) {
     if (!pcm.valid() || startFrame >= endFrame || endFrame > pcm.frameCount() ||
-        !std::isfinite(speed) || speed <= 0.0f) {
+        outputSampleRate_ == 0 || !std::isfinite(userSpeed) || userSpeed <= 0.0f) {
         return false;
     }
 
+    const float sourceStep = userSpeed * static_cast<float>(pcm.sampleRate) /
+                             static_cast<float>(outputSampleRate_);
+    if (!std::isfinite(sourceStep) || sourceStep <= 0.0f) return false;
+
     Voice* selected = nullptr;
     for (Voice& voice : voices_) {
-        if (!voice.player.isPlaying()) {
+        if (voice.player.isPlaying() && voice.padId == padId) {
             selected = &voice;
             break;
+        }
+    }
+
+    if (selected == nullptr) {
+        for (Voice& voice : voices_) {
+            if (!voice.player.isPlaying()) {
+                selected = &voice;
+                break;
+            }
         }
     }
 
@@ -25,8 +38,9 @@ bool VoiceManager::trigger(PcmView pcm, std::size_t startFrame, std::size_t endF
     }
 
     selected->player.setSample(pcm, startFrame, endFrame);
-    selected->player.setSpeed(speed);
+    selected->player.setSpeed(sourceStep);
     selected->player.trigger();
+    selected->padId = padId;
     selected->age = nextAge_++;
     return true;
 }

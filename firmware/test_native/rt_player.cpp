@@ -36,7 +36,9 @@
 #endif
 
 namespace {
-VoiceManager g_voices;
+constexpr uint32_t kOutputSampleRate = VoiceManager::kDefaultOutputSampleRate;
+constexpr VoiceManager::PadId kSpacePadId = 0;
+VoiceManager g_voices{kOutputSampleRate};
 std::atomic<float> g_speed{1.0f};
 std::atomic<bool> g_running{true};
 std::mutex g_audioMutex;
@@ -58,7 +60,6 @@ struct AppState {
     SampleCatalog::FolderId browserFolder = SampleCatalog::rootId();
     std::vector<SampleCatalog::Entry> browserEntries;
     std::size_t browserSelection = 0;
-    uint32_t outputSampleRate = 0;
     bool browserActive = false;
 };
 
@@ -118,12 +119,6 @@ void load_browser_selection(ScreenUi& screen, AppState& state) {
         std::fprintf(stderr, "WAV invalide : %s\n", path.string().c_str());
         return;
     }
-    if (loaded.sampleRate != state.outputSampleRate) {
-        std::fprintf(stderr, "frequence refusee : %u Hz (sortie %u Hz)\n",
-                     loaded.sampleRate, state.outputSampleRate);
-        return;
-    }
-
     {
         std::lock_guard<std::mutex> lock(g_audioMutex);
         g_voices.stopAll();
@@ -132,7 +127,8 @@ void load_browser_selection(ScreenUi& screen, AppState& state) {
     state.breakName = selected.name;
     state.browserActive = false;
     screen.showPerformance();
-    std::printf("charge : %s\n", path.string().c_str());
+    std::printf("charge : %s (%u Hz natif, sortie %u Hz)\n", path.string().c_str(),
+                state.wav.sampleRate, kOutputSampleRate);
 }
 
 void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& state) {
@@ -170,7 +166,7 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
     } else if (c == ' ') {
         std::lock_guard<std::mutex> lock(g_audioMutex);
         const PcmView pcm = state.wav.view();
-        g_voices.trigger(pcm, 0, pcm.frameCount(), g_speed.load());
+        g_voices.trigger(kSpacePadId, pcm, 0, pcm.frameCount(), g_speed.load());
         std::printf("retrigger\n");
     } else if (c == 'm') {
         simulation.mode = next_mode(simulation.mode);
@@ -266,14 +262,14 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "impossible de charger %s\n", path);
         return 1;
     }
-    std::printf("charge : %s (%u Hz, %u canal, %.2f s)\n", path, state.wav.sampleRate,
-                state.wav.channels,
+    std::printf("charge : %s (%u Hz natif, %u canal, %.2f s, sortie %u Hz)\n", path,
+                state.wav.sampleRate, state.wav.channels,
                 static_cast<double>(state.wav.samples.size() / state.wav.channels) /
-                    state.wav.sampleRate);
+                    state.wav.sampleRate,
+                kOutputSampleRate);
     const std::filesystem::path absolutePath = std::filesystem::absolute(path);
     state.sampleRoot = absolutePath.parent_path();
     state.breakName = absolutePath.filename().string();
-    state.outputSampleRate = state.wav.sampleRate;
     std::string scanError;
     if (!scanSampleDirectory(state.sampleRoot, state.catalog, scanError)) {
         std::fprintf(stderr, "scan impossible : %s\n", scanError.c_str());
@@ -286,7 +282,7 @@ int main(int argc, char** argv) {
 
     cfg.playback.format = ma_format_f32;
     cfg.playback.channels = 2;
-    cfg.sampleRate = state.outputSampleRate;
+    cfg.sampleRate = kOutputSampleRate;
     cfg.dataCallback = audio_callback;
     ma_device device;
     if (ma_device_init(nullptr, &cfg, &device) != MA_SUCCESS) {
