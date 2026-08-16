@@ -36,13 +36,13 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : vérifié numériquement sur test.wav (1 s, 440 Hz stéréo) : speed 0,5 → 220 Hz / 2,0 s ; 1,0 → 440 Hz / 1,0 s ; 2,0 → 880 Hz / 0,5 s. Le player PC complet compile.
 - Vérification : analyse par zero-crossing (fréquence) + comptage de frames rendues (durée), pour les 3 vitesses.
 
-## J3 — Pool de 8 voix [À FAIRE] — P1
+## J3 — Pool de 4 voix [À FAIRE] — P1
 
-- Objectif : 8 SamplePlayer simultanés — le sampler devient polyphonique.
+- Objectif : 4 SamplePlayer simultanés — le sampler devient polyphonique tout en conservant de la marge CPU pour les effets.
 - Fichiers : `src/engine/voice_manager.h` + `voice_manager.cpp` + test dans test_native/.
-- Spec : pool de 8 voix, chacune = un SamplePlayer + son état (occupée/libre). Allocation : première voix libre ; si toutes occupées : vol de voix (la plus ancienne). Mixage : somme des render() de toutes les voix dans le même buffer ; clipping : clamp final à [-1, 1] (ou soft clip). trigger(pad) doit pouvoir retrigger la MÊME voix en jouant un second son (retrig + mélange, pas de coupure sèche).
-- DoD : 8 déclenchements simultanés s'entendent additionnés sans saturation ni artefact ; un 9e vol de voix proprement.
-- Vérification : test PC qui déclenche 8 voix à des positions décalées, mesure que le mix ne dépasse pas [-1,1] ; écoute via rt_player étendu (touches = pads).
+- Spec : pool de 4 voix, chacune = un SamplePlayer + son état (occupée/libre). Les voix référencent les échantillons partagés sans les copier : la durée du break pèse sur la PSRAM, tandis que le nombre de voix actives pèse sur le CPU. Allocation : première voix libre ; si toutes occupées : vol de voix (la plus ancienne). Mixage : somme des render() de toutes les voix dans le même buffer ; clipping : clamp final à [-1, 1] (ou soft clip). trigger(pad) doit pouvoir retrigger la MÊME voix en jouant un second son (retrig + mélange, pas de coupure sèche).
+- DoD : 4 déclenchements simultanés s'entendent additionnés sans saturation ni artefact ; un 5e vole proprement la voix la plus ancienne.
+- Vérification : test PC qui déclenche 4 voix à des positions décalées, mesure que le mix ne dépasse pas [-1,1] et vérifie que le 5e trigger vole la bonne voix ; écoute via rt_player étendu (touches = pads).
 
 ## J4 — PSRAM (mémoire Teensy) [À FAIRE] — P1
 
