@@ -31,6 +31,7 @@ public:
                        std::uint64_t nowMs, const char* suffix = nullptr);
     void showBrowser(const char* folderName, const BrowserLine* lines,
                      std::size_t count, std::size_t selectedIndex);
+    void showFxPad(int padNumber, const char* fxName, int selectedEncoder);
     void showPerformance();
     void render(std::uint64_t nowMs);
 
@@ -51,6 +52,7 @@ private:
     void drawPerformance();
     void drawParameter();
     void drawBrowser();
+    void drawFxPad();
 
     struct StoredBrowserLine {
         std::array<char, 31> name{};
@@ -63,6 +65,7 @@ private:
     std::array<char, 4> parameterSuffix_{};
     std::array<char, 32> browserFolder_{};
     std::array<StoredBrowserLine, 3> browserLines_{};
+    std::array<char, 17> fxPadName_{};
     int bpm_ = 120;
     PlaybackMode mode_ = PlaybackMode::OneShot;
     int parameterValue_ = 0;
@@ -71,7 +74,10 @@ private:
     std::uint64_t overlayUntilMs_ = 0;
     std::size_t browserLineCount_ = 0;
     std::size_t browserSelectedLine_ = 0;
+    int fxPadNumber_ = 0;
+    int fxPadEncoder_ = 1;
     bool browserActive_ = false;
+    bool fxPadActive_ = false;
 };
 
 #endif

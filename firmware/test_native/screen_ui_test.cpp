@@ -98,6 +98,46 @@ int main() {
     assert(std::any_of(screen.buffer().begin(), screen.buffer().end(),
                        [](std::uint8_t byte) { return byte != 0; }));
 
+    screen.showPerformance();
+    screen.showFxPad(7, "BLANK", 1);
+    screen.render(7000);
+    const ScreenUi::Buffer fxBlank = screen.buffer();
+    assert(fxBlank != performance);
+    assert(std::any_of(fxBlank.begin(), fxBlank.end(),
+                       [](std::uint8_t byte) { return byte != 0; }));
+
+    screen.showFxPad(8, "BLANK", 1);
+    screen.render(7000);
+    assert(screen.buffer() != fxBlank);
+
+    screen.showFxPad(7, "RESONATOR", 1);
+    screen.render(7000);
+    assert(screen.buffer() != fxBlank);
+
+    screen.showFxPad(7, "BLANK", 2);
+    screen.render(7000);
+    assert(screen.buffer() != fxBlank);
+
+    screen.showFxPad(7, "BLANK", 1);
+    screen.render(7000);
+    assert(screen.buffer() == fxBlank);
+
+    screen.showParameter("amount", 5, 0, 10, 7000);
+    screen.render(7000);
+    assert(screen.buffer() == fxBlank);
+
+    screen.showBrowser("breaks", lines, 4, 0);
+    screen.render(7000);
+    assert(screen.buffer() != fxBlank);
+
+    screen.showFxPad(7, "BLANK", 1);
+    screen.render(7000);
+    assert(screen.buffer() == fxBlank);
+
+    screen.showPerformance();
+    screen.render(7000);
+    assert(screen.buffer() == performance);
+
     assert(!screen.pixel(-1, 0));
     assert(!screen.pixel(ScreenUi::kWidth, 0));
     std::printf("screen_ui: ok\n");

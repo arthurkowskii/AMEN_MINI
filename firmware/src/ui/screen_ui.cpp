@@ -146,6 +146,7 @@ void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
     browserLineCount_ = 0;
     browserSelectedLine_ = 0;
     browserActive_ = true;
+    fxPadActive_ = false;
 
     if (lines == nullptr || count == 0U) {
         return;
@@ -166,8 +167,18 @@ void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
     }
 }
 
+void ScreenUi::showFxPad(int padNumber, const char* fxName, int selectedEncoder) {
+    copyLabel(fxPadName_, fxName);
+    fxPadNumber_ = std::clamp(padNumber, 0, 99);
+    fxPadEncoder_ = std::clamp(selectedEncoder, 1, 7);
+    fxPadActive_ = true;
+    browserActive_ = false;
+    overlayUntilMs_ = 0;
+}
+
 void ScreenUi::showPerformance() {
     browserActive_ = false;
+    fxPadActive_ = false;
     overlayUntilMs_ = 0;
 }
 
@@ -175,6 +186,8 @@ void ScreenUi::render(std::uint64_t nowMs) {
     clear();
     if (browserActive_) {
         drawBrowser();
+    } else if (fxPadActive_) {
+        drawFxPad();
     } else if (nowMs < overlayUntilMs_) {
         drawParameter();
     } else {
@@ -305,6 +318,19 @@ void ScreenUi::drawParameter() {
     if (progress > 0) {
         fillRect(39, 25, progress, 4);
     }
+}
+
+void ScreenUi::drawFxPad() {
+    // Reserved artwork tile. Final religious sprites will replace this placeholder.
+    drawRect(0, 0, 32, 32);
+    drawText(10, 9, "ART");
+
+    drawVerticalLine(33, 0, kHeight);
+    char padLabel[8]{};
+    std::snprintf(padLabel, sizeof(padLabel), "PAD %d", fxPadNumber_);
+    drawText(38, 1, padLabel);
+    drawText(38, 9, fxPadName_.data(), 2);
+    drawText(38, 24, fxPadEncoder_ == 1 ? "E1 NAV CLIC ASSIGN" : "F1 POUR E1");
 }
 
 void ScreenUi::drawBrowser() {
