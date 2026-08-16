@@ -220,3 +220,14 @@ Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis 
 - Harness : `kDivisionNames` à 6 entrées, `repeat_division()` à 6 cases, cycles E3 (Windows) et touche `e` (Linux) modulo 6, overlay `0..5`.
 - Test moteur : `testTripletDivisions` — 1/12 → 33 frames et 1/24 → 17 frames @ BPM 60 (fixture 100 Hz), périodes stabilisées exactes. Tous les tests Live Repeat passent.
 - Vérifié : test natif strict (-Wall -Wextra -Wpedantic), compile harness, smoke run, `start_firmware.ps1`. **Non encore validé à l'écoute par Arthur.**
+
+### Checkpoint 17/08/2026 — Revue post-analyse + bootstrap Teensy
+
+- Commit `48d9f1c` (`feat: post-review plan, teensy layer bootstrap, gitignore cleanup`) poussé sur `dev`.
+- **Revue d'architecture complète** : layout PCB, paradigme interaction, OLED, firmware, adéquation objectif sound design expérimental. Plan détaillé dans `docs/PLAN_REVIEW_AOUT_2026.md`.
+- **Décisions d'interaction** : le mode de lecture définit le latch (ONE SHOT = full auto ou gate, LOOP/GRANULAR/SLICE SYNC = latch, 2e appui stoppe). Crossfade vol de voix fixé à 64 frames (~1.5 ms). Navigateur SD : liste verticale 3 lignes + défilement horizontal après 0.5 s. Overlay OLED persistant tant qu'encodeur tourne. Noms techniques abrégés (1/8T, 1/16T).
+- **Direction artistique OLED confirmée** : tile religieuse 32×32 avec 3 états visuels (calme/tendu/furieux), sprites après validation fonctionnelle.
+- **FX roadmap étendue** : 8 slots (BLANK, REPEAT ✅, REVERSE, TRANCE GATE, FILTER, DELAY, BITCRUSH, CHAOS). E6 proposé comme LFO assignable.
+- **Bootstrap Teensy (J4/J12 commencé)** : `firmware.ino` setup() diagnostic, `PsramArena` (extmem_malloc 8 Mo), `TeensyWavReader` (wrapper SD File → WavReader), `SampleLoader` (SD → PSRAM avec validation avant arrêt des voix). Prochaine étape : intégrer AudioStream/SGTL5000 et callback render().
+- `.gitignore` : exclut `*.o` et `test_native/samples`.
+- **Checkpoint Notion** : non synchronisé (API Notion indisponible — header `Notion-Version` manquant côté serveur).
