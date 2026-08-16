@@ -4,7 +4,8 @@ Ce document est la source claire des controles de performance actuels. Le harnes
 
 ## Pads
 
-- Pads voix 1-6 (`Numpad 1-6`) : l'appui declenche le break. Le maintien ouvre le navigateur SD.
+- Pads voix 1-6 (`Numpad 1-6`) : l'appui declenche le break et fait du pad la **cible des encodeurs** tant qu'il est tenu. Toujours maintenir le pad pour editer ses parametres (règle : le dernier pad appuye gagne, relacher retombe sur le pad encore tenu le plus recent).
+- Le pad voix maintenu + `E1` ouvre le navigateur SD (le relacher le ferme). L'appui seul ne change plus l'ecran.
 - Pads FX 7-9 (`Numpad 7-9`) : le maintien active l'effet assigne, le relachement le coupe.
 - Le Repeat capture l'audio du mix global immediatement anterieur a l'appui. Il ne retrigger pas une voix individuelle.
 - Liste d'assignation : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`.
@@ -15,12 +16,14 @@ Ce document est la source claire des controles de performance actuels. Le harnes
 - `E1 NAV` : sur un pad voix maintenu, navigue dans la SD et le clic entre/charge. Sur un pad FX maintenu, navigue dans la liste FX et le clic assigne.
 - `E2 AMOUNT` : mix dry/wet du Repeat, de 0 a 100 %. La valeur par defaut est 100 %.
 - `E3 DIVISION` : longueur du Repeat, choix live `1/4`, `1/8`, `1/16`, `1/32`. La valeur par defaut est `1/4`.
-- `E4 SPEED` : vitesse du sample du dernier pad voix, de 25 a 400 % par pas de 5 %. Le clic revient a 100 %. E4 ne devient pas un parametre FX.
-- `E5 MODE` : mode de lecture du sample.
+- `E4 SPEED` : vitesse du pad voix **tenu** (plus jamais le "dernier joue"), de 25 a 400 % par pas de 5 %. Appliquee en direct a la voix active du pad (rampe de 128 frames, sans retrigger) et memorisee pour son prochain trigger. Le clic remet **ce pad** a 100 %. Sans pad tenu : hint `E4 TENIR PAD`, aucun effet.
+- `E5 MODE` : mode de lecture du pad voix **tenu** (`ONE SHOT` / `LOOP` / `GRANULAR` / `SLICE SYNC`). Le clic remet ce pad en `ONE SHOT`. Sans pad tenu : hint `E5 TENIR PAD`, aucun effet.
 - `E6 J10` : reserve.
 - `E7 BPM` : tempo global de 20 a 300 BPM. La longueur du Repeat est recalculee en direct.
 
-Dans le harness Windows, `F1-F7` choisit l'encodeur, les fleches le tournent et `Entree` le clique. `Espace` retrigger le dernier pad voix, `Retour arriere` remonte dans le browser et `q` quitte.
+Chaque pad voix memorise sa propre vitesse et son propre mode ; l'ecran d'accueil affiche le BPM et le mode du dernier pad joue.
+
+Dans le harness Windows, `F1-F7` choisit l'encodeur, les fleches le tournent et `Entree` le clique. `Espace` retrigger le dernier pad voix avec SA propre vitesse, `Retour arriere` remonte dans le browser et `q` quitte.
 
 ## Transitions Audio
 

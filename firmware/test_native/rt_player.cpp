@@ -1,12 +1,14 @@
 // AMEN_MINI — Player temps réel PC (J2).
 // Le PC joue le rôle du Teensy : la lib audio appelle render() comme le
 // callback du codec le fera. Le clavier simule la face avant de la machine :
-//   numpad 1-6  = pads voix : appui = joue le break, maintien = navigateur SD
+//   numpad 1-6  = pads voix : appui = joue le break et devient la cible des
+//                 encodeurs tant qu'il est tenu. Maintenir + E1 = navigateur
+//                 SD, + E4 = vitesse de CE pad, + E5 = mode de CE pad.
 //   numpad 7-9  = pads FX : maintien = active le FX assigné
 //   F1-F7       = sélectionne l'encodeur actif (E1..E7)
 //   flèches     = tournent l'encodeur sélectionné
 //   entrée      = clique l'encodeur sélectionné
-//   espace      = retrigger du dernier pad joué
+//   espace      = retrigger du dernier pad joué (avec sa propre vitesse)
 //   retour      = dossier parent dans le navigateur
 //   q           = quitter
 // Usage : amen_rt [fichier.wav]
@@ -53,8 +55,8 @@ LiveRepeat g_repeat{kOutputSampleRate,
                     g_repeatFrozenL.data(),
                     g_repeatFrozenR.data(),
                     kRepeatBufferFrames};
-std::atomic<int> g_speedPercent{100};
-std::atomic<int> g_lastPadId{0};
+std::atomic<int> g_targetSpeedPercent{100};
+std::atomic<int> g_targetPadId{-1};
 std::atomic<int> g_repeatAmountPercent{100};
 std::atomic<int> g_repeatDivision{0};
 std::atomic<int> g_bpm{145};
@@ -68,12 +70,24 @@ const char* kDivisionNames[] = {"1/4", "1/8", "1/16", "1/32"};
 const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
                                "E5 MODE", "E6 J10", "E7 BPM"};
 
+constexpr int kVoicePadCount = 6;
+
+// Réglages propres à chaque pad voix : la vitesse et le mode vivent ici,
+// jamais dans une variable globale. La cible des encodeurs E4/E5 est le pad
+// tenu (heldVoicePad), pas le dernier pad joué.
+struct PadSettings {
+    int speedPercent = 100;
+    PlaybackMode mode = PlaybackMode::OneShot;
+};
+
 struct UiSimulation {
     int bpm = 145;
     int effectAmount = 100;
     int repeatDivision = 0;
-    int speedPercent = 100;
-    PlaybackMode mode = PlaybackMode::OneShot;
+    std::array<PadSettings, kVoicePadCount> pads{};
+    std::array<int, kVoicePadCount> padPressSeq{};
+    int pressSeqCounter = 0;
+    int heldVoicePad = -1;
     int lastPadId = 0;
     int selectedEncoder = 1;
     int heldFxPad = -1;
@@ -161,12 +175,51 @@ void load_browser_selection(ScreenUi& screen, AppState& state) {
                 state.wav.sampleRate, kOutputSampleRate);
 }
 
-void set_speed_percent(int speedPercent, ScreenUi& screen, UiSimulation& simulation,
-                       std::uint64_t time) {
-    simulation.speedPercent = std::clamp(speedPercent, 25, 400);
-    g_speedPercent.store(simulation.speedPercent);
-    screen.showParameter("SPEED", simulation.speedPercent, 25, 400, time, "%");
-    std::printf("vitesse : %d%%\n", simulation.speedPercent);
+// Overlay 128x32 d'un paramètre ciblant un pad précis : le nom composite
+// "PAD n SPEED" indique quelle cible est éditée, en plus de la valeur.
+void show_pad_overlay(ScreenUi& screen, int pad, const char* label, int value,
+                      int minimum, int maximum, std::uint64_t time,
+                      const char* suffix = nullptr) {
+    std::array<char, 17> name{};
+    std::snprintf(name.data(), name.size(), "PAD %d %s", pad + 1, label);
+    screen.showParameter(name.data(), value, minimum, maximum, time, suffix);
+}
+
+// Applique la vitesse au pad donné : stocke la valeur du pad (pour son
+// prochain trigger) et pose la paire atomique lue par le callback audio
+// (vitesse écrite d'abord, pad ensuite) pour la rampe live sans retrigger.
+void set_pad_speed_percent(int pad, int speedPercent, ScreenUi& screen,
+                           UiSimulation& simulation, std::uint64_t time) {
+    if (pad < 0 || pad >= kVoicePadCount) return;
+    simulation.pads[pad].speedPercent = std::clamp(speedPercent, 25, 400);
+    g_targetSpeedPercent.store(simulation.pads[pad].speedPercent);
+    g_targetPadId.store(pad);
+    show_pad_overlay(screen, pad, "SPEED", simulation.pads[pad].speedPercent, 25,
+                     400, time, "%");
+    std::printf("pad %d vitesse : %d%%\n", pad + 1,
+                simulation.pads[pad].speedPercent);
+}
+
+const char* mode_label(PlaybackMode mode) {
+    switch (mode) {
+        case PlaybackMode::OneShot:
+            return "ONE SHOT";
+        case PlaybackMode::Loop:
+            return "LOOP";
+        case PlaybackMode::Granular:
+            return "GRANULAR";
+        case PlaybackMode::SliceSync:
+            return "SLICE SYNC";
+    }
+    return "ONE SHOT";
+}
+
+void set_pad_mode(int pad, PlaybackMode mode, ScreenUi& screen,
+                  UiSimulation& simulation, std::uint64_t time) {
+    if (pad < 0 || pad >= kVoicePadCount) return;
+    simulation.pads[pad].mode = mode;
+    show_pad_overlay(screen, pad, "MODE", 0, 0, 1, time);
+    std::printf("pad %d mode : %s\n", pad + 1, mode_label(mode));
 }
 
 RepeatDivision repeat_division(int index) {
@@ -183,20 +236,6 @@ RepeatDivision repeat_division(int index) {
 }
 
 #ifdef _WIN32
-const char* mode_label(PlaybackMode mode) {
-    switch (mode) {
-        case PlaybackMode::OneShot:
-            return "ONE SHOT";
-        case PlaybackMode::Loop:
-            return "LOOP";
-        case PlaybackMode::Granular:
-            return "GRANULAR";
-        case PlaybackMode::SliceSync:
-            return "SLICE SYNC";
-    }
-    return "ONE SHOT";
-}
-
 void select_encoder(int encoder, ScreenUi& screen, UiSimulation& simulation) {
     simulation.selectedEncoder = std::clamp(encoder, 1, 7);
     if (simulation.heldFxPad >= 0) {
@@ -232,6 +271,11 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
                     --state.browserSelection;
                     refresh_browser(screen, state);
                 }
+            } else if (simulation.heldVoicePad >= 0) {
+                state.browserActive = true;
+                refresh_browser(screen, state);
+                std::printf("navigateur pour pad %d (relacher pour fermer)\n",
+                            simulation.heldVoicePad + 1);
             } else {
                 screen.showParameter("E1 TENIR PAD", 0, 0, 0, time);
             }
@@ -253,13 +297,24 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
                         kDivisionNames[simulation.repeatDivision]);
             break;
         case 4:
-            set_speed_percent(simulation.speedPercent + 5 * direction, screen,
-                              simulation, time);
+            if (simulation.heldVoicePad >= 0) {
+                set_pad_speed_percent(
+                    simulation.heldVoicePad,
+                    simulation.pads[simulation.heldVoicePad].speedPercent +
+                        5 * direction,
+                    screen, simulation, time);
+            } else {
+                screen.showParameter("E4 TENIR PAD", 0, 0, 0, time);
+            }
             break;
         case 5:
-            simulation.mode = next_mode(simulation.mode);
-            screen.showParameter(mode_label(simulation.mode), 0, 0, 1, time);
-            std::printf("mode : %s\n", mode_label(simulation.mode));
+            if (simulation.heldVoicePad >= 0) {
+                set_pad_mode(simulation.heldVoicePad,
+                             next_mode(simulation.pads[simulation.heldVoicePad].mode),
+                             screen, simulation, time);
+            } else {
+                screen.showParameter("E5 TENIR PAD", 0, 0, 0, time);
+            }
             break;
         case 6:
             screen.showParameter("E6 RESERVE J10", 0, 0, 0, time);
@@ -287,14 +342,28 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
                             kFxNames[simulation.fxCandidate]);
             } else if (state.browserActive) {
                 load_browser_selection(screen, state);
+            } else if (simulation.heldVoicePad >= 0) {
+                state.browserActive = true;
+                refresh_browser(screen, state);
+                std::printf("navigateur pour pad %d (relacher pour fermer)\n",
+                            simulation.heldVoicePad + 1);
             }
             break;
         case 4:
-            set_speed_percent(100, screen, simulation, time);
+            if (simulation.heldVoicePad >= 0) {
+                set_pad_speed_percent(simulation.heldVoicePad, 100, screen,
+                                      simulation, time);
+            } else {
+                screen.showParameter("E4 TENIR PAD", 0, 0, 0, time);
+            }
             break;
         case 5:
-            screen.showParameter(mode_label(simulation.mode), 0, 0, 1, time);
-            std::printf("mode applique aux 12 chops (simulation)\n");
+            if (simulation.heldVoicePad >= 0) {
+                set_pad_mode(simulation.heldVoicePad, PlaybackMode::OneShot, screen,
+                             simulation, time);
+            } else {
+                screen.showParameter("E5 TENIR PAD", 0, 0, 0, time);
+            }
             break;
         case 6:
             screen.showParameter("E6 RESERVE J10", 0, 0, 0, time);
@@ -307,19 +376,44 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
 void voice_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation,
                     AppState& state) {
     const PcmView pcm = state.wav.view();
-    const float speed = static_cast<float>(simulation.speedPercent) / 100.0f;
+    const float speed =
+        static_cast<float>(simulation.pads[pad].speedPercent) / 100.0f;
     {
         std::lock_guard<std::mutex> lock(g_audioMutex);
         g_voices.trigger(static_cast<VoiceManager::PadId>(pad), pcm, 0,
                          pcm.frameCount(), speed);
     }
+    // Le pad appuyé devient la cible des encodeurs tant qu'il est tenu.
+    // Règle "le dernier appuyé gagne" : l'ordre d'appui est mémorisé par pad.
+    simulation.heldVoicePad = pad;
+    simulation.padPressSeq[pad] = ++simulation.pressSeqCounter;
     simulation.lastPadId = pad;
-    g_lastPadId.store(pad);
-    state.browserActive = true;
     if (simulation.heldFxPad < 0) {
-        refresh_browser(screen, state);
+        screen.showPerformance();
     }
-    std::printf("pad %d : trigger (maintien = navigateur SD)\n", pad + 1);
+    std::printf(
+        "pad %d : trigger (tenir + E1 = navigateur, + E4 vitesse, + E5 mode)\n",
+        pad + 1);
+}
+
+// Quand le pad tenu est relâché, la cible retombe sur le dernier pad encore
+// appuyé (le plus récemment pressé), sinon aucun. La fermeture du navigateur
+// reste gérée par poll_numpad quand tous les pads voix sont relâchés.
+void voice_pad_up(int pad, ScreenUi& screen, UiSimulation& simulation,
+                  AppState& state) {
+    (void)screen;
+    (void)state;
+    if (simulation.heldVoicePad != pad) return;
+    int best = -1;
+    int bestSeq = -1;
+    const std::uint16_t held = simulation.numpadPrev;
+    for (int p = 0; p < kVoicePadCount; ++p) {
+        if (((held >> p) & 1U) != 0 && simulation.padPressSeq[p] > bestSeq) {
+            bestSeq = simulation.padPressSeq[p];
+            best = p;
+        }
+    }
+    simulation.heldVoicePad = best;
 }
 
 void fx_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation) {
@@ -359,6 +453,9 @@ void poll_numpad(ScreenUi& screen, UiSimulation& simulation, AppState& state) {
     for (int pad = 0; pad < 6; ++pad) {
         if ((pressed & (1U << pad)) != 0) {
             voice_pad_down(pad, screen, simulation, state);
+        }
+        if ((released & (1U << pad)) != 0) {
+            voice_pad_up(pad, screen, simulation, state);
         }
     }
     for (int pad = 6; pad < 9; ++pad) {
@@ -406,13 +503,14 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
         }
     } else if (c == ' ') {
         const PcmView pcm = state.wav.view();
-        const float speed = static_cast<float>(simulation.speedPercent) / 100.0f;
+        const float speed =
+            static_cast<float>(simulation.pads[simulation.lastPadId].speedPercent) /
+            100.0f;
         {
             std::lock_guard<std::mutex> lock(g_audioMutex);
             g_voices.trigger(static_cast<VoiceManager::PadId>(simulation.lastPadId),
                              pcm, 0, pcm.frameCount(), speed);
         }
-        g_lastPadId.store(simulation.lastPadId);
         std::printf("retrigger pad %d\n", simulation.lastPadId + 1);
     }
     // '1'-'9' ignorés : les pads numpad sont lus par poll_numpad (VK_NUMPADx).
@@ -429,7 +527,7 @@ void key_loop(ScreenUi& screen, ScreenPreview& preview, AppState& state) {
             g_running.store(false);
         }
         screen.setPerformance(state.breakName.c_str(), simulation.bpm,
-                              simulation.mode);
+                              simulation.pads[simulation.lastPadId].mode);
         screen.render(now_ms());
         preview.draw(screen);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -468,19 +566,27 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
             }
         }
     } else if (c == 'z') {
-        set_speed_percent(simulation.speedPercent - 5, screen, simulation, time);
+        set_pad_speed_percent(simulation.lastPadId,
+                              simulation.pads[simulation.lastPadId].speedPercent - 5,
+                              screen, simulation, time);
     } else if (c == 'x') {
-        set_speed_percent(simulation.speedPercent + 5, screen, simulation, time);
+        set_pad_speed_percent(simulation.lastPadId,
+                              simulation.pads[simulation.lastPadId].speedPercent + 5,
+                              screen, simulation, time);
     } else if (c == 'c') {
-        set_speed_percent(100, screen, simulation, time);
+        set_pad_speed_percent(simulation.lastPadId, 100, screen, simulation, time);
     } else if (c == ' ') {
         std::lock_guard<std::mutex> lock(g_audioMutex);
         const PcmView pcm = state.wav.view();
-        const float speed = static_cast<float>(simulation.speedPercent) / 100.0f;
-        g_voices.trigger(0, pcm, 0, pcm.frameCount(), speed);
-        std::printf("retrigger\n");
+        const float speed =
+            static_cast<float>(simulation.pads[simulation.lastPadId].speedPercent) /
+            100.0f;
+        g_voices.trigger(static_cast<VoiceManager::PadId>(simulation.lastPadId),
+                         pcm, 0, pcm.frameCount(), speed);
+        std::printf("retrigger pad %d\n", simulation.lastPadId + 1);
     } else if (c == 'm') {
-        simulation.mode = next_mode(simulation.mode);
+        simulation.pads[simulation.lastPadId].mode =
+            next_mode(simulation.pads[simulation.lastPadId].mode);
     } else if (c == 'e') {
         simulation.repeatDivision = (simulation.repeatDivision + 1) % 4;
         g_repeatDivision.store(simulation.repeatDivision);
@@ -518,7 +624,7 @@ void key_loop(ScreenUi& screen, ScreenPreview& preview, AppState& state) {
             handle_key(c, screen, simulation, state);
         }
         screen.setPerformance(state.breakName.c_str(), simulation.bpm,
-                              simulation.mode);
+                              simulation.pads[simulation.lastPadId].mode);
         screen.render(now_ms());
         preview.draw(screen);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -537,15 +643,24 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     std::unique_lock<std::mutex> lock(g_audioMutex, std::try_to_lock);
     if (!lock.owns_lock()) return;
 
-    static int appliedSpeedPercent = 100;
+    static int appliedTargetPad = -2;
+    static int appliedSpeedPercent = -1;
     static int appliedAmountPercent = -1;
     static int appliedDivision = -1;
     static int appliedBpm = -1;
     static bool appliedRepeatActive = false;
-    const int targetSpeedPercent = g_speedPercent.load();
-    if (targetSpeedPercent != appliedSpeedPercent) {
-        const float speed = static_cast<float>(targetSpeedPercent) / 100.0f;
-        g_voices.setPadSpeed(g_lastPadId.load(), speed);
+    // La cible et la vitesse voyagent ensemble : lecture pad puis vitesse
+    // (l'UI écrit vitesse puis pad). Au pire, un cycle applique une valeur
+    // d'un bloc avant de se corriger — imperceptible.
+    const int targetPad = g_targetPadId.load();
+    const int targetSpeedPercent = g_targetSpeedPercent.load();
+    if (targetPad != appliedTargetPad ||
+        targetSpeedPercent != appliedSpeedPercent) {
+        if (targetPad >= 0) {
+            const float speed = static_cast<float>(targetSpeedPercent) / 100.0f;
+            g_voices.setPadSpeed(static_cast<VoiceManager::PadId>(targetPad), speed);
+        }
+        appliedTargetPad = targetPad;
         appliedSpeedPercent = targetSpeedPercent;
     }
 
@@ -634,8 +749,8 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "impossible d'ouvrir l'apercu OLED\n");
     }
 
-    std::printf("numpad 1-6 : pads voix (maintien = navigateur SD) | numpad 7-9 : pads FX (maintien = activation)\n");
-    std::printf("F1-F7 : encodeurs | E2 amount | E3 division Repeat | E7 BPM | entree : clic | q : quitter\n");
+    std::printf("numpad 1-6 : pads voix (appui = trigger + cible ; tenir + E1 = navigateur, + E4 vitesse, + E5 mode)\n");
+    std::printf("numpad 7-9 : pads FX (maintien = activation) | F1-F7 : encodeurs | E2 amount | E3 division | E7 BPM | entree : clic | q : quitter\n");
     key_loop(screen, preview, state);
 
     ma_device_uninit(&device);
