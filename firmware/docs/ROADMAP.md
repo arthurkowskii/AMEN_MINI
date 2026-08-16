@@ -128,7 +128,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 - Objectif : les 7 encodeurs en pages (pad / globale / browser) + USB-MIDI.
 - Fichiers : logique portable `src/ui/` et `src/browser/`, backends PC `test_native/screen_preview.cpp` et `sample_catalog_scanner.cpp`, futur backend OLED/SD/MIDI sous `src/teensy/`.
-- Spec contrôles : E1 porte la navigation duale (voice = SD, FX = liste et assignation). E2 règle l'amount dry/wet du Repeat, E3 sa division, E4 reste la vitesse sample, E5 le mode, E6 est réservé et E7 le BPM. Mode cible le dernier chop joué ; chaque chop mémorise son mode. Shift = couche secondaire (volume, tap tempo, etc.). USB-MIDI : notes sur les pads (canal configurable), CC sur les encodeurs. Voir `docs/CONTROLS.md`.
+- Spec contrôles : E1 porte la navigation duale (voice = SD, FX = liste et assignation). E2 règle l'amount dry/wet du Repeat, E3 sa division, E4 la vitesse du pad voix tenu, E5 son mode, E6 est réservé et E7 le BPM. Chaque pad mémorise sa propre vitesse et son mode. Shift = couche secondaire (volume, tap tempo, etc.). USB-MIDI : notes sur les pads (canal configurable), CC sur les encodeurs. Voir `docs/CONTROLS.md`.
 - Spec écran : framebuffer monochrome 128×32 portable. Au repos : nom du break, BPM et mode du chop sélectionné. Tout changement de paramètre ouvre un overlay pendant 1 s, avec zone 32×32 réservée au symbole/illustration, nom technique lisible et valeur forte. Direction artistique : anges, ailes, croix et auréoles ; 3 états visuels (calme / tendu / furieux) et micro-animations ponctuelles, à produire après validation fonctionnelle. Les pages utilitaires (browser, erreurs) privilégient la lisibilité.
 - Spec browser : la racine et chaque dossier affichent leurs WAV directs et uniquement les sous-dossiers ayant au moins un WAV descendant. L'arborescence et la casse d'affichage de la carte sont conservées ; comparaisons et extension `.wav` sont insensibles à la casse. La sélection charge un seul WAV à la fois sans dupliquer le PCM entre les pads/voix.
 - DoD : le visualiseur PC suit les contrôles et revient à l'écran Performance 1 s après un overlay ; on navigue dans la SD depuis le browser et on charge un break sans reboot ; le BPM se règle live ; un DAW reçoit les notes.
@@ -156,6 +156,15 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - Le maintien des pads est réel sous Windows (polling `GetAsyncKeyState` sur VK_NUMPAD1..9, indépendant du NumLock, front détecté toutes les 10 ms) ; l'écran « PAD n » (`ScreenUi::showFxPad`) affiche le nom du FX en grand et un hint dépendant de l'encodeur sélectionné (E1 = « E1 NAV CLIC ASSIGN », sinon « F1 POUR E1 »).
 - Le sim PC est une réduction de la machine : 6 pads voix au lieu de 12 chops (J5 pas fait — tous déclenchent le break entier) et 3 pads FX au lieu de 8 ; le pool reste à 4 voix avec vol de la plus ancienne (J3). Le mapping physique E1-E7 sur le panneau reste à confirmer une fois le câblage défini.
 - Prochaines étapes : la priorité reste J12/J4 (couche `src/teensy/`, `WavReader` SD, arène PSRAM) comme indiqué au checkpoint précédent. Côté interaction, le chantier logique suivant est J5 (slices — les pads voix jouent des chops distincts). Le Repeat natif est prêt ; Reverse et Trance Gate restent sans DSP.
+
+### Checkpoint 16/08/2026 (session 3) — cible paramètres « pad maintenu »
+
+- Commit fonctionnel : `ab28049` (`feat: target held pad for speed and mode edit`) sur `dev`.
+- E4/E5 ne ciblent plus le « dernier pad joué » mais le pad voix **tenu** : chaque pad mémorise sa propre vitesse (25-400 %) et son propre mode, appliqués en direct à la voix active (rampe 128 frames, sans retrigger) et réutilisés au prochain trigger. Clic E4 = 100 % du pad tenu, clic E5 = ONE SHOT du pad tenu. Sans pad tenu : hints `E4/E5 TENIR PAD`, aucun effet.
+- Grammaire « tenir le pad = cibler » : E1 ouvre le navigateur SD du pad tenu (l'appui seul ne change plus l'écran) ; le relâchement retombe sur le dernier pad encore tenu (règle « le dernier appuyé gagne »).
+- Implémentation : `UiSimulation` gagne un tableau `PadSettings` par pad + `heldVoicePad` (ordre d'appui mémorisé pour le retarget) ; le callback audio reçoit une paire d'atomiques (pad + vitesse, écriture vitesse puis pad) et appelle `VoiceManager::setPadSpeed`. Le moteur (`voice_manager.cpp`, `sample_player.cpp`) et `ScreenUi` sont inchangés.
+- Espace retrigger : dernier pad joué avec SA propre vitesse.
+- Vérifié : compile g++ exit 0 (warnings miniaudio vendored uniquement), smoke test PC, `start_firmware.ps1` (« deja compile » + lancement avec les nouveaux contrôles). **Non encore validé à l'écoute par Arthur.**
 
 ## J14 — Polish, démo, git [À FAIRE] — P1
 
