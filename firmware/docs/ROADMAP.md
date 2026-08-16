@@ -47,7 +47,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 ## J4 — PSRAM (mémoire Teensy) [EN COURS — API buffer externe] — P1
 
 - Objectif : les échantillons chargés vivent en PSRAM (8 Mo) sur Teensy, pas en RAM interne (1 Mo).
-- Fichiers : couche Teensy `src/teensy/` (allocateur) ; le moteur ne change pas.
+- Fichiers : future couche Teensy `src/teensy/` (`WavReader` SD + propriétaire du buffer PSRAM) ; le moteur portable ne dépend pas d'Arduino.
 - Spec : le chargeur commence par `wav_probe()`, calcule la taille PCM16 finale, puis `wav_decode()` écrit sans allocation dans un buffer fourni par la plateforme. Sur Teensy, ce buffer est une grande zone allouée une seule fois via `extmem_malloc` ; sur PC, `WavData` reste propriétaire de son vector. 1 s stéréo 16-bit = 176 Ko ; un break 6 s ≈ 1 Mo → ~45 s de stéréo dans 8 Mo. Les voix consomment une `PcmView` non propriétaire et ne dépendent pas du type d'allocation.
 - DoD : sur PC rien ne change ; sur Teensy, un sketch de test charge un WAV depuis la SD dans la PSRAM et mesure la mémoire libre (RAM interne quasi intacte, PSRAM consommée).
 - Vérification : compile arduino-cli + test réel quand le matériel arrive (sinon : vérification du code + bench RAM sur PC simulé).
@@ -112,8 +112,8 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 ## J12 — Couche Teensy : drivers + Audio Library [À FAIRE] — P1
 
 - Objectif : faire tourner le moteur sur la vraie machine.
-- Fichiers : `firmware.ino` (graphe audio existe déjà depuis le 11/08 : oscillateur → I2S → casque), `src/teensy/` (SD, PSRAM, matrice 21 pads, 7 encodeurs, OLED SSD1306 I2C).
-- Spec : brancher le moteur au graphe Audio Library (SGTL5000) : un objet AudioStream qui appelle le render() du moteur à la place de l'oscillateur. SD → wav_load → PSRAM. Matrice : 21 switches (12 chops + 8 fx + shift), lecture sans ghosting. Encodeurs : incrémentaux, jamais de saut de valeur. OLED : contexte des pages.
+- Fichiers à créer : `firmware.ino` et `src/teensy/` (SD, PSRAM, AudioStream, matrice 21 pads, 7 encodeurs, OLED SSD1306 I2C). Aucun de ces fichiers n'existe encore au checkpoint `5cff9c5`.
+- Spec : initialiser SGTL5000/I2S et brancher un objet AudioStream qui appelle le render() du moteur. Le backend SD enveloppe `File` dans `WavReader`, le backend mémoire réserve une zone via `extmem_malloc()`, puis la chaîne est SD → `wav_probe()` → contrôle capacité → `wav_decode()` directement en PSRAM → `PcmView`. Matrice : 21 switches (12 chops + 8 fx + shift), lecture sans ghosting. Encodeurs : incrémentaux, jamais de saut de valeur. OLED : contexte des pages et browser.
 - DoD : compile arduino-cli (`arduino-cli compile --fqbn teensy:avr:teensy41 firmware`) ; sur matériel : son dans le casque, pads déclenchent les voix, encodeurs changent le pitch.
 - Vérification : compile + test réel (matériel attendu fin août).
 
@@ -129,6 +129,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 ### Checkpoint 16/08/2026 — fondation sample browser
 
+- Commit fonctionnel : `5cff9c5` (`feat: add sample browser foundation`) sur `dev`.
 - Livré côté portable/PC : `PcmView` non propriétaire, `SamplePlayer` à plage `[startFrame, endFrame)`, pool fixe de 4 voix partageant le même PCM, `wav_probe()` + `wav_decode()` vers un buffer externe sans allocation, catalogue hiérarchique FAT case-insensitive, scanner récursif PC, écran browser 128×32 et chargement d'un WAV sélectionné sans redémarrage.
 - Tests ajoutés : `voice_manager_test.cpp`, `wav_loader_reader_test.cpp`, `sample_catalog_test.cpp`, `sample_catalog_scanner_test.cpp` et extension de `screen_ui_test.cpp`. Les tests natifs stricts, les cinq formats WAV, la compilation hôte `-DARDUINO`, le harness Windows et `start_firmware.ps1` passent.
 - Limite importante : aucune allocation PSRAM réelle ni lecture SD Teensy n'existe encore. Le PC utilise toujours `WavData::samples` et le scanner `std::filesystem`. Il ne faut pas considérer J4 ou J12 terminés.
