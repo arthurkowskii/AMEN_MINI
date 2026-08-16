@@ -15,8 +15,9 @@ Run native commands from `firmware/`.
 - Build the WAV loader test with warnings enabled (PowerShell): `g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -I src/engine test_native/main.cpp src/engine/wav_loader.cpp -o "$env:TEMP/amen_test.exe"`.
 - The loader test writes `out.wav` in its working directory. Run it from a temporary directory if you do not want an artifact in the repo.
 - Full format validation is `python3 test_native/check_formats.py`, but the script hardcodes its test executable as `/tmp/amen_test`; it is directly usable on Linux after compiling to that path, not from ordinary Windows Python. It also regenerates the committed files under `test_native/test_wavs/`.
-- Build the Windows listening harness: `g++ -std=c++17 -O2 test_native/rt_player.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp -I src/engine -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm`.
-- Run `amen_rt.exe test_native/test.wav`; keys `1`-`5` change speed, Space retriggers, and `q` exits. Adding strict warnings to this target currently emits warnings from vendored `miniaudio.h`, unlike the engine-only test.
+- Build the Windows listening harness: `g++ -std=c++17 -O2 test_native/rt_player.cpp test_native/screen_preview.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp src/ui/screen_ui.cpp -I src/engine -I src/ui -I test_native -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm -lgdi32 -luser32`.
+- Run `amen_rt.exe test_native/test.wav`; keys `1`-`5` change speed, Space retriggers, `m` changes mode, `e` selects the effect preview, `[`/`]` change intensity, `-`/`+` change BPM, and `q` exits. Adding strict warnings to this target currently emits warnings from vendored `miniaudio.h`, unlike the engine-only test.
+- After changing listening-harness sources, dependencies, compiler/linker options, or controls, update `start_firmware.ps1` when necessary and run it as the integration check. Its source tracking, build command, and displayed controls must remain aligned with the manual command above.
 - `arduino-cli` is not currently installed in the repository's Windows development environment.
 
 ## Engine Contracts

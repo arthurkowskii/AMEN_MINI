@@ -26,7 +26,13 @@ if ($running) {
     Start-Sleep -Milliseconds 300
 }
 
-$srcs = @(Get-Item firmware/test_native/rt_player.cpp) + @(Get-ChildItem firmware/src/engine -Recurse -Include *.cpp, *.h)
+$srcs = @(
+    Get-Item firmware/test_native/rt_player.cpp
+    Get-Item firmware/test_native/screen_preview.cpp
+    Get-Item firmware/test_native/screen_preview.h
+    Get-ChildItem firmware/src/engine -Recurse -Include *.cpp, *.h
+    Get-ChildItem firmware/src/ui -Recurse -Include *.cpp, *.h
+)
 $needsBuild = -not (Test-Path "firmware/amen_rt.exe")
 if (-not $needsBuild) {
     $exeTime = (Get-Item "firmware/amen_rt.exe").LastWriteTime
@@ -35,10 +41,13 @@ if (-not $needsBuild) {
 if ($needsBuild) {
     Write-Host "moteur audio : compilation ..." -NoNewline
     $libs = @()
-    if ($env:OS -eq "Windows_NT") { $libs = @("-lole32", "-lwinmm") }
+    if ($env:OS -eq "Windows_NT") {
+        $libs = @("-lole32", "-lwinmm", "-lgdi32", "-luser32")
+    }
     $cppFiles = $srcs | Where-Object { $_.Extension -eq ".cpp" } | ForEach-Object { $_.FullName }
     $build = & g++ -std=c++17 -O2 -Wno-stringop-overflow -Wno-stringop-overread `
-        -I firmware/src/engine -I firmware/test_native/third_party `
+        -I firmware/src/engine -I firmware/src/ui -I firmware/test_native `
+        -I firmware/test_native/third_party `
         @cppFiles `
         -o firmware/amen_rt.exe @libs 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -59,7 +68,7 @@ $WavFull = (Resolve-Path $Wav).Path
 Write-Host "echantillon charge : $WavFull" -ForegroundColor Green
 
 Write-Host "sequenceur pret."
-Write-Host "touches : 1-5 vitesse | espace retrigger | q quitter" -ForegroundColor Cyan
+Write-Host "touches : 1-5 vitesse | espace retrigger | m mode | e effet | [/] intensite | -/+ BPM | q quitter" -ForegroundColor Cyan
 Write-Host ""
 
 Set-Location firmware

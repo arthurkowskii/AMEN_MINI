@@ -16,7 +16,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - Format interne : **int16 partout** (WavData.samples = vector<int16_t>), stéréo conservée, WAV 44,1 kHz.
   Les buffers de sortie render() sont des floats dans [-1, 1] (division par 32768).
 - Tests PC : `firmware/test_native/` — miniaudio (header-only) dans `test_native/third_party/`.
-  Compile + écoute Windows : `g++ -std=c++17 -O2 test_native/rt_player.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp -I src/engine -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm` puis `amen_rt.exe test_native/test.wav` (touches 1-5 = vitesse, espace = retrig, q = quitter).
+  Compile + écoute Windows : `g++ -std=c++17 -O2 test_native/rt_player.cpp test_native/screen_preview.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp src/ui/screen_ui.cpp -I src/engine -I src/ui -I test_native -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm -lgdi32 -luser32` puis `amen_rt.exe test_native/test.wav` (touches 1-5 = vitesse, espace = retrig, m = mode, e = effet, [/] = intensité, -/+ = BPM, q = quitter). Le visualiseur reproduit le framebuffer OLED 128×32 dans une fenêtre 640×160 ; les illustrations sont encore des emplacements réservés.
 - Le moteur ne touche JAMAIS au matériel. Tout ce qui est Teensy (SD, PSRAM, GPIO, Audio Library) vit dans la couche Teensy (firmware.ino + src/teensy/).
 - Définition de fait globale : compile sans warning (g++ -Wall -Wextra) + vérification numérique/écoute + push sur dev.
 
@@ -92,13 +92,14 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : changer le BPM recalcule les retrigs en live ; le morph glisse d'une slice à l'autre sans saut.
 - Vérification : écoute au métronome (BPM 80-140) + vérif des périodes de retrig par analyse.
 
-## J10 — Effets 8 pads [À FAIRE] — P2
+## J10 — Effets expérimentaux jouables [À FAIRE] — P1
 
-- Objectif : 8 pads fx jouables en direct : reverse, stutter/roll, filtre, pitch bend, tape stop, bitcrush, half-speed, delay.
-- Fichiers : `src/engine/fx/` (un fichier par effet), intégration dans le mix.
-- Spec : reverse = speed_ négatif (tête qui recule) ; stutter/roll = retrig du buffer à un taux (calé BPM) ; filtre = one-pole (cutoff + résonance simple) ; pitch bend = glissement de speed_ vers une cible ; tape stop = rampe speed_ → 0 (décélération) ; bitcrush = réduction de résolution (masquage de bits) ; half-speed = speed_ = 0,5 ; delay = ligne à retard unique, envoi global, temps calé BPM. Chaque effet s'active depuis un pad fx et s'applique au mix (ou à la voix active).
-- DoD : chaque effet s'entend distinctement, sans craquement à l'activation (rampes courtes), delay et stutter calés sur le BPM.
-- Vérification : écoute + test numérique unitaire par effet (ex. bitcrush : paliers visibles dans l'onde ; tape stop : fréquence décroissante).
+- Objectif septembre : trois familles originales et fiables plutôt que huit effets génériques — trance gate, disperser de phase all-pass et résonateur harmonique accordable. Les 8 pads fx pourront rappeler des variantes/presets ; le mapping final dépendra des tests d'écoute.
+- Fichiers : `src/engine/fx/` (un fichier par famille), intégration dans le mix, paramètres exposés à l'UI.
+- Spec : trance gate = pattern synchronisé au BPM, profondeur et transitions lissées ; disperser = cascade de filtres all-pass sans traitement FFT, quantité/fréquence/spread/mix ; résonateur = banque de filtres accordée sur une fondamentale et une gamme choisies, decay/couleur/mix. Pad fx maintenu = effet actif et les 4 encodeurs du haut pilotent ses paramètres. Relâchement sans clic via rampes courtes.
+- DoD : les trois familles produisent des résultats clairement distincts, expressifs sur un Amen Break, sans dropout ni clic d'activation. L'utilisation CPU maximale est mesurée sur Teensy avant d'ajouter une quatrième famille.
+- Vérification : tests numériques des enveloppes/filtres + écoute dans `rt_player` + `AudioProcessorUsageMax()` sur Teensy.
+- Après septembre / R&D : spectral gate STFT et frequency stretching conscient de la fondamentale. Ne pas en faire une dépendance de la démo tant que latence, suivi de fondamentale et coût CPU ne sont pas mesurés.
 
 ## J11 — Séquenceur minimal [À FAIRE] — P2
 
@@ -116,13 +117,14 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : compile arduino-cli (`arduino-cli compile --fqbn teensy:avr:teensy41 firmware`) ; sur matériel : son dans le casque, pads déclenchent les voix, encodeurs changent le pitch.
 - Vérification : compile + test réel (matériel attendu fin août).
 
-## J13 — UI pages + USB-MIDI [À FAIRE] — P1
+## J13 — UI pages + USB-MIDI [EN COURS — visualiseur PC] — P1
 
 - Objectif : les 7 encodeurs en pages (pad / globale / browser) + USB-MIDI.
-- Fichiers : `src/teensy/ui.cpp`, OLED, MIDI.
-- Spec : page pad (pitch, début chop, fin chop, +1 param selon mode), page globale (BPM, volume, niveau fx), page browser (navigation des WAV de la SD, chargement en PSRAM). Shift = couche secondaire (tap tempo = shift + pad 12, etc.). USB-MIDI : notes sur les pads (canal configurable), CC sur les encodeurs.
-- DoD : on navigue dans la SD depuis le browser et on charge un break sans reboot ; le BPM se règle live ; un DAW reçoit les notes.
-- Vérification : test réel sur matériel.
+- Fichiers : logique portable `src/ui/`, backend PC `test_native/screen_preview.cpp`, futur backend OLED et MIDI sous `src/teensy/`.
+- Spec contrôles : les 4 encodeurs du haut sont contextuels ; les 3 latéraux gardent les rôles Mode / Browser / BPM. Mode cible le dernier chop joué ; chaque chop mémorise son mode (one-shot / loop / granular / slice-sync) et une pression sur Mode applique le mode courant aux 12 chops. Pad fx maintenu = les 4 encodeurs du haut contrôlent cet effet. Shift = couche secondaire (volume, tap tempo, etc.). USB-MIDI : notes sur les pads (canal configurable), CC sur les encodeurs.
+- Spec écran : framebuffer monochrome 128×32 portable. Au repos : nom du break, BPM et mode du chop sélectionné. Tout changement de paramètre ouvre un overlay pendant 1 s, avec zone 32×32 réservée au symbole/illustration, nom technique lisible et valeur forte. Direction artistique : anges, ailes, croix et auréoles ; 3 états visuels (calme / tendu / furieux) et micro-animations ponctuelles, à produire après validation fonctionnelle. Les pages utilitaires (browser, erreurs) privilégient la lisibilité.
+- DoD : le visualiseur PC suit les contrôles et revient à l'écran Performance 1 s après un overlay ; on navigue dans la SD depuis le browser et on charge un break sans reboot ; le BPM se règle live ; un DAW reçoit les notes.
+- Vérification : `g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic test_native/screen_ui_test.cpp src/ui/screen_ui.cpp -I src/ui -o screen_ui_test.exe` puis `.\screen_ui_test.exe` + visualiseur PC + test réel sur matériel.
 
 ## J14 — Polish, démo, git [À FAIRE] — P1
 
@@ -132,5 +134,5 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 ## Priorités
 
-- P1 (chemin critique démo) : J3, J4, J5, J7, J12, J13, J14.
-- P2 (glisse après rentrée si retard, la démo tient quand même) : J6, J8, J9, J10, J11.
+- P1 (chemin critique démo) : J3, J4, J5, J7, J10 limité aux 3 familles validées, J12, J13, J14.
+- P2 (glisse après rentrée si retard, la démo tient quand même) : J6, J8, J9, J11 et effets R&D de J10.
