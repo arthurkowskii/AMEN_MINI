@@ -60,7 +60,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : chaque pad joue son segment, pitch indépendant par pad, retrig sans clic.
 - Vérification : test PC (12 pads → 12 segments distincts, fréquences/durées vérifiées) + écoute.
 
-## J6 — Auto-chop : transients / grille 16th / random [À FAIRE] — P2
+## J6 — Auto-chop : transients / grille 16th / random [SUSPENDU — à valider, pas une dépendance démo] — P2
 
 - Objectif : générer automatiquement les 12 slices à la pose du break (3 modes au choix).
 - Fichiers : `src/engine/auto_chop.h` + `auto_chop.cpp`.
@@ -169,10 +169,45 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 ## J14 — Polish, démo, git [À FAIRE] — P1
 
 - Objectif : démo présentable pour la rentrée (début septembre).
-- Spec : enchaînement démo 30-60 s : poser un break → auto-chop → 12 chops joués live → fx → séquenceur. Checklist : démarrage USB, son casque sans PC, pads fiables, contrôle live sans dropout, doc de câblage/tests. Si matériel pas arrivé : démo PC (rt_player) + flash dès réception.
+- Spec : enchaînement démo 30-60 s : poser un break → découpe en chops (J5 manuelle ; l'auto-chop J6 est suspendu) → 12 chops joués live → fx → séquenceur. Checklist : démarrage USB, son casque sans PC, pads fiables, contrôle live sans dropout, doc de câblage/tests. Si matériel pas arrivé : démo PC (rt_player) + flash dès réception.
 - DoD : la checklist passe ; tout est poussé sur dev ; Notion à jour.
+
+## Décisions nouvelles features — 16/08/2026
+
+Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis d'Arthur :
+
+### ✅ ADOPTÉ — Triplets sur E3 (P1 démo)
+
+- La division Repeat passe de `1/4 · 1/8 · 1/16 · 1/32` à `+ 1/12 · 1/24` (roll triplet, geste signature du breakbeat).
+- Coût très faible (un rapport de frames de plus dans `LiveRepeat`). Jouable pour la démo de septembre.
+
+### ✅ ADOPTÉ — Skip Back V1 (P2, après démo)
+
+- Buffer rétrospectif du mix de **15 s** en PSRAM (15 s stéréo 16-bit 44,1 kHz = 2,6 Mo ; break 6 s ≈ 1 Mo ; marge PSRAM ≈ 4,4 Mo restants).
+- Capture = **Shift + pad voix** → assigne les 15 dernières secondes au pad. Fusionne l'ancienne idée « resample-to-commit » : même mécanisme de capture rétrospective (jouer d'abord, décider après).
+- Écriture annulaire par blocs de 512 frames dans le callback, aucune allocation. Mesurer `AudioProcessorUsageMax()` sur Teensy avant d'étendre à 20-30 s.
+- **Pas de provenance/takes numérotés en V1** (suspendu) : capture simple, éventuelle méta « capturé à HH:MM:SS » plus tard.
+
+### ✅ ADOPTÉ — Checkpoint temporaire (P2, après démo)
+
+- Snapshot de l'état (pattern 16 pas + chance, BPM, vitesses/modes des pads, assigns FX) ≈ quelques Ko, copié hors callback → zéro impact temps réel.
+- Restore instantané : les gros risques live deviennent gratuits. À définir : gestes save/restore (candidat E6) et sémantique du restore (couper ou laisser finir les voix).
+
+### 🔒 SUSPENDU (à valider plus tard, pas une priorité)
+
+- **Auto-chop (J6 transients/grille/random)** : Arthur n'est pas sûr de le vouloir → J6 reste en recherche, **la démo ne doit pas en dépendre** (le flux démo peut passer par la découpe manuelle J5).
+- **Loop bed** (break entier boucle en fond + chops par-dessus) : intéressant, à valider plus tard.
+- **Fill comme geste** (pas marqués Fill joués quand on tient un pad FX) : à valider avec le séquenceur J11.
+- **Provenance/takes** des captures (voir Skip Back).
+- **Tap chop** (découpe manuelle au tapping) : écarté — pas la philosophie de la machine.
+
+### ⏸️ EN ÉTUDE — Chaos / Control All
+
+- Transformation globale du mix en un geste (drops/breakdowns). Boutons : suffisants (matrice 21 switches prévue en J12).
+- **Option A recommandée** : `CHAOS` devient un slot FX assignable (la liste FX est libre : BLANK/REPEAT/REVERSE/TRANCE GATE/CHAOS) → aucun nouveau bouton, grammaire existante. Option B : Shift + encodeur.
+- À trancher lors de l'implémentation des FX.
 
 ## Priorités
 
-- P1 (chemin critique démo) : J3, J4, J5, J7, J10 Repeat V1, J12, J13, J14.
-- P2 (glisse après rentrée si retard, la démo tient quand même) : J6, J8, J9, J11 et effets R&D de J10.
+- P1 (chemin critique démo) : J3, J4, J5, J7, J10 Repeat V1 + **Triplets E3**, J12, J13, J14.
+- P2 (glisse après rentrée si retard, la démo tient quand même) : J8, J9, J11, **Skip Back 15 s**, **Checkpoint**, effets R&D de J10, recherches suspendues (J6, loop bed, fill).
