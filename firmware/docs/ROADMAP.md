@@ -40,14 +40,14 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 - Objectif : 4 SamplePlayer simultanés — le sampler devient polyphonique tout en conservant de la marge CPU pour les effets.
 - Fichiers : `src/engine/voice_manager.h` + `voice_manager.cpp` + test dans test_native/.
-- Spec : pool de 4 voix, chacune = un SamplePlayer + son état (occupée/libre) et son `PadId`. Les voix référencent les échantillons partagés sans les copier : la durée du break pèse sur la PSRAM, tandis que le nombre de voix actives pèse sur le CPU. Un nouveau trigger du même pad arrête/remplace immédiatement sa voix active ; des pads différents restent polyphoniques. Allocation : première voix libre ; si quatre pads distincts sont actifs : vol de la voix la plus ancienne. Mixage : somme des render() de toutes les voix dans le même buffer ; clipping final à [-1, 1].
-- DoD : 4 pads distincts s'entendent additionnés sans saturation ; retrigger un même pad ne double pas son son ; un 5e pad distinct vole proprement la voix la plus ancienne.
+- Spec : pool de 4 voix, chacune = un SamplePlayer + son état (occupée/libre) et son `PadId`. Les voix référencent les échantillons partagés sans les copier : la durée du break pèse sur la PSRAM, tandis que le nombre de voix actives pèse sur le CPU. Un nouveau trigger du même pad arrête/remplace immédiatement sa voix active ; des pads différents restent polyphoniques. Allocation : première voix libre ; si quatre pads distincts sont actifs : vol de la voix la plus ancienne avec **crossfade de 64 frames (~1.5 ms)** — fade out linéaire sur la voix volée, inaudible mais anti-clic. Mixage : somme des render() de toutes les voix dans le même buffer ; clipping final à [-1, 1].
+- DoD : 4 pads distincts s'entendent additionnés sans saturation ; retrigger un même pad ne double pas son son ; un 5e pad distinct vole la voix la plus ancienne sans clic audible.
 - Vérification : test PC qui déclenche 4 voix à des positions décalées, mesure que le mix ne dépasse pas [-1,1] et vérifie que le 5e trigger vole la bonne voix ; écoute via rt_player étendu (touches = pads).
 
 ## J4 — PSRAM (mémoire Teensy) [EN COURS — API buffer externe] — P1
 
 - Objectif : les échantillons chargés vivent en PSRAM (8 Mo) sur Teensy, pas en RAM interne (1 Mo).
-- Fichiers : future couche Teensy `src/teensy/` (`WavReader` SD + propriétaire du buffer PSRAM) ; le moteur portable ne dépend pas d'Arduino.
+- Fichiers : `src/teensy/psram_arena.h/.cpp` (bootstrap commit `48d9f1c`), `src/teensy/teensy_wav_reader.h/.cpp`, `src/teensy/sample_loader.h/.cpp` ; le moteur portable ne dépend pas d'Arduino.
 - Spec : le chargeur commence par `wav_probe()`, calcule la taille PCM16 finale, puis `wav_decode()` écrit sans allocation dans un buffer fourni par la plateforme. Sur Teensy, ce buffer est une grande zone allouée une seule fois via `extmem_malloc` ; sur PC, `WavData` reste propriétaire de son vector. 1 s stéréo 16-bit = 176 Ko ; un break 6 s ≈ 1 Mo → ~45 s de stéréo dans 8 Mo. Les voix consomment une `PcmView` non propriétaire et ne dépendent pas du type d'allocation.
 - DoD : sur PC rien ne change ; sur Teensy, un sketch de test charge un WAV depuis la SD dans la PSRAM et mesure la mémoire libre (RAM interne quasi intacte, PSRAM consommée).
 - Vérification : compile arduino-cli + test réel quand le matériel arrive (sinon : vérification du code + bench RAM sur PC simulé).
@@ -70,10 +70,13 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 ## J7 — One-shot + loop + test d'écoute [À FAIRE] — P1
 
-- Objectif : modes one-shot (actuel) et loop ; première session d'écoute complète sur PC.
+- Objectif : modes one-shot et loop, avec comportement de latch intégré au mode — le mode définit si le pad reste actif doigt levé.
 - Fichiers : SamplePlayer (mode), test_native/rt_player.cpp (choix du mode au clavier).
-- Spec : mode loop = à la fin du range, pos_ revient à start (pas d'arrêt, pas de clic audible — si clic : court crossfade de ~5 ms). Mode one-shot = comportement J2/J5 actuel.
-- DoD : un break boucle sans artefact pendant 30 s ; one-shot s'arrête net.
+- Spec :
+  - **ONE SHOT** : lecture complète du range. Deux variantes à trancher — AUTO (l'appui déclenche la lecture complète) vs GATE (lecture uniquement tant que le pad est tenu). Le mécanisme de sélection est à définir (E6 `TRIG MODE` ou clic long E5).
+  - **LOOP** : latch — l'appui lance la boucle, elle continue doigt levé. Un deuxième appui sur le même pad stoppe. À la fin du range, pos_ revient à start sans clic (crossfade de couture ~5 ms si nécessaire).
+  - **GRANULAR** (futur J8) et **SLICE SYNC** (futur J9) : latch également, 2e appui stoppe.
+- DoD : un break boucle sans artefact pendant 30 s, 2e appui stoppe net ; one-shot s'arrête à la fin du range ou au relâchement (gate).
 - Vérification : écoute + test de durée (la boucle ne retourne jamais false).
 
 ## J8 — Granulaire [À FAIRE] — P2
@@ -94,9 +97,9 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 ## J10 — Live FX Repeat V1 [IMPLÉMENTÉ — ÉCOUTE À TESTER] — P1
 
-- Liste verrouillée : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`. Reverse et Trance Gate restent assignables sans DSP pour l'instant.
+- Liste assignable (8 slots, mapping 8 pads FX) : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`, `FILTER`, `DELAY`, `BITCRUSH`, `CHAOS`. Seul REPEAT a du DSP aujourd'hui ; REVERSE est P1, TRANCE GATE/FILTER/DELAY/BITCRUSH/CHAOS sont P2 (post-démo).
 - Fichiers : `src/engine/fx/live_repeat.h/.cpp`, test ciblé `test_native/live_repeat_test.cpp`, intégration après le mix global de `VoiceManager` dans `rt_player`.
-- Spec Repeat : le maintien du pad capture et boucle l'audio immédiatement antérieur à l'appui. E2 règle le dry/wet (100 % par défaut). E3 sélectionne dynamiquement `1/4`, `1/8`, `1/16`, `1/32` (défaut `1/4`). E7 recalcule la longueur au BPM live. E4 reste exclusivement la vitesse sample.
+- Spec Repeat : le maintien du pad capture et boucle l'audio immédiatement antérieur à l'appui. E2 règle le dry/wet (100 % par défaut). E3 sélectionne dynamiquement `1/4`, `1/8`, `1/8T`, `1/16`, `1/16T`, `1/32` (défaut `1/4`). Les noms affichés sont abrégés pour l'OLED 128×32 : `1/4`, `1/8`, `1/8T`, `1/16`, `1/16T`, `1/32`. E7 recalcule la longueur au BPM live. E4 reste exclusivement la vitesse sample.
 - Temps réel : `LiveRepeat` n'alloue aucune mémoire et reçoit de l'appelant quatre buffers float (historique/copie gelée stéréo) avec leur capacité. `requiredBufferFrames(sampleRate)` dimensionne le pire cas `1/4` à 20 BPM ; la future couche Teensy pourra fournir ces zones depuis la PSRAM. Activation, relâchement, amount et changement de longueur utilisent des transitions de 128 frames, et chaque couture périodique est lissée sans changer la période BPM. Le segment initial reste intact pendant un maintien prolongé.
 - Vérification native : `g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic test_native/live_repeat_test.cpp src/engine/fx/live_repeat.cpp -I src/engine -o live_repeat_test.exe` puis exécuter le test. Les tests numériques et le build Windows passent, mais le Repeat n'a pas encore été testé à l'écoute par Arthur. Le lancement de `start_firmware.ps1` vérifie uniquement que le harness démarre, pas la qualité sonore de l'effet.
 - Reste matériel : brancher le même processeur après le mix dans le futur `AudioStream`, allouer ses quatre buffers en PSRAM, mesurer `AudioProcessorUsageMax()` et écouter les transitions sur Teensy. Aucune mesure Teensy n'a encore été réalisée.
@@ -116,10 +119,11 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : un break joue en boucle avec des triggers aux pas programmés ; la chance saute des pas de façon audible ; le tempo change en live sans désync.
 - Vérification : écoute + test de timing (les retrigs tombent dans ±2 ms de la grille).
 
-## J12 — Couche Teensy : drivers + Audio Library [À FAIRE] — P1
+## J12 — Couche Teensy : drivers + Audio Library [EN COURS — bootstrap livré] — P1
 
 - Objectif : faire tourner le moteur sur la vraie machine.
-- Fichiers à créer : `firmware.ino` et `src/teensy/` (SD, PSRAM, AudioStream, matrice 21 pads, 7 encodeurs, OLED SSD1306 I2C). Aucun de ces fichiers n'existe encore au checkpoint `5cff9c5`.
+- Fichiers créés (bootstrap commit `48d9f1c`) : `firmware.ino` (setup diagnostic), `src/teensy/psram_arena.h/.cpp` (extmem_malloc 8 Mo), `src/teensy/teensy_wav_reader.h/.cpp` (wrapper SD File → WavReader), `src/teensy/sample_loader.h/.cpp` (SD → PSRAM avec validation avant arrêt des voix).
+- Reste à créer : intégration AudioStream/SGTL5000 dans le callback render(), driver OLED SSD1306 I2C, matrice 21 pads (12 chops + 8 fx + shift) avec anti-ghosting, 7 encodeurs incrémentaux, USB-MIDI.
 - Spec : initialiser SGTL5000/I2S et brancher un objet AudioStream qui appelle le render() du moteur. Le backend SD enveloppe `File` dans `WavReader`, le backend mémoire réserve une zone via `extmem_malloc()`, puis la chaîne est SD → `wav_probe()` → contrôle capacité → `wav_decode()` directement en PSRAM → `PcmView`. Matrice : 21 switches (12 chops + 8 fx + shift), lecture sans ghosting. Encodeurs : incrémentaux, jamais de saut de valeur. OLED : contexte des pages et browser.
 - DoD : compile arduino-cli (`arduino-cli compile --fqbn teensy:avr:teensy41 firmware`) ; sur matériel : son dans le casque, pads déclenchent les voix, encodeurs changent le pitch.
 - Vérification : compile + test réel (matériel attendu fin août).
@@ -129,8 +133,11 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - Objectif : les 7 encodeurs en pages (pad / globale / browser) + USB-MIDI.
 - Fichiers : logique portable `src/ui/` et `src/browser/`, backends PC `test_native/screen_preview.cpp` et `sample_catalog_scanner.cpp`, futur backend OLED/SD/MIDI sous `src/teensy/`.
 - Spec contrôles : E1 porte la navigation duale (voice = SD, FX = liste et assignation). E2 règle l'amount dry/wet du Repeat, E3 sa division, E4 la vitesse du pad voix tenu, E5 son mode, E6 est réservé et E7 le BPM. Chaque pad mémorise sa propre vitesse et son mode. Shift = couche secondaire (volume, tap tempo, etc.). USB-MIDI : notes sur les pads (canal configurable), CC sur les encodeurs. Voir `docs/CONTROLS.md`.
-- Spec écran : framebuffer monochrome 128×32 portable. Au repos : nom du break, BPM et mode du chop sélectionné. Tout changement de paramètre ouvre un overlay pendant 1 s, avec zone 32×32 réservée au symbole/illustration, nom technique lisible et valeur forte. Direction artistique : anges, ailes, croix et auréoles ; 3 états visuels (calme / tendu / furieux) et micro-animations ponctuelles, à produire après validation fonctionnelle. Les pages utilitaires (browser, erreurs) privilégient la lisibilité.
+- Spec écran : framebuffer monochrome 128×32 portable. Au repos : nom du break, BPM et mode du chop sélectionné. Tout changement de paramètre ouvre un overlay qui **persiste tant que l'encodeur sélectionné tourne** (disparaît 1 s après la dernière interaction). Zone 32×32 réservée au symbole/illustration religieuse, nom technique abrégé et valeur forte. Direction artistique : anges, ailes, croix et auréoles ; 3 états visuels (calme / tendu / furieux) et micro-animations ponctuelles, à produire après validation fonctionnelle. Les pages utilitaires (browser, erreurs) privilégient la lisibilité.
 - Spec browser : la racine et chaque dossier affichent leurs WAV directs et uniquement les sous-dossiers ayant au moins un WAV descendant. L'arborescence et la casse d'affichage de la carte sont conservées ; comparaisons et extension `.wav` sont insensibles à la casse. La sélection charge un seul WAV à la fois sans dupliquer le PCM entre les pads/voix.
+  - Navigation : liste verticale de 3 lignes (10 px par ligne). E1 tourne = déplace la flèche de sélection.
+  - Fichiers longs : après 0.5 s d'arrêt sur une entrée, le nom défile horizontalement à ~30 px/s.
+  - Préfixes : `>` pour dossier, `-` pour fichier WAV. Noms tronqués avec `..` si pas en scroll.
 - DoD : le visualiseur PC suit les contrôles et revient à l'écran Performance 1 s après un overlay ; on navigue dans la SD depuis le browser et on charge un break sans reboot ; le BPM se règle live ; un DAW reçoit les notes.
 - Vérification : `g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic test_native/screen_ui_test.cpp src/ui/screen_ui.cpp -I src/ui -o screen_ui_test.exe` puis `.\screen_ui_test.exe` + visualiseur PC + test réel sur matériel.
 
@@ -202,16 +209,31 @@ Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis 
 - **Provenance/takes** des captures (voir Skip Back).
 - **Tap chop** (découpe manuelle au tapping) : écarté — pas la philosophie de la machine.
 
-### ⏸️ EN ÉTUDE — Chaos / Control All
+### ✅ ADOPTÉ — CHAOS en slot FX (P2)
 
-- Transformation globale du mix en un geste (drops/breakdowns). Boutons : suffisants (matrice 21 switches prévue en J12).
-- **Option A recommandée** : `CHAOS` devient un slot FX assignable (la liste FX est libre : BLANK/REPEAT/REVERSE/TRANCE GATE/CHAOS) → aucun nouveau bouton, grammaire existante. Option B : Shift + encodeur.
-- À trancher lors de l'implémentation des FX.
+- **Option A retenue** : `CHAOS` devient le 8e slot FX assignable (liste : BLANK/REPEAT/REVERSE/TRANCE GATE/FILTER/DELAY/BITCRUSH/CHAOS) → aucun nouveau bouton, grammaire existante.
+- DSP à définir : transformation globale du mix en un geste (drops/breakdowns).
+
+### ✅ ADOPTÉ — FX roadmap étendue (P2, post-démo)
+
+- 8 slots FX pour les 8 pads physiques. Priorités :
+  - P1 : **REVERSE** (lecture inversée du sample, le plus simple à implémenter après Repeat).
+  - P2 : **TRANCE GATE** (gate rythmique synchronisée BPM), **FILTER** (state-variable LP/BP/HP, cutoff + résonance), **DELAY** (ping-pong stéréo, feedback, synchro BPM), **BITCRUSH** (réduction résolution + sample rate), **CHAOS** (destruction globale du mix).
+
+### ✅ ADOPTÉ — E6 proposition LFO (P2, post-démo)
+
+- E6 (actuellement réservé) proposé comme LFO assignable : forme (sinus, carré, dents de scie, aléatoire), vitesse (sync BPM ou libre), destination (pitch ou filter cutoff).
+- À valider avant implémentation.
+
+### ✅ ADOPTÉ — OLED overlay persistant + noms abrégés (P1)
+
+- L'overlay paramètre reste affiché tant que l'encodeur sélectionné tourne (disparaît 1 s après la dernière interaction, pas 1 s fixe).
+- Les noms techniques longs utilisent des abréviations : `1/8T` (Eighth Triplet), `1/16T` (Sixteenth Triplet). Gain de place immédiat sur le 128×32.
 
 ## Priorités
 
-- P1 (chemin critique démo) : J3, J4, J5, J7, J10 Repeat V1 + **Triplets E3**, J12, J13, J14.
-- P2 (glisse après rentrée si retard, la démo tient quand même) : J8, J9, J11, **Skip Back 15 s**, **Checkpoint**, effets R&D de J10, recherches suspendues (J6, loop bed, fill).
+- P1 (chemin critique démo) : J3 + **crossfade vol de voix 64 frames**, J4, J5, J7 + **mode=latch**, J10 Repeat V1 + **Triplets E3** + **noms abrégés (1/8T, 1/16T)**, **REVERSE DSP**, J12 + **AudioStream/SGTL5000 callback**, J13 + **overlay persistant + scroll horizontal SD**, J14.
+- P2 (glisse après rentrée si retard, la démo tient quand même) : J8, J9, J11, **Skip Back 15 s**, **Checkpoint**, TRANCE GATE, FILTER, DELAY, BITCRUSH, CHAOS, E6/LFO, recherches suspendues (J6, loop bed, fill).
 
 ### Checkpoint 16/08/2026 (session 4) — Triplets Repeat
 
