@@ -167,7 +167,7 @@ void ScreenUi::showParameter(const char* name, int value, int minimum, int maxim
 
 void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
                            std::size_t count, std::size_t selectedIndex,
-                           std::uint64_t nowMs) {
+                           std::uint64_t eventTimeMs) {
     copyBrowserLabel(browserFolder_,
                      folderName == nullptr || folderName[0] == '\0'
                          ? "ROOT"
@@ -175,7 +175,7 @@ void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
                      false);
     browserLineCount_ = 0;
     browserSelectedLine_ = 0;
-    browserScrollStartMs_ = nowMs;
+    browserScrollStartMs_ = eventTimeMs;
     browserActive_ = true;
     fxPadActive_ = false;
 

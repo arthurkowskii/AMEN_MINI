@@ -28,7 +28,7 @@ public:
                        std::uint64_t nowMs, const char* suffix = nullptr);
     void showBrowser(const char* folderName, const BrowserLine* lines,
                      std::size_t count, std::size_t selectedIndex,
-                     std::uint64_t nowMs);
+                     std::uint64_t eventTimeMs);
     void showFxPad(int padNumber, const char* fxName, int selectedEncoder);
     void showPerformance();
     void render(std::uint64_t nowMs);

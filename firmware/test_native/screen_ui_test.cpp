@@ -20,6 +20,21 @@ bool regionEqual(const Buffer& left, const Buffer& right, int yBegin, int yEnd) 
     return true;
 }
 
+bool regionShiftedLeftBy(const Buffer& earlier, const Buffer& later, int pixels,
+                         int xBegin, int xEnd, int yBegin, int yEnd) {
+    for (int y = yBegin; y < yEnd; ++y) {
+        for (int x = xBegin; x < xEnd; ++x) {
+            const int earlierIndex = x + pixels + (y / 8) * ScreenUi::kWidth;
+            const int laterIndex = x + (y / 8) * ScreenUi::kWidth;
+            const std::uint8_t mask = static_cast<std::uint8_t>(1U << (y % 8));
+            if ((earlier[earlierIndex] & mask) != (later[laterIndex] & mask)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 Buffer renderAt(ScreenUi& screen, std::uint64_t nowMs) {
     screen.render(nowMs);
     return screen.buffer();
@@ -99,11 +114,20 @@ int main() {
     const Buffer scroll600 = renderAt(screen, 10600);
     const Buffer scroll700 = renderAt(screen, 10700);
     assert(scroll600 != preview500);
-    assert(scroll700 != scroll600);
+
+    // At 30 px/s, elapsed scroll times 100 ms and 200 ms produce offsets 3 and
+    // 6: the later selected text is the earlier text shifted left exactly 3 px.
+    // The interior range excludes the x=1..3 marker and both clipping edges.
+    assert(regionShiftedLeftBy(scroll600, scroll700, 3, 12, 112, 10, 15));
 
     // Only the selected row moves; a non-selected long row stays fixed.
     assert(!regionEqual(scroll600, scroll700, 8, 16));
     assert(regionEqual(scroll600, scroll700, 16, 24));
+
+    // Reconstructing the display with the retained event timestamp preserves
+    // the idle timeline instead of restarting the 500 ms delay.
+    screen.showBrowser("LONG", longLines, 3, 0, 10000);
+    assert(renderAt(screen, 10700) == scroll700);
 
     // A selection event resets the new selected row to a fresh preview baseline.
     screen.showBrowser("LONG", longLines, 3, 1, 10700);
