@@ -16,11 +16,15 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
+#include "assignment_session.h"
+#include "browser_interaction.h"
+#include "pad_assignment.h"
+#include "pad_trigger_logic.h"
 #include "sample_catalog.h"
 #include "sample_catalog_scanner.h"
-#include "pad_trigger_logic.h"
 #include "screen_preview.h"
 #include "screen_ui.h"
+#include "transient_detector.h"
 #include "fx/live_repeat.h"
 #include "voice_manager.h"
 #include "wav_loader.h"
@@ -63,6 +67,28 @@ std::atomic<int> g_bpm{145};
 std::atomic<bool> g_repeatActive{false};
 std::atomic<bool> g_running{true};
 std::mutex g_audioMutex;
+
+// --- Assignation atomique TRANSIENT (plan, tache 6B) ---
+// Une seule session possede le plan de douze plages publie et son break.
+// Le harness adapte VoiceManager au contrat VoiceStopper par ce wrapper
+// minimal : la session appelle stopAll() juste avant de publier un nouveau
+// plan, pour qu'aucune voix ne rende des plages obsoletes contre le nouveau
+// buffer. Le verrou est celui de toutes les commandes du chemin de controle
+// (le callback audio le tente sans attendre).
+class HarnessVoiceStopper final : public VoiceStopper {
+public:
+    void stopAll() override {
+        std::lock_guard<std::mutex> lock(g_audioMutex);
+        g_voices.stopAll();
+    }
+};
+
+AssignmentSession g_assignment;
+HarnessVoiceStopper g_voiceStopper;
+
+// Machine a etats de l'appui long E1 : press/hold/release sur une entree du
+// navigateur. Chemin de controle uniquement, jamais dans le callback audio.
+BrowserInteraction g_browserInteraction;
 constexpr int kFxCount = 3;
 constexpr int kRepeatFx = 1;
 const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE"};
@@ -108,6 +134,10 @@ struct AppState {
     std::uint64_t browserEventTimeMs = 0;
     bool browserActive = false;
     bool browserEventTimeInitialized = false;
+    // Vrai apres une assignation TRANSIENT reussie : les pads voix
+    // declenchent alors leur plage du plan publie au lieu du WAV entier.
+    // Remis a false par le chargement classique d'un WAV (appui court).
+    bool transientPlanActive = false;
 };
 
 std::uint64_t now_ms() {
@@ -180,11 +210,75 @@ void load_browser_selection(ScreenUi& screen, AppState& state, std::uint64_t tim
         g_voices.stopAll();
         state.wav = std::move(loaded);
     }
+    // Le chargement classique d'un WAV (appui court) reprend le mode
+    // fichier-entier ; un eventuel plan TRANSIENT cesse d'etre actif.
+    state.transientPlanActive = false;
     state.breakName = selected.name;
     state.browserActive = false;
     screen.showPerformance();
     std::printf("charge : %s (%u Hz natif, sortie %u Hz)\n", path.string().c_str(),
                 state.wav.sampleRate, kOutputSampleRate);
+}
+
+// Applique l'action TRANSIENT confirmee dans le menu : charge le WAV cible,
+// detecte les onze frontieres internes puis publie atomiquement le plan de
+// douze plages via la session. En cas d'echec, le WAV en place et le plan
+// precedent restent intacts et le menu est reouvert pour permettre
+// l'annulation. Les modes E5, latchs et vitesses des pads ne sont jamais
+// touches.
+void perform_transient_assignment(ScreenUi& screen, AppState& state,
+                                  const char* targetName,
+                                  std::uint64_t time) {
+    const SampleCatalog::Entry* entry = nullptr;
+    for (const auto& candidate : state.browserEntries) {
+        if (candidate.kind == SampleCatalog::EntryKind::Wav &&
+            candidate.name == targetName) {
+            entry = &candidate;
+            break;
+        }
+    }
+    if (entry == nullptr &&
+        state.browserSelection < state.browserEntries.size()) {
+        entry = &state.browserEntries[state.browserSelection];
+    }
+    if (entry == nullptr) {
+        std::fprintf(stderr, "assignation impossible : cible introuvable\n");
+        screen.showAssignmentMenu(targetName, 0, time);
+        return;
+    }
+
+    const std::filesystem::path path = state.sampleRoot / entry->relativePath;
+    WavData loaded = wav_load(path.string());
+    if (!loaded.valid()) {
+        std::fprintf(stderr, "assignation impossible : %s\n",
+                     path.string().c_str());
+        screen.showAssignmentMenu(targetName, 0, time);
+        return;
+    }
+
+    const PcmView pcm = loaded.view();
+    const auto boundaries = detectTransientBoundaries(pcm);
+    if (!boundaries.has_value() ||
+        !g_assignment.applyTransient(std::move(loaded), *boundaries,
+                                     g_voiceStopper)) {
+        std::fprintf(stderr,
+                     "assignation impossible : detection ou plan invalide\n");
+        screen.showAssignmentMenu(targetName, 0, time);
+        return;
+    }
+
+    state.transientPlanActive = true;
+    state.breakName = entry->name;
+    screen.showPerformance();
+    std::printf("TRANSIENT : %s -> 12 plages\n", entry->name.c_str());
+    for (std::size_t pad = 0; pad < kPadCount; ++pad) {
+        const auto range = g_assignment.plan()->range(pad);
+        if (range.has_value()) {
+            std::printf("  pad %2zu : [%zu, %zu)\n", pad + 1U,
+                        range->startFrame, range->endFrame);
+        }
+    }
+    std::printf("  (pads 7-12 assignes mais non jouables dans le harness PC)\n");
 }
 
 // Overlay 128x32 d'un paramètre ciblant un pad précis : le nom composite
@@ -274,7 +368,13 @@ RepeatDivision repeat_division(int index) {
 PadTriggerAction apply_pad_down_audio(int pad, const UiSimulation& simulation,
                                       const AppState& state) {
     const PadSettings& settings = simulation.pads[pad];
-    const PcmView pcm = state.wav.view();
+    // Quand un plan TRANSIENT est actif, le break vit dans la session (le WAV
+    // charge par appui court reste intact mais inutilise). Le pad declenche
+    // alors uniquement sa plage du plan ; les onze autres plages, le mode E5,
+    // le latch et la vitesse du pad restent inchanges par conception.
+    const PcmView pcm = state.transientPlanActive && g_assignment.plan() != nullptr
+                            ? g_assignment.currentWav()->view()
+                            : state.wav.view();
     const float speed = static_cast<float>(settings.speedPercent) / 100.0f;
     std::lock_guard<std::mutex> lock(g_audioMutex);
     const auto padId = static_cast<VoiceManager::PadId>(pad);
@@ -282,6 +382,15 @@ PadTriggerAction apply_pad_down_audio(int pad, const UiSimulation& simulation,
         settings.mode, settings.behavior, g_voices.isPadPlaying(padId));
     if (action == PadTriggerAction::Stop) {
         g_voices.stopPad(padId);
+    } else if (state.transientPlanActive && g_assignment.plan() != nullptr) {
+        const auto range = g_assignment.plan()->range(pad);
+        if (range.has_value()) {
+            g_voices.trigger(padId, pcm, range->startFrame, range->endFrame,
+                             speed, settings.mode);
+        } else {
+            g_voices.trigger(padId, pcm, 0, pcm.frameCount(), speed,
+                             settings.mode);
+        }
     } else {
         g_voices.trigger(padId, pcm, 0, pcm.frameCount(), speed, settings.mode);
     }
@@ -542,9 +651,23 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
             select_encoder(code - 0x3B + 1, screen, simulation);
         }
     } else if (c == '\r' || c == '\n') {
-        encoder_click(screen, simulation, state);
+        if (state.browserActive ||
+            g_browserInteraction.mode() == BrowserMode::AssignmentMenu) {
+            // Enter dans le navigateur et dans le menu est pilote par la
+            // detection d'appui long (GetAsyncKeyState(VK_RETURN)) de la
+            // boucle principale : le clic court est decide au relachement.
+        } else {
+            encoder_click(screen, simulation, state);
+        }
     } else if (c == 8 || c == 127) {
-        if (state.browserActive && simulation.heldFxPad < 0) {
+        if (g_browserInteraction.mode() == BrowserMode::AssignmentMenu) {
+            const auto event = g_browserInteraction.cancel(now_ms());
+            if (event.type == BrowserInteraction::Event::Type::CancelMenu) {
+                // L'annulation conserve la chronologie de defilement du
+                // navigateur (aucun record_browser_event).
+                refresh_browser(screen, state);
+            }
+        } else if (state.browserActive && simulation.heldFxPad < 0) {
             const auto parent = state.catalog.parent(state.browserFolder);
             if (parent) {
                 state.browserFolder = *parent;
@@ -566,10 +689,46 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
 
 void key_loop(ScreenUi& screen, ScreenPreview& preview, AppState& state) {
     UiSimulation simulation;
+    bool enterHeldPrev = false;
     while (g_running.load()) {
         while (_kbhit()) {
             handle_key(_getch(), screen, simulation, state);
         }
+        // Appui long E1 : VK_RETURN est lu en continu pour distinguer le clic
+        // court (relachement avant 600 ms) du menu d'assignation (maintien).
+        const bool enterHeld = (GetAsyncKeyState(VK_RETURN) & 0x8000) != 0;
+        const std::uint64_t time = now_ms();
+        if (enterHeld && !enterHeldPrev) {
+            if (g_browserInteraction.mode() == BrowserMode::AssignmentMenu) {
+                const auto event = g_browserInteraction.confirm(time);
+                if (event.type ==
+                    BrowserInteraction::Event::Type::ConfirmTransient) {
+                    perform_transient_assignment(screen, state,
+                                                 event.name.data(), time);
+                }
+            } else if (state.browserActive && !state.browserEntries.empty()) {
+                const auto& selected =
+                    state.browserEntries[state.browserSelection];
+                const auto kind =
+                    selected.kind == SampleCatalog::EntryKind::Folder
+                        ? BrowserInteraction::EntryKind::Folder
+                        : BrowserInteraction::EntryKind::Wav;
+                g_browserInteraction.press(time, selected.name.c_str(), kind);
+            }
+        }
+        if (enterHeld) {
+            const auto event = g_browserInteraction.hold(time);
+            if (event.type == BrowserInteraction::Event::Type::EnterMenu) {
+                screen.showAssignmentMenu(event.name.data(), 0, time);
+            }
+        }
+        if (!enterHeld && enterHeldPrev) {
+            const auto event = g_browserInteraction.release(time);
+            if (event.type == BrowserInteraction::Event::Type::ShortPress) {
+                load_browser_selection(screen, state, time);
+            }
+        }
+        enterHeldPrev = enterHeld;
         poll_numpad(screen, simulation, state);
         if (!preview.pumpEvents()) {
             g_running.store(false);
@@ -785,7 +944,8 @@ int main(int argc, char** argv) {
     }
 
     std::printf("numpad 1-6 : pads voix (appui selon ONE SHOT/LOOP + GATE/LATCH ; tenir + E1 navigateur, + E4 vitesse, + E5 rotation lecture/clic comportement)\n");
-    std::printf("numpad 7-9 : pads FX | F1-F7 : encodeurs | espace : simule appui dernier pad | E6 : LFO reserve | entree : clic | q : quitter\n");
+    std::printf("numpad 7-9 : pads FX | F1-F7 : encodeurs | espace : simule appui dernier pad | E6 : LFO reserve | q : quitter\n");
+    std::printf("entree : clic | tenir entree 600 ms sur un WAV : menu ALL PADS / TRANSIENT / CANCEL (entree confirme, retour arriere annule)\n");
     key_loop(screen, preview, state);
 
     ma_device_uninit(&device);
