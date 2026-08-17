@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstddef>
+#include <optional>
 
 constexpr std::size_t kPadCount = 12;
 
@@ -14,32 +15,32 @@ struct PadRange {
 
 class PadAssignmentPlan {
 public:
-    bool valid() const noexcept;
     PcmView pcm() const noexcept { return pcm_; }
     PadRange range(std::size_t padIndex) const noexcept;
 
 private:
-    friend bool buildBoundaryAssignment(
-        PcmView pcm,
-        const std::array<std::size_t, kPadCount + 1>& boundaries,
-        PadAssignmentPlan& output) noexcept;
-    friend bool assignWholeFileToPad(const PadAssignmentPlan& previous,
-                                     std::size_t padIndex,
-                                     PadAssignmentPlan& output) noexcept;
+    PadAssignmentPlan(PcmView pcm,
+                      const std::array<PadRange, kPadCount>& ranges) noexcept;
 
-    PcmView pcm_{};
-    std::array<PadRange, kPadCount> ranges_{};
+    friend std::optional<PadAssignmentPlan> buildBoundaryAssignment(
+        PcmView pcm,
+        const std::array<std::size_t, kPadCount + 1>& boundaries) noexcept;
+    friend std::optional<PadAssignmentPlan> assignWholeFileToPad(
+        const PadAssignmentPlan& previous,
+        std::size_t padIndex) noexcept;
+
+    PcmView pcm_;
+    std::array<PadRange, kPadCount> ranges_;
 };
 
 // Builds twelve contiguous, non-empty ranges covering exactly [0, frameCount).
-// output is modified only when the complete candidate is valid.
-bool buildBoundaryAssignment(
+// Failure is represented without constructing a PadAssignmentPlan.
+std::optional<PadAssignmentPlan> buildBoundaryAssignment(
     PcmView pcm,
-    const std::array<std::size_t, kPadCount + 1>& boundaries,
-    PadAssignmentPlan& output) noexcept;
+    const std::array<std::size_t, kPadCount + 1>& boundaries) noexcept;
 
-// Returns a candidate in which only padIndex spans the whole shared PCM view.
-// previous and output are unchanged on failure.
-bool assignWholeFileToPad(const PadAssignmentPlan& previous,
-                          std::size_t padIndex,
-                          PadAssignmentPlan& output) noexcept;
+// Returns a plan in which only padIndex spans the whole shared PCM view.
+// Returning a value makes input/output aliasing impossible.
+std::optional<PadAssignmentPlan> assignWholeFileToPad(
+    const PadAssignmentPlan& previous,
+    std::size_t padIndex) noexcept;

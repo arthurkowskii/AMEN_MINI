@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
+#include <type_traits>
 
 namespace {
 
@@ -27,10 +29,15 @@ std::array<std::size_t, kPadCount + 1> unitBoundaries() {
     return boundaries;
 }
 
+PadAssignmentPlan requirePlan(std::optional<PadAssignmentPlan> result,
+                              const char* message) {
+    require(result.has_value(), message);
+    return *result;
+}
+
 void requireSamePlan(const PadAssignmentPlan& actual,
                      const PadAssignmentPlan& expected,
                      const char* message) {
-    require(actual.valid() == expected.valid(), message);
     require(actual.pcm().samples == expected.pcm().samples, message);
     require(actual.pcm().sampleRate == expected.pcm().sampleRate, message);
     require(actual.pcm().channels == expected.pcm().channels, message);
@@ -47,11 +54,10 @@ void testBoundaryAssignmentCoversSharedPcm() {
     std::array<int16_t, 24> samples{};
     const PcmView pcm = makePcm(samples, 2);
     const auto boundaries = unitBoundaries();
-    PadAssignmentPlan plan;
+    const PadAssignmentPlan plan = requirePlan(
+        buildBoundaryAssignment(pcm, boundaries),
+        "13 valid boundaries must build an assignment");
 
-    require(buildBoundaryAssignment(pcm, boundaries, plan),
-            "13 valid boundaries must build an assignment");
-    require(plan.valid(), "a successfully built assignment must be valid");
     require(plan.pcm().samples == samples.data(),
             "the plan must reference PCM without copying samples");
     require(plan.pcm().sampleRate == pcm.sampleRate &&
@@ -82,13 +88,13 @@ void testWholeFileAssignmentChangesOnlySpecifiedPad() {
     std::array<std::size_t, kPadCount + 1> boundaries{};
     for (std::size_t i = 0; i < boundaries.size(); ++i) boundaries[i] = i * 2;
 
-    PadAssignmentPlan previous;
-    require(buildBoundaryAssignment(pcm, boundaries, previous),
-            "fixture assignment must build");
-    PadAssignmentPlan candidate;
-    require(assignWholeFileToPad(previous, 5, candidate),
-            "a valid pad must accept the whole file");
-    require(candidate.valid(), "whole-file candidate must remain valid");
+    const PadAssignmentPlan previous = requirePlan(
+        buildBoundaryAssignment(pcm, boundaries),
+        "fixture assignment must build");
+    const PadAssignmentPlan candidate = requirePlan(
+        assignWholeFileToPad(previous, 5),
+        "a valid pad must accept the whole file");
+
     require(candidate.range(5).startFrame == 0 &&
                 candidate.range(5).endFrame == pcm.frameCount(),
             "the selected pad must span the complete file");
@@ -105,12 +111,11 @@ void testWholeFileAssignmentChangesOnlySpecifiedPad() {
             "building a candidate must not mutate the previous plan");
 }
 
-void testInvalidPcmAndTooShortPcmAreTransactional() {
+void testInvalidPcmAndTooShortPcmDoNotMutateExistingPlan() {
     std::array<int16_t, 12> sentinelSamples{};
-    PadAssignmentPlan sentinel;
-    require(buildBoundaryAssignment(makePcm(sentinelSamples), unitBoundaries(),
-                                    sentinel),
-            "sentinel assignment must build");
+    const PadAssignmentPlan sentinel = requirePlan(
+        buildBoundaryAssignment(makePcm(sentinelSamples), unitBoundaries()),
+        "sentinel assignment must build");
 
     const std::array<PcmView, 5> invalidPcm{{
         {},
@@ -120,30 +125,30 @@ void testInvalidPcmAndTooShortPcmAreTransactional() {
         {48000, 2, sentinelSamples.data(), 11},
     }};
     for (const PcmView pcm : invalidPcm) {
-        PadAssignmentPlan output = sentinel;
-        require(!buildBoundaryAssignment(pcm, unitBoundaries(), output),
-                "invalid PCM must be rejected");
-        requireSamePlan(output, sentinel,
-                        "invalid PCM must leave the output plan unchanged");
+        PadAssignmentPlan existing = sentinel;
+        const auto rejected = buildBoundaryAssignment(pcm, unitBoundaries());
+        require(!rejected.has_value(), "invalid PCM must be rejected");
+        requireSamePlan(existing, sentinel,
+                        "failed value factories cannot mutate an existing plan");
     }
 
     std::array<int16_t, kPadCount - 1> shortSamples{};
-    PadAssignmentPlan output = sentinel;
-    require(!buildBoundaryAssignment(makePcm(shortSamples), unitBoundaries(),
-                                     output),
+    PadAssignmentPlan existing = sentinel;
+    const auto rejected =
+        buildBoundaryAssignment(makePcm(shortSamples), unitBoundaries());
+    require(!rejected.has_value(),
             "PCM shorter than twelve frames cannot make twelve ranges");
-    requireSamePlan(output, sentinel,
-                    "too-short PCM must leave the output plan unchanged");
+    requireSamePlan(existing, sentinel,
+                    "too-short PCM must not mutate an existing plan");
 }
 
-void testMalformedBoundariesAreTransactional() {
+void testMalformedBoundariesDoNotMutateExistingPlan() {
     std::array<int16_t, 24> samples{};
     const PcmView pcm = makePcm(samples);
     std::array<int16_t, 12> sentinelSamples{};
-    PadAssignmentPlan sentinel;
-    require(buildBoundaryAssignment(makePcm(sentinelSamples), unitBoundaries(),
-                                    sentinel),
-            "sentinel assignment must build");
+    const PadAssignmentPlan sentinel = requirePlan(
+        buildBoundaryAssignment(makePcm(sentinelSamples), unitBoundaries()),
+        "sentinel assignment must build");
 
     const auto valid = [] {
         std::array<std::size_t, kPadCount + 1> boundaries{};
@@ -160,42 +165,38 @@ void testMalformedBoundariesAreTransactional() {
     malformed[4][7] = pcm.frameCount() + 1;
 
     for (const auto& boundaries : malformed) {
-        PadAssignmentPlan output = sentinel;
-        require(!buildBoundaryAssignment(pcm, boundaries, output),
-                "malformed boundaries must be rejected");
-        requireSamePlan(output, sentinel,
-                        "malformed boundaries must leave output unchanged");
+        PadAssignmentPlan existing = sentinel;
+        const auto rejected = buildBoundaryAssignment(pcm, boundaries);
+        require(!rejected.has_value(), "malformed boundaries must be rejected");
+        requireSamePlan(existing, sentinel,
+                        "failed value factories cannot mutate an existing plan");
     }
 }
 
-void testInvalidPadAndInvalidPreviousPlanAreTransactional() {
+void testInvalidPadDoesNotMutateExistingPlan() {
     std::array<int16_t, 12> samples{};
-    PadAssignmentPlan previous;
-    require(buildBoundaryAssignment(makePcm(samples), unitBoundaries(), previous),
-            "fixture assignment must build");
-    PadAssignmentPlan output = previous;
+    const PadAssignmentPlan previous = requirePlan(
+        buildBoundaryAssignment(makePcm(samples), unitBoundaries()),
+        "fixture assignment must build");
+    PadAssignmentPlan existing = previous;
 
-    require(!assignWholeFileToPad(previous, kPadCount, output),
-            "pad index twelve must be rejected");
-    requireSamePlan(output, previous,
-                    "invalid pad must leave output unchanged");
-
-    const PadAssignmentPlan invalidPrevious;
-    require(!assignWholeFileToPad(invalidPrevious, 0, output),
-            "an invalid previous plan must be rejected");
-    requireSamePlan(output, previous,
-                    "invalid previous plan must leave output unchanged");
+    const auto rejected = assignWholeFileToPad(previous, kPadCount);
+    require(!rejected.has_value(), "pad index twelve must be rejected");
+    requireSamePlan(existing, previous,
+                    "failed value factories cannot mutate an existing plan");
 }
 
 }  // namespace
 
 int main() {
     static_assert(kPadCount == 12, "the assignment model must expose twelve pads");
+    static_assert(!std::is_default_constructible<PadAssignmentPlan>::value,
+                  "invalid pad assignment plans must not be publicly constructible");
     testBoundaryAssignmentCoversSharedPcm();
     testWholeFileAssignmentChangesOnlySpecifiedPad();
-    testInvalidPcmAndTooShortPcmAreTransactional();
-    testMalformedBoundariesAreTransactional();
-    testInvalidPadAndInvalidPreviousPlanAreTransactional();
+    testInvalidPcmAndTooShortPcmDoNotMutateExistingPlan();
+    testMalformedBoundariesDoNotMutateExistingPlan();
+    testInvalidPadDoesNotMutateExistingPlan();
     std::cout << "All pad assignment tests passed\n";
     return 0;
 }
