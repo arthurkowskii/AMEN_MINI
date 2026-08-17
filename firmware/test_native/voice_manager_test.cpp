@@ -159,8 +159,43 @@ void testSamePadRetriggerDoesNotLeaveATail() {
     float sampleL = 0.0f;
     float sampleR = 0.0f;
     manager.render(&sampleL, &sampleR, 1);
+    require(near(sampleL, 15000.0f / 32768.0f),
+            "incoming-pad retrigger must cancel the tail from its active crossfade");
+}
+
+void testRetirementOnlyPadRetriggerCancelsItsOldTail() {
+    WavData wav = makeCrossfadeWav();
+    VoiceManager manager(48000);
+    for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
+        triggerCrossfadeSegment(manager, wav.view(),
+                                static_cast<VoiceManager::PadId>(voice), voice);
+    }
+    triggerCrossfadeSegment(manager, wav.view(), 4, 4);
+    triggerCrossfadeSegment(manager, wav.view(), 0, 5);
+
+    float sampleL = 0.0f;
+    float sampleR = 0.0f;
+    manager.render(&sampleL, &sampleR, 1);
+    require(near(sampleL, 9000.0f / 32768.0f),
+            "retirement-only pad retrigger must cancel its old tail before stealing");
+}
+
+void testPadRetriggerPreservesUnrelatedRetirementTails() {
+    WavData wav = makeCrossfadeWav();
+    VoiceManager manager(48000);
+    for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
+        triggerCrossfadeSegment(manager, wav.view(),
+                                static_cast<VoiceManager::PadId>(voice), voice);
+    }
+    triggerCrossfadeSegment(manager, wav.view(), 4, 4);
+    triggerCrossfadeSegment(manager, wav.view(), 5, 5);
+    triggerCrossfadeSegment(manager, wav.view(), 4, 6);
+
+    float sampleL = 0.0f;
+    float sampleR = 0.0f;
+    manager.render(&sampleL, &sampleR, 1);
     require(near(sampleL, 16000.0f / 32768.0f),
-            "same-pad retrigger during a crossfade must not retire its replaced source");
+            "pad retrigger must preserve retirement tails from unrelated steals");
 }
 
 void testStopAllCancelsCrossfadeTail() {
@@ -431,6 +466,8 @@ int main() {
     testFourVoicesAndOldestSteal();
     testStolenVoiceCrossfadeIsExactly64Frames();
     testSamePadRetriggerDoesNotLeaveATail();
+    testRetirementOnlyPadRetriggerCancelsItsOldTail();
+    testPadRetriggerPreservesUnrelatedRetirementTails();
     testStopAllCancelsCrossfadeTail();
     testRapidStealRetirementOverflowDropsOldestTail();
     testCrossfadeMixRemainsClamped();

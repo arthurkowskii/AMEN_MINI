@@ -35,6 +35,8 @@ private:
 
     struct Retirement {
         SamplePlayer player;
+        PadId outgoingPadId = 0;
+        PadId incomingPadId = 0;
         std::size_t crossfadeFrame = kCrossfadeFrames;
         uint64_t serial = 0;
         bool active = false;
@@ -43,7 +45,8 @@ private:
     static constexpr std::size_t kCrossfadeFrames = 64;
     static constexpr std::size_t kRetirementCount = kVoiceCount;
 
-    void retire(const SamplePlayer& player);
+    void cancelRetirementsForPad(PadId padId);
+    void retire(const SamplePlayer& player, PadId outgoingPadId, PadId incomingPadId);
     void renderVoice(Voice& voice, float* outL, float* outR, int numFrames);
     void renderRetirement(Retirement& retirement, float* outL, float* outR,
                           int numFrames);

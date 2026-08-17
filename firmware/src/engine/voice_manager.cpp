@@ -16,6 +16,8 @@ bool VoiceManager::trigger(PadId padId, PcmView pcm, std::size_t startFrame,
     const float sourceStep = userSpeed * sourceRateRatio;
     if (!std::isfinite(sourceStep) || sourceStep <= 0.0f) return false;
 
+    cancelRetirementsForPad(padId);
+
     Voice* selected = nullptr;
     for (Voice& voice : voices_) {
         if (voice.player.isPlaying() && voice.padId == padId) {
@@ -41,7 +43,7 @@ bool VoiceManager::trigger(PadId padId, PcmView pcm, std::size_t startFrame,
         stealing = true;
     }
 
-    if (stealing) retire(selected->player);
+    if (stealing) retire(selected->player, selected->padId, padId);
     selected->player.setSample(pcm, startFrame, endFrame);
     selected->player.setSpeed(sourceStep);
     selected->player.trigger();
@@ -52,7 +54,20 @@ bool VoiceManager::trigger(PadId padId, PcmView pcm, std::size_t startFrame,
     return true;
 }
 
-void VoiceManager::retire(const SamplePlayer& player) {
+void VoiceManager::cancelRetirementsForPad(PadId padId) {
+    for (Retirement& retirement : retirements_) {
+        if (!retirement.active ||
+            (retirement.outgoingPadId != padId && retirement.incomingPadId != padId)) {
+            continue;
+        }
+        retirement.player.stop();
+        retirement.crossfadeFrame = kCrossfadeFrames;
+        retirement.active = false;
+    }
+}
+
+void VoiceManager::retire(const SamplePlayer& player, PadId outgoingPadId,
+                          PadId incomingPadId) {
     Retirement* selected = nullptr;
     for (Retirement& retirement : retirements_) {
         if (!retirement.active) {
@@ -70,6 +85,8 @@ void VoiceManager::retire(const SamplePlayer& player) {
     }
 
     selected->player = player;
+    selected->outgoingPadId = outgoingPadId;
+    selected->incomingPadId = incomingPadId;
     selected->crossfadeFrame = 0;
     selected->serial = nextRetirementSerial_++;
     selected->active = true;
