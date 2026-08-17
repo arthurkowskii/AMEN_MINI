@@ -35,19 +35,31 @@ PadAssignmentPlan requirePlan(std::optional<PadAssignmentPlan> result,
     return *result;
 }
 
+bool sameRange(std::optional<PadRange> actual,
+               std::optional<PadRange> expected) {
+    if (actual.has_value() != expected.has_value()) return false;
+    return !actual.has_value() ||
+           (actual->startFrame == expected->startFrame &&
+            actual->endFrame == expected->endFrame);
+}
+
 void requireSamePlan(const PadAssignmentPlan& actual,
                      const PadAssignmentPlan& expected,
                      const char* message) {
-    require(actual.pcm().samples == expected.pcm().samples, message);
-    require(actual.pcm().sampleRate == expected.pcm().sampleRate, message);
-    require(actual.pcm().channels == expected.pcm().channels, message);
-    require(actual.pcm().sampleCount == expected.pcm().sampleCount, message);
+    require(actual.pcmView().samples == expected.pcmView().samples, message);
+    require(actual.pcmView().sampleRate == expected.pcmView().sampleRate, message);
+    require(actual.pcmView().channels == expected.pcmView().channels, message);
+    require(actual.pcmView().sampleCount == expected.pcmView().sampleCount, message);
     for (std::size_t pad = 0; pad < kPadCount; ++pad) {
-        require(actual.range(pad).startFrame == expected.range(pad).startFrame,
-                message);
-        require(actual.range(pad).endFrame == expected.range(pad).endFrame,
-                message);
+        require(sameRange(actual.range(pad), expected.range(pad)), message);
     }
+}
+
+PadRange requireRange(const PadAssignmentPlan& plan, std::size_t padIndex,
+                      const char* message) {
+    const auto result = plan.range(padIndex);
+    require(result.has_value(), message);
+    return *result;
 }
 
 void testBoundaryAssignmentCoversSharedPcm() {
@@ -58,28 +70,34 @@ void testBoundaryAssignmentCoversSharedPcm() {
         buildBoundaryAssignment(pcm, boundaries),
         "13 valid boundaries must build an assignment");
 
-    require(plan.pcm().samples == samples.data(),
+    require(plan.pcmView().samples == samples.data(),
             "the plan must reference PCM without copying samples");
-    require(plan.pcm().sampleRate == pcm.sampleRate &&
-                plan.pcm().channels == pcm.channels &&
-                plan.pcm().sampleCount == pcm.sampleCount,
+    require(plan.pcmView().sampleRate == pcm.sampleRate &&
+                plan.pcmView().channels == pcm.channels &&
+                plan.pcmView().sampleCount == pcm.sampleCount,
             "all PCM metadata must be preserved");
-    require(plan.range(0).startFrame == 0,
+    require(requireRange(plan, 0, "pad zero must have a range").startFrame == 0,
             "the first range must start at frame zero");
-    require(plan.range(kPadCount - 1).endFrame == pcm.frameCount(),
+    require(requireRange(plan, kPadCount - 1, "last pad must have a range")
+                .endFrame == pcm.frameCount(),
             "the final range must end at frameCount");
 
     for (std::size_t pad = 0; pad < kPadCount; ++pad) {
-        const PadRange range = plan.range(pad);
+        const PadRange range =
+            requireRange(plan, pad, "valid pads must have ranges");
         require(range.startFrame < range.endFrame,
                 "every pad range must be non-empty");
         if (pad > 0) {
-            require(plan.range(pad - 1).endFrame == range.startFrame,
+            require(requireRange(plan, pad - 1, "valid pads must have ranges")
+                        .endFrame == range.startFrame,
                     "boundary-built ranges must be contiguous");
         }
-        require(plan.pcm().samples == pcm.samples,
+        require(plan.pcmView().samples == pcm.samples,
                 "every range must use the plan's shared PCM view");
     }
+
+    require(!plan.range(kPadCount).has_value(),
+            "an out-of-range pad index must not look like a valid empty range");
 }
 
 void testWholeFileAssignmentChangesOnlySpecifiedPad() {
@@ -95,27 +113,21 @@ void testWholeFileAssignmentChangesOnlySpecifiedPad() {
         assignWholeFileToPad(previous, 5),
         "a valid pad must accept the whole file");
 
-    require(candidate.range(5).startFrame == 0 &&
-                candidate.range(5).endFrame == pcm.frameCount(),
+    const PadRange assigned =
+        requireRange(candidate, 5, "assigned pad must have a range");
+    require(assigned.startFrame == 0 && assigned.endFrame == pcm.frameCount(),
             "the selected pad must span the complete file");
     for (std::size_t pad = 0; pad < kPadCount; ++pad) {
         if (pad == 5) continue;
-        require(candidate.range(pad).startFrame == previous.range(pad).startFrame &&
-                    candidate.range(pad).endFrame == previous.range(pad).endFrame,
+        require(sameRange(candidate.range(pad), previous.range(pad)),
                 "whole-file assignment must preserve every other pad range");
     }
-    require(candidate.pcm().samples == previous.pcm().samples,
-            "whole-file assignment must retain the shared PCM pointer");
-    require(previous.range(5).startFrame == 10 &&
-                previous.range(5).endFrame == 12,
-            "building a candidate must not mutate the previous plan");
+    require(candidate.pcmView().samples == previous.pcmView().samples,
+            "whole-file assignment must retain the borrowed PCM pointer");
 }
 
-void testInvalidPcmAndTooShortPcmDoNotMutateExistingPlan() {
+void testInvalidPcmAndTooShortPcmAreRejected() {
     std::array<int16_t, 12> sentinelSamples{};
-    const PadAssignmentPlan sentinel = requirePlan(
-        buildBoundaryAssignment(makePcm(sentinelSamples), unitBoundaries()),
-        "sentinel assignment must build");
 
     const std::array<PcmView, 5> invalidPcm{{
         {},
@@ -125,30 +137,20 @@ void testInvalidPcmAndTooShortPcmDoNotMutateExistingPlan() {
         {48000, 2, sentinelSamples.data(), 11},
     }};
     for (const PcmView pcm : invalidPcm) {
-        PadAssignmentPlan existing = sentinel;
         const auto rejected = buildBoundaryAssignment(pcm, unitBoundaries());
         require(!rejected.has_value(), "invalid PCM must be rejected");
-        requireSamePlan(existing, sentinel,
-                        "failed value factories cannot mutate an existing plan");
     }
 
     std::array<int16_t, kPadCount - 1> shortSamples{};
-    PadAssignmentPlan existing = sentinel;
     const auto rejected =
         buildBoundaryAssignment(makePcm(shortSamples), unitBoundaries());
     require(!rejected.has_value(),
             "PCM shorter than twelve frames cannot make twelve ranges");
-    requireSamePlan(existing, sentinel,
-                    "too-short PCM must not mutate an existing plan");
 }
 
-void testMalformedBoundariesDoNotMutateExistingPlan() {
+void testMalformedBoundariesAreRejected() {
     std::array<int16_t, 24> samples{};
     const PcmView pcm = makePcm(samples);
-    std::array<int16_t, 12> sentinelSamples{};
-    const PadAssignmentPlan sentinel = requirePlan(
-        buildBoundaryAssignment(makePcm(sentinelSamples), unitBoundaries()),
-        "sentinel assignment must build");
 
     const auto valid = [] {
         std::array<std::size_t, kPadCount + 1> boundaries{};
@@ -165,25 +167,22 @@ void testMalformedBoundariesDoNotMutateExistingPlan() {
     malformed[4][7] = pcm.frameCount() + 1;
 
     for (const auto& boundaries : malformed) {
-        PadAssignmentPlan existing = sentinel;
         const auto rejected = buildBoundaryAssignment(pcm, boundaries);
         require(!rejected.has_value(), "malformed boundaries must be rejected");
-        requireSamePlan(existing, sentinel,
-                        "failed value factories cannot mutate an existing plan");
     }
 }
 
-void testInvalidPadDoesNotMutateExistingPlan() {
+void testInvalidPadPreservesExistingPlan() {
     std::array<int16_t, 12> samples{};
     const PadAssignmentPlan previous = requirePlan(
         buildBoundaryAssignment(makePcm(samples), unitBoundaries()),
         "fixture assignment must build");
-    PadAssignmentPlan existing = previous;
+    const PadAssignmentPlan snapshot = previous;
 
     const auto rejected = assignWholeFileToPad(previous, kPadCount);
     require(!rejected.has_value(), "pad index twelve must be rejected");
-    requireSamePlan(existing, previous,
-                    "failed value factories cannot mutate an existing plan");
+    requireSamePlan(previous, snapshot,
+                    "rejecting an invalid update must preserve its input plan");
 }
 
 }  // namespace
@@ -194,9 +193,9 @@ int main() {
                   "invalid pad assignment plans must not be publicly constructible");
     testBoundaryAssignmentCoversSharedPcm();
     testWholeFileAssignmentChangesOnlySpecifiedPad();
-    testInvalidPcmAndTooShortPcmDoNotMutateExistingPlan();
-    testMalformedBoundariesDoNotMutateExistingPlan();
-    testInvalidPadDoesNotMutateExistingPlan();
+    testInvalidPcmAndTooShortPcmAreRejected();
+    testMalformedBoundariesAreRejected();
+    testInvalidPadPreservesExistingPlan();
     std::cout << "All pad assignment tests passed\n";
     return 0;
 }

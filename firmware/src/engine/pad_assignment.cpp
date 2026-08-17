@@ -17,8 +17,10 @@ PadAssignmentPlan::PadAssignmentPlan(
     const std::array<PadRange, kPadCount>& ranges) noexcept
     : pcm_(pcm), ranges_(ranges) {}
 
-PadRange PadAssignmentPlan::range(std::size_t padIndex) const noexcept {
-    return padIndex < kPadCount ? ranges_[padIndex] : PadRange{};
+std::optional<PadRange> PadAssignmentPlan::range(
+    std::size_t padIndex) const noexcept {
+    if (padIndex >= kPadCount) return std::nullopt;
+    return ranges_[padIndex];
 }
 
 std::optional<PadAssignmentPlan> buildBoundaryAssignment(
