@@ -19,8 +19,11 @@ public:
         : outputSampleRate_(outputSampleRate) {}
 
     bool trigger(PadId padId, PcmView pcm, std::size_t startFrame,
-                 std::size_t endFrame, float userSpeed);
+                 std::size_t endFrame, float userSpeed,
+                 PlaybackMode mode = PlaybackMode::OneShot);
     bool setPadSpeed(PadId padId, float userSpeed);
+    void stopPad(PadId padId);
+    bool isPadPlaying(PadId padId) const;
     void render(float* outL, float* outR, int numFrames);
     void stopAll();
 

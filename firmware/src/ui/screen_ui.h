@@ -1,16 +1,11 @@
 #ifndef SCREEN_UI_H
 #define SCREEN_UI_H
 
+#include "../engine/playback_mode.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
-
-enum class PlaybackMode {
-    OneShot,
-    Loop,
-    Granular,
-    SliceSync,
-};
 
 class ScreenUi {
 public:

@@ -3,12 +3,13 @@
 // callback du codec le fera. Le clavier simule la face avant de la machine :
 //   numpad 1-6  = pads voix : appui = joue le break et devient la cible des
 //                 encodeurs tant qu'il est tenu. Maintenir + E1 = navigateur
-//                 SD, + E4 = vitesse de CE pad, + E5 = mode de CE pad.
+//                 SD, + E4 = vitesse de CE pad, + E5 = lecture ONE SHOT/LOOP
+//                 (rotation) et comportement GATE/LATCH (clic).
 //   numpad 7-9  = pads FX : maintien = active le FX assigné
 //   F1-F7       = sélectionne l'encodeur actif (E1..E7)
 //   flèches     = tournent l'encodeur sélectionné
 //   entrée      = clique l'encodeur sélectionné
-//   espace      = retrigger du dernier pad joué (avec sa propre vitesse)
+//   espace      = simule l'appui du dernier pad (LOOP+LATCH bascule)
 //   retour      = dossier parent dans le navigateur
 //   q           = quitter
 // Usage : amen_rt [fichier.wav]
@@ -17,6 +18,7 @@
 
 #include "sample_catalog.h"
 #include "sample_catalog_scanner.h"
+#include "pad_trigger_logic.h"
 #include "screen_preview.h"
 #include "screen_ui.h"
 #include "fx/live_repeat.h"
@@ -55,8 +57,6 @@ LiveRepeat g_repeat{kOutputSampleRate,
                     g_repeatFrozenL.data(),
                     g_repeatFrozenR.data(),
                     kRepeatBufferFrames};
-std::atomic<int> g_targetSpeedPercent{100};
-std::atomic<int> g_targetPadId{-1};
 std::atomic<int> g_repeatAmountPercent{100};
 std::atomic<int> g_repeatDivision{0};
 std::atomic<int> g_bpm{145};
@@ -68,7 +68,7 @@ constexpr int kRepeatFx = 1;
 const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE"};
 const char* kDivisionNames[] = {"1/4", "1/8", "1/12", "1/16", "1/24", "1/32"};
 const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
-                               "E5 MODE", "E6 J10", "E7 BPM"};
+                               "E5 MODE", "E6 LFO", "E7 BPM"};
 
 constexpr int kVoicePadCount = 6;
 
@@ -78,6 +78,7 @@ constexpr int kVoicePadCount = 6;
 struct PadSettings {
     int speedPercent = 100;
     PlaybackMode mode = PlaybackMode::OneShot;
+    TriggerBehavior behavior = TriggerBehavior::Gate;
 };
 
 struct UiSimulation {
@@ -114,17 +115,7 @@ std::uint64_t now_ms() {
 }
 
 PlaybackMode next_mode(PlaybackMode mode) {
-    switch (mode) {
-        case PlaybackMode::OneShot:
-            return PlaybackMode::Loop;
-        case PlaybackMode::Loop:
-            return PlaybackMode::Granular;
-        case PlaybackMode::Granular:
-            return PlaybackMode::SliceSync;
-        case PlaybackMode::SliceSync:
-            return PlaybackMode::OneShot;
-    }
-    return PlaybackMode::OneShot;
+    return mode == PlaybackMode::Loop ? PlaybackMode::OneShot : PlaybackMode::Loop;
 }
 
 void refresh_browser(ScreenUi& screen, AppState& state) {
@@ -185,15 +176,19 @@ void show_pad_overlay(ScreenUi& screen, int pad, const char* label, int value,
     screen.showParameter(name.data(), value, minimum, maximum, time, suffix);
 }
 
-// Applique la vitesse au pad donné : stocke la valeur du pad (pour son
-// prochain trigger) et pose la paire atomique lue par le callback audio
-// (vitesse écrite d'abord, pad ensuite) pour la rampe live sans retrigger.
+// Applique la vitesse au pad donné et la mémorise pour son prochain trigger.
+// La mise à jour live partage le verrou du moteur afin que pad et vitesse
+// forment une seule commande indivisible face au callback audio.
 void set_pad_speed_percent(int pad, int speedPercent, ScreenUi& screen,
                            UiSimulation& simulation, std::uint64_t time) {
     if (pad < 0 || pad >= kVoicePadCount) return;
     simulation.pads[pad].speedPercent = std::clamp(speedPercent, 25, 400);
-    g_targetSpeedPercent.store(simulation.pads[pad].speedPercent);
-    g_targetPadId.store(pad);
+    {
+        std::lock_guard<std::mutex> lock(g_audioMutex);
+        const float speed =
+            static_cast<float>(simulation.pads[pad].speedPercent) / 100.0f;
+        g_voices.setPadSpeed(static_cast<VoiceManager::PadId>(pad), speed);
+    }
     show_pad_overlay(screen, pad, "SPEED", simulation.pads[pad].speedPercent, 25,
                      400, time, "%");
     std::printf("pad %d vitesse : %d%%\n", pad + 1,
@@ -218,8 +213,24 @@ void set_pad_mode(int pad, PlaybackMode mode, ScreenUi& screen,
                   UiSimulation& simulation, std::uint64_t time) {
     if (pad < 0 || pad >= kVoicePadCount) return;
     simulation.pads[pad].mode = mode;
-    show_pad_overlay(screen, pad, "MODE", 0, 0, 1, time);
-    std::printf("pad %d mode : %s\n", pad + 1, mode_label(mode));
+    show_pad_overlay(screen, pad, mode_label(mode), 0, 0, 1, time);
+    std::printf("pad %d lecture : %s\n", pad + 1, mode_label(mode));
+}
+
+const char* behavior_label(TriggerBehavior behavior) {
+    return behavior == TriggerBehavior::Gate ? "GATE" : "LATCH";
+}
+
+void toggle_pad_behavior(int pad, ScreenUi& screen, UiSimulation& simulation,
+                         std::uint64_t time) {
+    if (pad < 0 || pad >= kVoicePadCount) return;
+    PadSettings& settings = simulation.pads[pad];
+    settings.behavior = settings.behavior == TriggerBehavior::Gate
+                            ? TriggerBehavior::Latch
+                            : TriggerBehavior::Gate;
+    show_pad_overlay(screen, pad, behavior_label(settings.behavior), 0, 0, 1, time);
+    std::printf("pad %d comportement : %s\n", pad + 1,
+                behavior_label(settings.behavior));
 }
 
 RepeatDivision repeat_division(int index) {
@@ -237,6 +248,23 @@ RepeatDivision repeat_division(int index) {
         default:
             return RepeatDivision::Quarter;
     }
+}
+
+PadTriggerAction apply_pad_down_audio(int pad, const UiSimulation& simulation,
+                                      const AppState& state) {
+    const PadSettings& settings = simulation.pads[pad];
+    const PcmView pcm = state.wav.view();
+    const float speed = static_cast<float>(settings.speedPercent) / 100.0f;
+    std::lock_guard<std::mutex> lock(g_audioMutex);
+    const auto padId = static_cast<VoiceManager::PadId>(pad);
+    const PadTriggerAction action = padDownAction(
+        settings.mode, settings.behavior, g_voices.isPadPlaying(padId));
+    if (action == PadTriggerAction::Stop) {
+        g_voices.stopPad(padId);
+    } else {
+        g_voices.trigger(padId, pcm, 0, pcm.frameCount(), speed, settings.mode);
+    }
+    return action;
 }
 
 #ifdef _WIN32
@@ -321,7 +349,7 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
             }
             break;
         case 6:
-            screen.showParameter("E6 RESERVE J10", 0, 0, 0, time);
+            screen.showParameter("E6 LFO RESERVE", 0, 0, 0, time);
             break;
         case 7:
             simulation.bpm = std::clamp(simulation.bpm + direction, 20, 300);
@@ -363,14 +391,13 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
             break;
         case 5:
             if (simulation.heldVoicePad >= 0) {
-                set_pad_mode(simulation.heldVoicePad, PlaybackMode::OneShot, screen,
-                             simulation, time);
+                toggle_pad_behavior(simulation.heldVoicePad, screen, simulation, time);
             } else {
                 screen.showParameter("E5 TENIR PAD", 0, 0, 0, time);
             }
             break;
         case 6:
-            screen.showParameter("E6 RESERVE J10", 0, 0, 0, time);
+            screen.showParameter("E6 LFO RESERVE", 0, 0, 0, time);
             break;
         default:
             break;
@@ -379,14 +406,7 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
 
 void voice_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation,
                     AppState& state) {
-    const PcmView pcm = state.wav.view();
-    const float speed =
-        static_cast<float>(simulation.pads[pad].speedPercent) / 100.0f;
-    {
-        std::lock_guard<std::mutex> lock(g_audioMutex);
-        g_voices.trigger(static_cast<VoiceManager::PadId>(pad), pcm, 0,
-                         pcm.frameCount(), speed);
-    }
+    const PadTriggerAction action = apply_pad_down_audio(pad, simulation, state);
     // Le pad appuyé devient la cible des encodeurs tant qu'il est tenu.
     // Règle "le dernier appuyé gagne" : l'ordre d'appui est mémorisé par pad.
     simulation.heldVoicePad = pad;
@@ -395,9 +415,11 @@ void voice_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation,
     if (simulation.heldFxPad < 0) {
         screen.showPerformance();
     }
-    std::printf(
-        "pad %d : trigger (tenir + E1 = navigateur, + E4 vitesse, + E5 mode)\n",
-        pad + 1);
+    std::printf("pad %d : %s [%s / %s] (tenir + E1 navigateur, + E4 vitesse, "
+                "+ E5 lecture/clic comportement)\n",
+                pad + 1, action == PadTriggerAction::Stop ? "stop" : "trigger",
+                mode_label(simulation.pads[pad].mode),
+                behavior_label(simulation.pads[pad].behavior));
 }
 
 // Quand le pad tenu est relâché, la cible retombe sur le dernier pad encore
@@ -407,6 +429,10 @@ void voice_pad_up(int pad, ScreenUi& screen, UiSimulation& simulation,
                   AppState& state) {
     (void)screen;
     (void)state;
+    if (padUpAction(simulation.pads[pad].behavior) == PadTriggerAction::Stop) {
+        std::lock_guard<std::mutex> lock(g_audioMutex);
+        g_voices.stopPad(static_cast<VoiceManager::PadId>(pad));
+    }
     if (simulation.heldVoicePad != pad) return;
     int best = -1;
     int bestSeq = -1;
@@ -506,16 +532,12 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
             }
         }
     } else if (c == ' ') {
-        const PcmView pcm = state.wav.view();
-        const float speed =
-            static_cast<float>(simulation.pads[simulation.lastPadId].speedPercent) /
-            100.0f;
-        {
-            std::lock_guard<std::mutex> lock(g_audioMutex);
-            g_voices.trigger(static_cast<VoiceManager::PadId>(simulation.lastPadId),
-                             pcm, 0, pcm.frameCount(), speed);
-        }
-        std::printf("retrigger pad %d\n", simulation.lastPadId + 1);
+        const int pad = simulation.lastPadId;
+        const PadTriggerAction action = apply_pad_down_audio(pad, simulation, state);
+        std::printf("espace pad %d : %s [%s / %s]\n", pad + 1,
+                    action == PadTriggerAction::Stop ? "stop" : "trigger",
+                    mode_label(simulation.pads[pad].mode),
+                    behavior_label(simulation.pads[pad].behavior));
     }
     // '1'-'9' ignorés : les pads numpad sont lus par poll_numpad (VK_NUMPADx).
 }
@@ -580,17 +602,18 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
     } else if (c == 'c') {
         set_pad_speed_percent(simulation.lastPadId, 100, screen, simulation, time);
     } else if (c == ' ') {
-        std::lock_guard<std::mutex> lock(g_audioMutex);
-        const PcmView pcm = state.wav.view();
-        const float speed =
-            static_cast<float>(simulation.pads[simulation.lastPadId].speedPercent) /
-            100.0f;
-        g_voices.trigger(static_cast<VoiceManager::PadId>(simulation.lastPadId),
-                         pcm, 0, pcm.frameCount(), speed);
-        std::printf("retrigger pad %d\n", simulation.lastPadId + 1);
+        const int pad = simulation.lastPadId;
+        const PadTriggerAction action = apply_pad_down_audio(pad, simulation, state);
+        std::printf("espace pad %d : %s [%s / %s]\n", pad + 1,
+                    action == PadTriggerAction::Stop ? "stop" : "trigger",
+                    mode_label(simulation.pads[pad].mode),
+                    behavior_label(simulation.pads[pad].behavior));
     } else if (c == 'm') {
-        simulation.pads[simulation.lastPadId].mode =
-            next_mode(simulation.pads[simulation.lastPadId].mode);
+        set_pad_mode(simulation.lastPadId,
+                     next_mode(simulation.pads[simulation.lastPadId].mode),
+                     screen, simulation, time);
+    } else if (c == 'g') {
+        toggle_pad_behavior(simulation.lastPadId, screen, simulation, time);
     } else if (c == 'e') {
         simulation.repeatDivision = (simulation.repeatDivision + 1) % 6;
         g_repeatDivision.store(simulation.repeatDivision);
@@ -647,27 +670,10 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     std::unique_lock<std::mutex> lock(g_audioMutex, std::try_to_lock);
     if (!lock.owns_lock()) return;
 
-    static int appliedTargetPad = -2;
-    static int appliedSpeedPercent = -1;
     static int appliedAmountPercent = -1;
     static int appliedDivision = -1;
     static int appliedBpm = -1;
     static bool appliedRepeatActive = false;
-    // La cible et la vitesse voyagent ensemble : lecture pad puis vitesse
-    // (l'UI écrit vitesse puis pad). Au pire, un cycle applique une valeur
-    // d'un bloc avant de se corriger — imperceptible.
-    const int targetPad = g_targetPadId.load();
-    const int targetSpeedPercent = g_targetSpeedPercent.load();
-    if (targetPad != appliedTargetPad ||
-        targetSpeedPercent != appliedSpeedPercent) {
-        if (targetPad >= 0) {
-            const float speed = static_cast<float>(targetSpeedPercent) / 100.0f;
-            g_voices.setPadSpeed(static_cast<VoiceManager::PadId>(targetPad), speed);
-        }
-        appliedTargetPad = targetPad;
-        appliedSpeedPercent = targetSpeedPercent;
-    }
-
     const int targetAmountPercent = g_repeatAmountPercent.load();
     if (targetAmountPercent != appliedAmountPercent) {
         g_repeat.setAmount(static_cast<float>(targetAmountPercent) / 100.0f);
@@ -753,8 +759,8 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "impossible d'ouvrir l'apercu OLED\n");
     }
 
-    std::printf("numpad 1-6 : pads voix (appui = trigger + cible ; tenir + E1 = navigateur, + E4 vitesse, + E5 mode)\n");
-    std::printf("numpad 7-9 : pads FX (maintien = activation) | F1-F7 : encodeurs | E2 amount | E3 division | E7 BPM | entree : clic | q : quitter\n");
+    std::printf("numpad 1-6 : pads voix (appui selon ONE SHOT/LOOP + GATE/LATCH ; tenir + E1 navigateur, + E4 vitesse, + E5 rotation lecture/clic comportement)\n");
+    std::printf("numpad 7-9 : pads FX | F1-F7 : encodeurs | espace : simule appui dernier pad | E6 : LFO reserve | entree : clic | q : quitter\n");
     key_loop(screen, preview, state);
 
     ma_device_uninit(&device);

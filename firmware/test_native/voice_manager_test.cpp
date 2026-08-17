@@ -1,4 +1,5 @@
 #include "sample_player.h"
+#include "pad_trigger_logic.h"
 #include "voice_manager.h"
 #include "wav_loader.h"
 
@@ -82,6 +83,195 @@ void testViewAndRanges() {
     b.render(bL, bR, 1);
     require(near(aL[0], 1000.0f / 32768.0f), "first range must start at its first frame");
     require(near(bL[0], 2000.0f / 32768.0f), "second range must share PCM at another offset");
+}
+
+void testOneShotEndsWithoutWrapping() {
+    WavData wav;
+    wav.sampleRate = 48000;
+    wav.channels = 1;
+    wav.samples = {1000, 2000, 3000};
+
+    SamplePlayer player;
+    player.setSample(wav.view(), 0, wav.view().frameCount(), PlaybackMode::OneShot);
+    player.setSpeed(1.0f);
+    player.trigger();
+    float left[5]{};
+    float right[5]{};
+    require(!player.render(left, right, 5), "one-shot must end naturally");
+    require(near(left[0], 1000.0f / 32768.0f) &&
+                near(left[2], 3000.0f / 32768.0f),
+            "one-shot must render its range once");
+    require(left[3] == 0.0f && left[4] == 0.0f,
+            "one-shot must not wrap after its natural end");
+}
+
+void testLoopWrapsWithFractionalAndLargeSteps() {
+    WavData wav;
+    wav.sampleRate = 48000;
+    wav.channels = 1;
+    wav.samples = {0, 10000, 20000};
+
+    SamplePlayer boundary;
+    boundary.setSample(wav.view(), 0, wav.view().frameCount(), PlaybackMode::Loop);
+    boundary.setSpeed(2.5f);
+    boundary.trigger();
+    float boundaryL[3]{};
+    float boundaryR[3]{};
+    require(boundary.render(boundaryL, boundaryR, 3), "loop must remain active");
+    require(near(boundaryL[1], 10000.0f / 32768.0f),
+            "loop interpolation must cross from end to start");
+    require(near(boundaryL[2], 20000.0f / 32768.0f),
+            "fractional loop wrap must preserve overshoot");
+
+    SamplePlayer largeStep;
+    largeStep.setSample(wav.view(), 0, wav.view().frameCount(), PlaybackMode::Loop);
+    largeStep.setSpeed(7.25f);
+    largeStep.trigger();
+    float largeL[3]{};
+    float largeR[3]{};
+    require(largeStep.render(largeL, largeR, 3),
+            "loop must handle source steps larger than its range");
+    require(near(largeL[1], 12500.0f / 32768.0f) &&
+                near(largeL[2], 10000.0f / 32768.0f),
+            "large loop steps must wrap with modulo and retain fractions");
+}
+
+void testVoicePlaybackModeAndPlayingQuery() {
+    WavData wav;
+    wav.sampleRate = 48000;
+    wav.channels = 1;
+    wav.samples = {1000, 2000, 3000};
+    VoiceManager manager(48000);
+
+    require(manager.trigger(1, wav.view(), 0, 3, 1.0f, PlaybackMode::Loop),
+            "looping voice must trigger");
+    float left[8]{};
+    float right[8]{};
+    manager.render(left, right, 8);
+    require(manager.isPadPlaying(1), "looping voice must continue beyond sample end");
+    require(near(left[6], 1000.0f / 32768.0f),
+            "looping voice must restart at its range start");
+
+    require(manager.trigger(2, wav.view(), 0, 3, 1.0f),
+            "default one-shot voice must trigger");
+    require(manager.isPadPlaying(2), "new one-shot must report playing");
+    float finishL[3]{};
+    float finishR[3]{};
+    manager.render(finishL, finishR, 3);
+    require(!manager.isPadPlaying(2),
+            "one-shot query must clear after natural completion");
+    require(manager.isPadPlaying(1), "one pad's mode must not affect another pad");
+}
+
+void testStopPadCancelsOnlyAssociatedAudio() {
+    WavData wav = makeCrossfadeWav();
+    VoiceManager manager(48000);
+    for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
+        triggerCrossfadeSegment(manager, wav.view(),
+                                static_cast<VoiceManager::PadId>(voice), voice);
+    }
+    triggerCrossfadeSegment(manager, wav.view(), 4, 4);
+    triggerCrossfadeSegment(manager, wav.view(), 5, 5);
+
+    manager.stopPad(4);
+    require(!manager.isPadPlaying(4), "stopPad must stop its active main voice");
+    require(manager.isPadPlaying(2) && manager.isPadPlaying(3) &&
+                manager.isPadPlaying(5),
+            "stopPad must preserve unrelated active voices");
+    float left = 0.0f;
+    float right = 0.0f;
+    manager.render(&left, &right, 1);
+    require(near(left, 9000.0f / 32768.0f),
+            "stopPad must cancel associated tails and preserve unrelated tails");
+}
+
+void testPadTriggerBehaviorMatrix() {
+    using Action = PadTriggerAction;
+    require(padDownAction(PlaybackMode::OneShot, TriggerBehavior::Gate, false) ==
+                Action::Trigger &&
+                padUpAction(TriggerBehavior::Gate) == Action::Stop,
+            "one-shot gate must trigger on down and stop on release");
+    require(padDownAction(PlaybackMode::OneShot, TriggerBehavior::Latch, true) ==
+                Action::Trigger &&
+                padUpAction(TriggerBehavior::Latch) == Action::None,
+            "one-shot latch must retrigger on down and ignore release");
+    require(padDownAction(PlaybackMode::Loop, TriggerBehavior::Gate, true) ==
+                Action::Trigger &&
+                padUpAction(TriggerBehavior::Gate) == Action::Stop,
+            "loop gate must retrigger on down and stop on release");
+    require(padDownAction(PlaybackMode::Loop, TriggerBehavior::Latch, false) ==
+                Action::Trigger &&
+                padDownAction(PlaybackMode::Loop, TriggerBehavior::Latch, true) ==
+                    Action::Stop &&
+                padUpAction(TriggerBehavior::Latch) == Action::None,
+            "loop latch must toggle on down and ignore release");
+}
+
+void applyPadDown(VoiceManager& manager, VoiceManager::PadId padId, PcmView pcm,
+                  PlaybackMode mode, TriggerBehavior behavior) {
+    const PadTriggerAction action =
+        padDownAction(mode, behavior, manager.isPadPlaying(padId));
+    if (action == PadTriggerAction::Stop) {
+        manager.stopPad(padId);
+    } else {
+        require(manager.trigger(padId, pcm, 0, pcm.frameCount(), 1.0f, mode),
+                "matrix pad-down trigger must succeed");
+    }
+}
+
+void applyPadUp(VoiceManager& manager, VoiceManager::PadId padId,
+                TriggerBehavior behavior) {
+    if (padUpAction(behavior) == PadTriggerAction::Stop) manager.stopPad(padId);
+}
+
+void testPadTriggerMatrixDrivesEngine() {
+    WavData wav;
+    wav.sampleRate = 48000;
+    wav.channels = 1;
+    wav.samples = {1000, 2000, 3000};
+    const PcmView pcm = wav.view();
+    float left[4]{};
+    float right[4]{};
+
+    VoiceManager oneShotGate(48000);
+    applyPadDown(oneShotGate, 1, pcm, PlaybackMode::OneShot,
+                 TriggerBehavior::Gate);
+    require(oneShotGate.isPadPlaying(1), "one-shot gate down must start audio");
+    applyPadUp(oneShotGate, 1, TriggerBehavior::Gate);
+    require(!oneShotGate.isPadPlaying(1), "one-shot gate release must stop audio");
+    applyPadDown(oneShotGate, 1, pcm, PlaybackMode::OneShot,
+                 TriggerBehavior::Gate);
+    oneShotGate.render(left, right, 4);
+    require(!oneShotGate.isPadPlaying(1), "one-shot gate must also end naturally");
+
+    VoiceManager oneShotLatch(48000);
+    applyPadDown(oneShotLatch, 2, pcm, PlaybackMode::OneShot,
+                 TriggerBehavior::Latch);
+    applyPadUp(oneShotLatch, 2, TriggerBehavior::Latch);
+    require(oneShotLatch.isPadPlaying(2), "one-shot latch release must be a no-op");
+    oneShotLatch.render(left, right, 1);
+    applyPadDown(oneShotLatch, 2, pcm, PlaybackMode::OneShot,
+                 TriggerBehavior::Latch);
+    left[0] = right[0] = 0.0f;
+    oneShotLatch.render(left, right, 1);
+    require(near(left[0], 1000.0f / 32768.0f),
+            "one-shot latch second down must retrigger from the start");
+    oneShotLatch.render(left, right, 3);
+    require(!oneShotLatch.isPadPlaying(2), "one-shot latch must end naturally");
+
+    VoiceManager loopGate(48000);
+    applyPadDown(loopGate, 3, pcm, PlaybackMode::Loop, TriggerBehavior::Gate);
+    loopGate.render(left, right, 4);
+    require(loopGate.isPadPlaying(3), "loop gate must wrap while held");
+    applyPadUp(loopGate, 3, TriggerBehavior::Gate);
+    require(!loopGate.isPadPlaying(3), "loop gate release must stop audio");
+
+    VoiceManager loopLatch(48000);
+    applyPadDown(loopLatch, 4, pcm, PlaybackMode::Loop, TriggerBehavior::Latch);
+    applyPadUp(loopLatch, 4, TriggerBehavior::Latch);
+    require(loopLatch.isPadPlaying(4), "loop latch release must be a no-op");
+    applyPadDown(loopLatch, 4, pcm, PlaybackMode::Loop, TriggerBehavior::Latch);
+    require(!loopLatch.isPadPlaying(4), "loop latch second down must stop audio");
 }
 
 void testFourVoicesAndOldestSteal() {
@@ -463,6 +653,12 @@ void testInvalidRatesAndSpeeds() {
 
 int main() {
     testViewAndRanges();
+    testOneShotEndsWithoutWrapping();
+    testLoopWrapsWithFractionalAndLargeSteps();
+    testVoicePlaybackModeAndPlayingQuery();
+    testStopPadCancelsOnlyAssociatedAudio();
+    testPadTriggerBehaviorMatrix();
+    testPadTriggerMatrixDrivesEngine();
     testFourVoicesAndOldestSteal();
     testStolenVoiceCrossfadeIsExactly64Frames();
     testSamePadRetriggerDoesNotLeaveATail();

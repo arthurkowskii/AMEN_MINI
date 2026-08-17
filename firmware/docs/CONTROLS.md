@@ -11,19 +11,30 @@ Ce document est la source claire des controles de performance actuels. Le harnes
 - Liste d'assignation : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`.
 - `BLANK` desassigne le pad. `REVERSE` et `TRANCE GATE` sont assignables mais n'ont pas encore de DSP.
 
+Chaque pad voix demarre en `ONE SHOT + GATE` et memorise independamment ses deux axes :
+
+| Lecture | Trigger | Appui | Relachement |
+|---|---|---|---|
+| `ONE SHOT` | `GATE` | demarre/retrigger | arrete le pad (la fin naturelle l'arrete aussi) |
+| `ONE SHOT` | `LATCH` | demarre/retrigger | ne fait rien ; lecture jusqu'a la fin naturelle |
+| `LOOP` | `GATE` | demarre/retrigger la boucle | arrete le pad |
+| `LOOP` | `LATCH` | premier appui = demarre ; appui suivant = arrete | ne fait rien |
+
+L'arret cible uniquement le pad concerne, y compris ses queues de crossfade, sans couper les autres pads.
+
 ## Encodeurs
 
 - `E1 NAV` : sur un pad voix maintenu, navigue dans la SD et le clic entre/charge. Sur un pad FX maintenu, navigue dans la liste FX et le clic assigne.
 - `E2 AMOUNT` : mix dry/wet du Repeat, de 0 a 100 %. La valeur par defaut est 100 %.
 - `E3 DIVISION` : longueur du Repeat, choix live `1/4`, `1/8`, `1/12`, `1/16`, `1/24`, `1/32` (les `1/12` et `1/24` sont les triplets de croche et de double-croche — le stutter swingue). La valeur par defaut est `1/4`.
 - `E4 SPEED` : vitesse du pad voix **tenu** (plus jamais le "dernier joue"), de 25 a 400 % par pas de 5 %. Appliquee en direct a la voix active du pad (rampe de 128 frames, sans retrigger) et memorisee pour son prochain trigger. Le clic remet **ce pad** a 100 %. Sans pad tenu : hint `E4 TENIR PAD`, aucun effet.
-- `E5 MODE` : mode de lecture du pad voix **tenu** (`ONE SHOT` / `LOOP` / `GRANULAR` / `SLICE SYNC`). Le clic remet ce pad en `ONE SHOT`. Sans pad tenu : hint `E5 TENIR PAD`, aucun effet.
-- `E6 J10` : reserve.
+- `E5 MODE` : deux axes independants pour le pad voix **tenu**. La rotation alterne uniquement le mode de lecture `ONE SHOT` / `LOOP`. Le clic alterne le comportement de trigger `GATE` / `LATCH`. L'overlay et la console affichent la valeur reelle choisie. Sans pad tenu : hint `E5 TENIR PAD`, aucun effet.
+- `E6 LFO` : reserve pour un futur LFO ; aucun controle audio dans cette tache.
 - `E7 BPM` : tempo global de 20 a 300 BPM. La longueur du Repeat est recalculee en direct.
 
-Chaque pad voix memorise sa propre vitesse et son propre mode ; l'ecran d'accueil affiche le BPM et le mode du dernier pad joue.
+Chaque pad voix memorise sa propre vitesse, son mode de lecture et son comportement de trigger ; l'ecran d'accueil affiche le BPM et le mode de lecture du dernier pad joue.
 
-Dans le harness Windows, `F1-F7` choisit l'encodeur, les fleches le tournent et `Entree` le clique. `Espace` retrigger le dernier pad voix avec SA propre vitesse, `Retour arriere` remonte dans le browser et `q` quitte.
+Dans le harness Windows, `F1-F7` choisit l'encodeur, les fleches le tournent et `Entree` le clique. `Espace` simule deterministiquement un nouvel appui sur le dernier pad voix avec tous ses reglages : il retrigger dans les trois premiers cas et bascule lecture/arret en `LOOP + LATCH`. `Retour arriere` remonte dans le browser et `q` quitte.
 
 ## Transitions Audio
 

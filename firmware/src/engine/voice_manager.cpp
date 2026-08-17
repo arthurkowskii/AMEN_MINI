@@ -4,7 +4,8 @@
 #include <cmath>
 
 bool VoiceManager::trigger(PadId padId, PcmView pcm, std::size_t startFrame,
-                           std::size_t endFrame, float userSpeed) {
+                           std::size_t endFrame, float userSpeed,
+                           PlaybackMode mode) {
     if (!pcm.valid() || startFrame >= endFrame || endFrame > pcm.frameCount() ||
         outputSampleRate_ == 0 || !std::isfinite(userSpeed) ||
         userSpeed < kMinUserSpeed || userSpeed > kMaxUserSpeed) {
@@ -44,7 +45,7 @@ bool VoiceManager::trigger(PadId padId, PcmView pcm, std::size_t startFrame,
     }
 
     if (stealing) retire(selected->player, selected->padId, padId);
-    selected->player.setSample(pcm, startFrame, endFrame);
+    selected->player.setSample(pcm, startFrame, endFrame, mode);
     selected->player.setSpeed(sourceStep);
     selected->player.trigger();
     selected->padId = padId;
@@ -105,6 +106,22 @@ bool VoiceManager::setPadSpeed(PadId padId, float userSpeed) {
         if (!std::isfinite(sourceStep) || sourceStep <= 0.0f) return false;
         voice.player.setSpeed(sourceStep);
         return true;
+    }
+    return false;
+}
+
+void VoiceManager::stopPad(PadId padId) {
+    for (Voice& voice : voices_) {
+        if (!voice.player.isPlaying() || voice.padId != padId) continue;
+        voice.player.stop();
+        voice.crossfadeFrame = kCrossfadeFrames;
+    }
+    cancelRetirementsForPad(padId);
+}
+
+bool VoiceManager::isPadPlaying(PadId padId) const {
+    for (const Voice& voice : voices_) {
+        if (voice.padId == padId && voice.player.isPlaying()) return true;
     }
     return false;
 }
