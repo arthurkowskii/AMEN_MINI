@@ -36,7 +36,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : vérifié numériquement sur test.wav (1 s, 440 Hz stéréo) : speed 0,5 → 220 Hz / 2,0 s ; 1,0 → 440 Hz / 1,0 s ; 2,0 → 880 Hz / 0,5 s. Le player PC complet compile.
 - Vérification : analyse par zero-crossing (fréquence) + comptage de frames rendues (durée), pour les 3 vitesses.
 
-## J3 — Pool de 4 voix [EN COURS — moteur natif] — P1
+## J3 — Pool de 4 voix [MOTEUR NATIF LIVRÉ — écoute matérielle en attente] — P1
 
 - Objectif : 4 SamplePlayer simultanés — le sampler devient polyphonique tout en conservant de la marge CPU pour les effets.
 - Fichiers : `src/engine/voice_manager.h` + `voice_manager.cpp` + test dans test_native/.
@@ -44,7 +44,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : 4 pads distincts s'entendent additionnés sans saturation ; retrigger un même pad ne double pas son son ; un 5e pad distinct vole la voix la plus ancienne sans clic audible.
 - Vérification : test PC qui déclenche 4 voix à des positions décalées, mesure que le mix ne dépasse pas [-1,1] et vérifie que le 5e trigger vole la bonne voix ; écoute via rt_player étendu (touches = pads).
 
-## J4 — PSRAM (mémoire Teensy) [EN COURS — API buffer externe] — P1
+## J4 — PSRAM (mémoire Teensy) [EN COURS — arène robuste 7 MiB livrée] — P1
 
 - Objectif : les échantillons chargés vivent en PSRAM (8 Mo) sur Teensy, pas en RAM interne (1 Mo).
 - Fichiers : `src/teensy/psram_arena.h/.cpp` (bootstrap commit `48d9f1c`), `src/teensy/teensy_wav_reader.h/.cpp`, `src/teensy/sample_loader.h/.cpp` ; le moteur portable ne dépend pas d'Arduino.
@@ -68,7 +68,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : les 3 modes produisent 12 slices exploitables (mode transients : les coups tombent sur les attaques perceptibles).
 - Vérification : test sur un break réel + visualisation (impression des positions en secondes) ; affinage des seuils.
 
-## J7 — One-shot + loop + test d'écoute [À FAIRE] — P1
+## J7 — One-shot + loop + test d'écoute [MOTEUR/HARNESS LIVRÉS — écoute matérielle en attente] — P1
 
 - Objectif : modes one-shot et loop, avec comportement de latch intégré au mode — le mode définit si le pad reste actif doigt levé.
 - Fichiers : SamplePlayer (mode), test_native/rt_player.cpp (choix du mode au clavier).
@@ -128,7 +128,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : compile arduino-cli (`arduino-cli compile --fqbn teensy:avr:teensy41 firmware`) ; sur matériel : son dans le casque, pads déclenchent les voix, encodeurs changent le pitch.
 - Vérification : compile + test réel (matériel attendu fin août).
 
-## J13 — UI pages + USB-MIDI [EN COURS — catalogue/browser + face avant PC] — P1
+## J13 — UI pages + USB-MIDI [EN COURS — logique OLED/browser livrée, MIDI restant] — P1
 
 - Objectif : les 7 encodeurs en pages (pad / globale / browser) + USB-MIDI.
 - Fichiers : logique portable `src/ui/` et `src/browser/`, backends PC `test_native/screen_preview.cpp` et `sample_catalog_scanner.cpp`, futur backend OLED/SD/MIDI sous `src/teensy/`.
@@ -151,7 +151,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - PSRAM : vérifier `external_psram_size`, appeler `extmem_malloc()` une seule fois au démarrage pour réserver la grande zone PCM16, tester le pointeur et sa capacité, puis appeler `wav_probe()` avant `wav_decode()` directement dans cette zone. Ne jamais allouer, libérer, scanner la SD ou convertir dans le callback audio.
 - Remplacement d'un break : arrêter les voix, vérifier format/taille, décoder le nouveau fichier, construire la `PcmView`, puis réaffecter les plages des pads. Un même PCM doit rester partageable par plusieurs pads/voix avec des `startFrame/endFrame` différents, sans copie.
 - Intégration matérielle restante : objet `AudioStream` vers SGTL5000/I2S, OLED réel, encodeur Browser, matrice de pads, mapping des 12 slices, gestion d'erreurs SD/PSRAM et mesures `AudioProcessorUsageMax()`/mémoire sur Teensy.
-- Risques connus à traiter : le 5e trigger vole actuellement la voix la plus ancienne sans crossfade ; ajouter une transition courte et faire une écoute dédiée avant de marquer J3 terminé. Le chargement PC conserve temporairement ancien et nouveau `WavData`, alors que le backend Teensy à zone PSRAM unique devra choisir une politique explicite en cas d'échec de chargement.
+- Risques connus restant à traiter : le chargement PC conserve temporairement ancien et nouveau `WavData`, alors que le backend Teensy à zone PSRAM unique devra choisir une politique explicite en cas d'échec de chargement. Le vol de la 5e voix dispose désormais de son crossfade linéaire exact de 64 frames, vérifié numériquement ; l'écoute dédiée sur matériel reste à faire.
 - Lecture multi-fréquence : `VoiceManager` convertit la vitesse utilisateur en pas source (`speed * sampleRate / outputSampleRate`) ; les WAV mono/stéréo restent en PCM16 à leur fréquence native, sans resampling au chargement ni travail supplémentaire dans le callback.
 - Vitesse performative : plage 25-400 % par pas de 5 %, affichage en pourcentage et rampe de 128 frames. Un changement vise la voix active du dernier pad joué, conserve sa position de lecture et devient la vitesse initiale de son prochain trigger.
 - Retrigger par pad : `VoiceManager::trigger(PadId, ...)` remplace la voix active du même pad au lieu de l'empiler. Les tests couvrent le remplacement par une autre plage, le mix de deux pads distincts et le vol de voix après quatre identités distinctes.
@@ -253,3 +253,15 @@ Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis 
 - **Bootstrap Teensy (J4/J12 commencé)** : `firmware.ino` setup() diagnostic, `PsramArena` (extmem_malloc 8 Mo), `TeensyWavReader` (wrapper SD File → WavReader), `SampleLoader` (SD → PSRAM avec validation avant arrêt des voix). Prochaine étape : intégrer AudioStream/SGTL5000 et callback render().
 - `.gitignore` : exclut `*.o` et `test_native/samples`.
 - **Checkpoint Notion** : non synchronisé (API Notion indisponible — header `Notion-Version` manquant côté serveur).
+
+### Checkpoint 17/08/2026 (session finale) — jalon firmware vérifié
+
+- **PSRAM J4/J12** : `PsramArena` réserve par défaut **7 MiB** sur les 8 MiB installés afin de laisser 1 MiB de marge à l'allocateur et aux futurs buffers fixes. Elle rejette et libère un fallback en RAM interne ainsi que toute plage qui dépasserait la PSRAM physique. Vérifié par `psram_arena_test` et par la compilation Teensy 4.1 ; aucune allocation n'a été mesurée sur la carte réelle.
+- **Voix J3** : le vol de la voix la plus ancienne utilise un crossfade **linéaire de 64 frames exactes**. Les queues sont bornées, le retrigger/stop d'un pad supprime ses queues obsolètes sans couper les autres pads, et les tests numériques couvrent l'enveloppe frame par frame.
+- **Modes J7** : chaque pad mémorise deux axes indépendants, lecture `ONE SHOT` / `LOOP` et déclenchement `GATE` / `LATCH`. E5 tourne le mode de lecture et son clic bascule Gate/Latch ; **E6 reste réservé**. Les quatre combinaisons et leur retrigger/stop sont couvertes nativement et simulées dans le harness PC, sans prétendre à une écoute ou un essai physique.
+- **OLED/browser J13** : chaque interaction renouvelle l'overlay pour **1 s depuis la dernière interaction**. Après **500 ms** d'immobilité, le WAV sélectionné défile à **30 px/s** ; le texte est découpé dans son viewport et ne déborde ni sur le marqueur ni hors du framebuffer **128×32**. La sélection et le dossier sont les seuls événements qui remettent cette chronologie à zéro.
+- **Suite native stricte** : compilations C++17 `-O2 -Wall -Wextra -Wpedantic -Werror` et exécutions réussies pour `voice_manager_test`, `live_repeat_test`, `screen_ui_test`, `psram_arena_test`, `sample_catalog_test`, `sample_catalog_scanner_test`, `wav_loader_reader_test` et `test_native/main.cpp`. `python3 test_native/check_formats.py` valide PCM 8/16/24/32 bits et float32, tous identiques à la conversion int16 attendue.
+- **Sanitizers** : les sept suites portables ci-dessus repassent avec `-fsanitize=address,undefined -fno-omit-frame-pointer`, sans diagnostic ASan/UBSan.
+- **Harness Linux** : compilation complète vers `/tmp/amen_rt_linux` avec `-Wall -Wextra -Wpedantic`, puis smoke borné à 5 s avec `test_native/test.wav` et sortie propre (`0`). ALSA/JACK signalent l'absence de périphérique audio sur cet hôte, sans blocage ; deux warnings `-Wunused-variable` restent propres à la branche Linux du simulateur (`kFxNames`, `kEncoderNames`).
+- **Deliverable Windows** : reconstruction en place par `x86_64-w64-mingw32-g++ -std=c++17 -O2 ... -lole32 -lwinmm -lgdi32 -luser32`, mode restauré à `0644`. `file`/`objdump` confirment un PE32+ x86-64 et `strings` retrouve `ONE SHOT`, `LOOP`, `GATE`, `LATCH`, `E1 NAV`, `E5 MODE`, `E6 LFO`, `1/12` et `1/24`. Le rebuild a changé les octets (`c2d70b60…` → `8409ffed…`) à taille identique (1 116 905 octets).
+- **Teensy 4.1 compile-only** : `arduino-cli compile --fqbn teensy:avr:teensy41 --output-dir /tmp/amen_mini_teensy41 firmware` réussit (FLASH code 79 576 octets ; RAM1 variables 11 072 octets ; RAM2 variables 12 416 octets). L'hôte prévient que `/etc/udev/rules.d/00-teensy.rules` manque. **Aucun upload, test audio, test PSRAM physique ni validation sur appareil n'a été réalisé.**
