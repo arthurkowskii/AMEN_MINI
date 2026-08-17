@@ -301,6 +301,41 @@ void ScreenUi::drawText(int x, int y, const char* text, int scale) {
     }
 }
 
+void ScreenUi::drawBrowserText(int x, int y, const char* text,
+                               std::size_t length) {
+    constexpr int kViewportLeft = 7;
+    constexpr int kGlyphWidth = 3;
+    constexpr int kAdvance = 4;
+    if (text == nullptr || length == 0U) {
+        return;
+    }
+
+    // Jump directly to the first glyph that can intersect the viewport. This
+    // keeps work bounded by the 31 visible/partial glyphs, even for 255-char names.
+    std::size_t first = 0;
+    if (x + kGlyphWidth <= kViewportLeft) {
+        first = std::min(length, static_cast<std::size_t>(
+            (kViewportLeft - (x + kGlyphWidth)) / kAdvance + 1));
+    }
+
+    for (std::size_t index = first; index < length; ++index) {
+        const int characterX = x + static_cast<int>(index) * kAdvance;
+        if (characterX >= kWidth) {
+            break;
+        }
+        const std::uint8_t* rows = glyphRows(text[index]);
+        for (int row = 0; row < 5; ++row) {
+            for (int column = 0; column < kGlyphWidth; ++column) {
+                const int pixelX = characterX + column;
+                if (pixelX >= kViewportLeft && pixelX < kWidth &&
+                    (rows[row] & (1U << (2 - column))) != 0) {
+                    setPixel(pixelX, y + row);
+                }
+            }
+        }
+    }
+}
+
 void ScreenUi::drawNumberRight(int right, int y, int value, int scale,
                                const char* suffix) {
     char text[16]{};
@@ -369,7 +404,7 @@ void ScreenUi::drawBrowser(std::uint64_t nowMs) {
     drawHorizontalLine(0, 7, kWidth);
 
     if (browserLineCount_ == 0U) {
-        drawText(7, 14, "EMPTY");
+        drawBrowserText(7, 14, "EMPTY", 5U);
         return;
     }
 
@@ -393,7 +428,8 @@ void ScreenUi::drawBrowser(std::uint64_t nowMs) {
             ? nowMs - browserScrollStartMs_
             : 0U;
         if (!selectedLong || idleMs <= kBrowserScrollDelayMs) {
-            drawText(kTextX, kLineY[index], preview.data());
+            drawBrowserText(kTextX, kLineY[index], preview.data(),
+                            textLength(preview.data()));
             continue;
         }
 
@@ -407,7 +443,7 @@ void ScreenUi::drawBrowser(std::uint64_t nowMs) {
              remainderMs * kBrowserScrollPixelsPerSecond / 1000U) %
             static_cast<std::uint64_t>(cycleWidth);
         const int x = kTextX - static_cast<int>(offset);
-        drawText(x, kLineY[index], name);
-        drawText(x + cycleWidth, kLineY[index], name);
+        drawBrowserText(x, kLineY[index], name, length);
+        drawBrowserText(x + cycleWidth, kLineY[index], name, length);
     }
 }

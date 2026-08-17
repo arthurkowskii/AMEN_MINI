@@ -45,6 +45,7 @@ private:
     void fillRect(int x, int y, int width, int height);
     void drawChar(int x, int y, char character, int scale = 1);
     void drawText(int x, int y, const char* text, int scale = 1);
+    void drawBrowserText(int x, int y, const char* text, std::size_t length);
     void drawNumberRight(int right, int y, int value, int scale,
                          const char* suffix = nullptr);
     void drawPerformance();
@@ -53,7 +54,7 @@ private:
     void drawFxPad();
 
     struct StoredBrowserLine {
-        std::array<char, 256> name{};
+        std::array<char, 258> name{};
         bool directory = false;
     };
 

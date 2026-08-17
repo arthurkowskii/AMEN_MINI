@@ -20,6 +20,18 @@ bool regionEqual(const Buffer& left, const Buffer& right, int yBegin, int yEnd) 
     return true;
 }
 
+bool rectangleEqual(const Buffer& left, const Buffer& right, int xBegin, int xEnd,
+                    int yBegin, int yEnd) {
+    for (int y = yBegin; y < yEnd; ++y) {
+        for (int x = xBegin; x < xEnd; ++x) {
+            const int index = x + (y / 8) * ScreenUi::kWidth;
+            const std::uint8_t mask = static_cast<std::uint8_t>(1U << (y % 8));
+            if ((left[index] & mask) != (right[index] & mask)) return false;
+        }
+    }
+    return true;
+}
+
 bool regionShiftedLeftBy(const Buffer& earlier, const Buffer& later, int pixels,
                          int xBegin, int xEnd, int yBegin, int yEnd) {
     for (int y = yBegin; y < yEnd; ++y) {
@@ -111,6 +123,13 @@ int main() {
     ScreenUi previewReference;
     previewReference.showBrowser("LONG", previewLines, 3, 0, 10000);
     assert(preview0 == renderAt(previewReference, 10000));
+
+    // Regression: as the first glyph moves through x=6, scrolling text must not
+    // alter the marker/margin columns. The text viewport itself must be moving.
+    const Buffer scroll534 = renderAt(screen, 10534);
+    assert(rectangleEqual(preview0, scroll534, 0, 7, 8, 16));
+    assert(!rectangleEqual(preview0, scroll534, 7, ScreenUi::kWidth, 8, 16));
+
     const Buffer scroll600 = renderAt(screen, 10600);
     const Buffer scroll700 = renderAt(screen, 10700);
     assert(scroll600 != preview500);
@@ -165,6 +184,26 @@ int main() {
     const ScreenUi::BrowserLine originalLine[] = {{originalLong.data(), false}};
     copiedBaseline.showBrowser("COPY", originalLine, 1, 0, 21000);
     assert(copiedScroll == renderAt(copiedBaseline, 21700));
+
+    // A legal 255-character directory name retains every character plus '/'.
+    std::array<char, 256> maximumDirectoryName{};
+    maximumDirectoryName.fill('A');
+    maximumDirectoryName.back() = '\0';
+    std::array<char, 257> expectedDirectoryLabel{};
+    expectedDirectoryLabel.fill('A');
+    expectedDirectoryLabel[255] = '/';
+    expectedDirectoryLabel[256] = '\0';
+    const ScreenUi::BrowserLine maximumDirectory[] = {
+        {maximumDirectoryName.data(), true},
+    };
+    const ScreenUi::BrowserLine expectedDirectory[] = {
+        {expectedDirectoryLabel.data(), false},
+    };
+    screen.showBrowser("MAX", maximumDirectory, 1, 0, 30000);
+    const Buffer maximumDirectoryTail = renderAt(screen, 62167);
+    ScreenUi maximumDirectoryReference;
+    maximumDirectoryReference.showBrowser("MAX", expectedDirectory, 1, 0, 30000);
+    assert(maximumDirectoryTail == renderAt(maximumDirectoryReference, 62167));
 
     // Existing browser formatting and defensive bounds remain intact.
     const ScreenUi::BrowserLine fileLine[] = {{"drums", false}};
