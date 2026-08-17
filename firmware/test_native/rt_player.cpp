@@ -18,6 +18,7 @@
 
 #include "assignment_session.h"
 #include "browser_interaction.h"
+#include "granular.h"
 #include "pad_assignment.h"
 #include "pad_trigger_logic.h"
 #include "sample_catalog.h"
@@ -115,6 +116,10 @@ const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
 
 constexpr int kVoicePadCount = 6;
 
+// Nuage granulaire par pad voix (mode CLOUD, plan 7.3). Le PCM est emprunte
+// (jamais copie) : il vit dans state.wav ou dans la session TRANSIENT.
+std::array<GrainCloud, kVoicePadCount> g_padClouds{};
+
 // Réglages propres à chaque pad voix : la vitesse et le mode vivent ici,
 // jamais dans une variable globale. La cible des encodeurs E4/E5 est le pad
 // tenu (heldVoicePad), pas le dernier pad joué.
@@ -164,7 +169,16 @@ std::uint64_t now_ms() {
 }
 
 PlaybackMode next_mode(PlaybackMode mode) {
-    return mode == PlaybackMode::Loop ? PlaybackMode::OneShot : PlaybackMode::Loop;
+    switch (mode) {
+        case PlaybackMode::OneShot:
+            return PlaybackMode::Loop;
+        case PlaybackMode::Loop:
+            return PlaybackMode::Granular;  // CLOUD
+        case PlaybackMode::Granular:
+        case PlaybackMode::SliceSync:
+            return PlaybackMode::OneShot;
+    }
+    return PlaybackMode::OneShot;
 }
 
 void record_browser_event(AppState& state, std::uint64_t time) {
@@ -354,7 +368,7 @@ const char* mode_label(PlaybackMode mode) {
         case PlaybackMode::Loop:
             return "LOOP";
         case PlaybackMode::Granular:
-            return "GRANULAR";
+            return "CLOUD";
         case PlaybackMode::SliceSync:
             return "SLICE SYNC";
     }
@@ -415,6 +429,36 @@ PadTriggerAction apply_pad_down_audio(int pad, const UiSimulation& simulation,
     const float speed = static_cast<float>(settings.speedPercent) / 100.0f;
     std::lock_guard<std::mutex> lock(g_audioMutex);
     const auto padId = static_cast<VoiceManager::PadId>(pad);
+
+    if (settings.mode == PlaybackMode::Granular) {
+        // CLOUD (plan 7.3) : la plage assignee devient un nuage granulaire.
+        // Meme logique GATE/LATCH que les autres modes, mais sans passer par
+        // VoiceManager : le nuage emprunte le PCM (jamais copie) et rend dans
+        // le callback audio, sous le meme verrou.
+        const bool playing = g_padClouds[pad].active();
+        const PadTriggerAction action =
+            padDownAction(settings.mode, settings.behavior, playing);
+        if (action == PadTriggerAction::Stop) {
+            g_padClouds[pad].stop();
+        } else {
+            std::size_t start = 0;
+            std::size_t end = pcm.frameCount();
+            if (state.transientPlanActive && g_assignment.plan() != nullptr) {
+                const auto range = g_assignment.plan()->range(pad);
+                if (range.has_value()) {
+                    start = range->startFrame;
+                    end = range->endFrame;
+                }
+            }
+            // Graine deterministe et distincte par pad : chaque pad a son
+            // propre nuage, reproductible a l'identique.
+            const std::uint32_t seed =
+                static_cast<std::uint32_t>(pad + 1U) * 2654435761U;
+            g_padClouds[pad].start(pcm, start, end, speed, seed);
+        }
+        return action;
+    }
+
     const PadTriggerAction action = padDownAction(
         settings.mode, settings.behavior, g_voices.isPadPlaying(padId));
     if (action == PadTriggerAction::Stop) {
@@ -603,7 +647,11 @@ void voice_pad_up(int pad, ScreenUi& screen, UiSimulation& simulation,
     (void)state;
     if (padUpAction(simulation.pads[pad].behavior) == PadTriggerAction::Stop) {
         std::lock_guard<std::mutex> lock(g_audioMutex);
-        g_voices.stopPad(static_cast<VoiceManager::PadId>(pad));
+        if (simulation.pads[pad].mode == PlaybackMode::Granular) {
+            g_padClouds[pad].stop();  // fondu ~10 ms, aucun clic
+        } else {
+            g_voices.stopPad(static_cast<VoiceManager::PadId>(pad));
+        }
     }
     if (simulation.heldVoicePad != pad) return;
     int best = -1;
@@ -954,6 +1002,12 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     while (rendered < frames) {
         const std::size_t count = std::min<std::size_t>(kRenderBlock, frames - rendered);
         g_voices.render(tmpL.data(), tmpR.data(), static_cast<int>(count));
+        for (int pad = 0; pad < kVoicePadCount; ++pad) {
+            // Les nuages CLOUD actifs s'ajoutent au mix des voix (materiau
+            // emprunte, rendu sous le verrou du callback).
+            g_padClouds[pad].render(tmpL.data(), tmpR.data(),
+                                    static_cast<int>(count));
+        }
         g_repeat.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_spectralGate.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_spectralFreeze.process(tmpL.data(), tmpR.data(), static_cast<int>(count));

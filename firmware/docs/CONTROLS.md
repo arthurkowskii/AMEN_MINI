@@ -30,7 +30,7 @@ L'arret cible uniquement le pad concerne, y compris ses queues de crossfade, san
 - `E2 AMOUNT` : mix dry/wet du Repeat, de 0 a 100 %. La valeur par defaut est 100 %.
 - `E3 DIVISION` : longueur du Repeat, choix live `1/4`, `1/8`, `1/12`, `1/16`, `1/24`, `1/32` (les `1/12` et `1/24` sont les triplets de croche et de double-croche — le stutter swingue). La valeur par defaut est `1/4`.
 - `E4 SPEED` : vitesse du pad voix **tenu** (plus jamais le "dernier joue"), de 25 a 400 % par pas de 5 %. Appliquee en direct a la voix active du pad (rampe de 128 frames, sans retrigger) et memorisee pour son prochain trigger. Le clic remet **ce pad** a 100 %. Sans pad tenu : hint `E4 TENIR PAD`, aucun effet.
-- `E5 MODE` : deux axes independants pour le pad voix **tenu**. La rotation alterne uniquement le mode de lecture `ONE SHOT` / `LOOP`. Le clic alterne le comportement de trigger `GATE` / `LATCH`. L'overlay et la console affichent la valeur reelle choisie. Sans pad tenu : hint `E5 TENIR PAD`, aucun effet.
+- `E5 MODE` : deux axes independants pour le pad voix **tenu**. La rotation alterne le mode de lecture `ONE SHOT` / `LOOP` / `CLOUD`. Le clic alterne le comportement de trigger `GATE` / `LATCH`. L'overlay et la console affichent la valeur reelle choisie. Sans pad tenu : hint `E5 TENIR PAD`, aucun effet.
 - `E6 LFO` : reserve pour un futur LFO ; aucun controle audio dans cette tache.
 - `E7 BPM` : tempo global de 20 a 300 BPM. La longueur du Repeat est recalculee en direct ; la grille 16 pas de la spectral gate suit aussi ce tempo.
 
@@ -66,3 +66,11 @@ Le freeze capture le **spectre d'amplitude des 512 dernieres frames** du mix (FF
 - Apres le relachement, le wet retombe a zero et l'etat gele est remis a zero : le passthrough exact est restaure.
 - Le freeze traite le mix apres la spectral gate (chaine : voix -> Repeat -> Gate -> Freeze) et n'alloue aucune memoire dans `process()` : tout l'etat (anneau, fenetre, boucles, FFT sans table de twiddles) vit dans l'objet.
 - Mesure native : ~5 ms CPU pour 1 s d'audio 44,1 kHz (0,5 % du temps reel), capture FFT 512 incluse.
+
+## Cloud granulaire (mode CLOUD, E5)
+
+Le mode `CLOUD` transforme la **plage assignee** du pad en nuage granulaire : des grains de 30 a 150 ms naissent toutes les ~22 ms (densite bornee, 8 grains simultanes maximum), positions et longueurs tirees d'une sequence deterministe propre a chaque pad. Chaque grain est enveloppe par une fenetre de Hann aux deux extremites : aucune coupure franche a la naissance ni a la mort d'un grain. Le relachement (ou le deuxieme appui en LATCH) arrete le nuage par un fondu de ~10 ms.
+
+- Le PCM est **emprunte, jamais copie** : le nuage lit directement la plage du WAV charge ou du plan TRANSIENT, et le budget memoire reste fixe (8 grains par pad).
+- La vitesse du pad (`E4`) s'applique a la lecture des grains ; le mode ne modifie ni le latch ni les autres pads.
+- Mesure native : ~13 ms CPU pour 1 s de nuage 44,1 kHz (1,3 % du temps reel, 8 grains maximum).
