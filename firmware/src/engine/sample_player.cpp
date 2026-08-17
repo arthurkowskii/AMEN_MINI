@@ -48,6 +48,11 @@ bool SamplePlayer::render(float* outL, float* outR, int numFrames) {
 }
 
 bool SamplePlayer::renderAdditive(float* outL, float* outR, int numFrames) {
+    return renderAdditiveScaled(outL, outR, numFrames, 1.0f, 0.0f);
+}
+
+bool SamplePlayer::renderAdditiveScaled(float* outL, float* outR, int numFrames,
+                                        float startGain, float gainIncrement) {
     if (numFrames <= 0) return playing_;
 
     if (!playing_ || !std::isfinite(speed_) || speed_ <= 0.0f) {
@@ -55,7 +60,8 @@ bool SamplePlayer::renderAdditive(float* outL, float* outR, int numFrames) {
         return false;
     }
 
-    for (int i = 0; i < numFrames; ++i) {
+    float gain = startGain;
+    for (int i = 0; i < numFrames; ++i, gain += gainIncrement) {
         if (pos_ >= static_cast<double>(endFrame_)) {
             playing_ = false;
             break;
@@ -69,14 +75,14 @@ bool SamplePlayer::renderAdditive(float* outL, float* outR, int numFrames) {
         const float left = (pcm_.samples[i0 * channels] * (1.0f - t) +
                             pcm_.samples[i1 * channels] * t) /
                            32768.0f;
-        outL[i] += left;
+        outL[i] += left * gain;
 
         if (channels > 1) {
-            outR[i] += (pcm_.samples[i0 * channels + 1] * (1.0f - t) +
-                        pcm_.samples[i1 * channels + 1] * t) /
-                       32768.0f;
+            outR[i] += ((pcm_.samples[i0 * channels + 1] * (1.0f - t) +
+                         pcm_.samples[i1 * channels + 1] * t) /
+                        32768.0f) * gain;
         } else {
-            outR[i] += left;
+            outR[i] += left * gain;
         }
 
         pos_ += speed_;

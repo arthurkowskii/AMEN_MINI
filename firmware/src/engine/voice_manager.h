@@ -30,9 +30,27 @@ private:
         PadId padId = 0;
         uint64_t age = 0;
         float sourceRateRatio = 1.0f;
+        std::size_t crossfadeFrame = kCrossfadeFrames;
     };
 
+    struct Retirement {
+        SamplePlayer player;
+        std::size_t crossfadeFrame = kCrossfadeFrames;
+        uint64_t serial = 0;
+        bool active = false;
+    };
+
+    static constexpr std::size_t kCrossfadeFrames = 64;
+    static constexpr std::size_t kRetirementCount = kVoiceCount;
+
+    void retire(const SamplePlayer& player);
+    void renderVoice(Voice& voice, float* outL, float* outR, int numFrames);
+    void renderRetirement(Retirement& retirement, float* outL, float* outR,
+                          int numFrames);
+
     std::array<Voice, kVoiceCount> voices_{};
+    std::array<Retirement, kRetirementCount> retirements_{};
     uint64_t nextAge_ = 1;
+    uint64_t nextRetirementSerial_ = 1;
     uint32_t outputSampleRate_;
 };

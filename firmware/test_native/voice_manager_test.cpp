@@ -40,6 +40,25 @@ WavData makeLongSegmentedWav() {
     return wav;
 }
 
+constexpr std::size_t kCrossfadeSegmentFrames = 128;
+
+WavData makeCrossfadeWav() {
+    WavData wav;
+    wav.sampleRate = 48000;
+    wav.channels = 1;
+    for (int value = 1000; value <= 9000; value += 1000) {
+        wav.samples.insert(wav.samples.end(), kCrossfadeSegmentFrames, value);
+    }
+    return wav;
+}
+
+void triggerCrossfadeSegment(VoiceManager& manager, PcmView pcm,
+                             VoiceManager::PadId padId, std::size_t segment) {
+    const std::size_t start = segment * kCrossfadeSegmentFrames;
+    require(manager.trigger(padId, pcm, start, start + kCrossfadeSegmentFrames, 1.0f),
+            "crossfade test segment must trigger");
+}
+
 void testViewAndRanges() {
     WavData wav = makeSegmentedWav();
     const PcmView first = wav.view();
@@ -89,7 +108,119 @@ void testFourVoicesAndOldestSteal() {
     require(manager.trigger(4, pcm, 16, 20, 1.0f),
             "fifth voice must trigger by stealing");
     manager.render(left, right, 1);
-    require(near(left[0], 14000.0f / 32768.0f), "fifth voice must steal the oldest voice");
+    require(near(left[0], 10000.0f / 32768.0f),
+            "a stolen voice must start with its outgoing contribution unchanged");
+}
+
+void testStolenVoiceCrossfadeIsExactly64Frames() {
+    WavData wav = makeCrossfadeWav();
+    VoiceManager manager(48000);
+    for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
+        triggerCrossfadeSegment(manager, wav.view(),
+                                static_cast<VoiceManager::PadId>(voice), voice);
+    }
+    triggerCrossfadeSegment(manager, wav.view(), 4, 4);
+
+    float left[65]{};
+    float right[65]{};
+    manager.render(left, right, 65);
+
+    require(near(left[0], 10000.0f / 32768.0f),
+            "crossfade frame one must contain full outgoing and zero incoming");
+    require(near(left[31], (10000.0f + 4000.0f * 31.0f / 63.0f) / 32768.0f),
+            "crossfade midpoint must follow the 64-frame linear envelope");
+    require(near(left[63], 14000.0f / 32768.0f),
+            "crossfade frame 64 must contain zero outgoing and full incoming");
+    require(near(left[64], 14000.0f / 32768.0f),
+            "only the incoming source may contribute after the transition");
+}
+
+void testSamePadRetriggerDoesNotLeaveATail() {
+    WavData wav = makeCrossfadeWav();
+    VoiceManager manager(48000);
+    triggerCrossfadeSegment(manager, wav.view(), 7, 0);
+    triggerCrossfadeSegment(manager, wav.view(), 7, 5);
+
+    float left[65]{};
+    float right[65]{};
+    manager.render(left, right, 65);
+    for (float sample : left) {
+        require(near(sample, 6000.0f / 32768.0f),
+                "same-pad retrigger must replace rather than retire the old source");
+    }
+
+    manager.stopAll();
+    for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
+        triggerCrossfadeSegment(manager, wav.view(),
+                                static_cast<VoiceManager::PadId>(voice), voice);
+    }
+    triggerCrossfadeSegment(manager, wav.view(), 4, 4);
+    triggerCrossfadeSegment(manager, wav.view(), 4, 5);
+    float sampleL = 0.0f;
+    float sampleR = 0.0f;
+    manager.render(&sampleL, &sampleR, 1);
+    require(near(sampleL, 16000.0f / 32768.0f),
+            "same-pad retrigger during a crossfade must not retire its replaced source");
+}
+
+void testStopAllCancelsCrossfadeTail() {
+    WavData wav = makeCrossfadeWav();
+    VoiceManager manager(48000);
+    for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
+        triggerCrossfadeSegment(manager, wav.view(),
+                                static_cast<VoiceManager::PadId>(voice), voice);
+    }
+    triggerCrossfadeSegment(manager, wav.view(), 4, 4);
+
+    float sampleL = 0.0f;
+    float sampleR = 0.0f;
+    manager.render(&sampleL, &sampleR, 1);
+    manager.stopAll();
+    sampleL = sampleR = 9.0f;
+    manager.render(&sampleL, &sampleR, 1);
+    require(sampleL == 0.0f && sampleR == 0.0f,
+            "stopAll during a crossfade must silence active and retired voices");
+}
+
+void testRapidStealRetirementOverflowDropsOldestTail() {
+    WavData wav = makeCrossfadeWav();
+    VoiceManager manager(48000);
+    for (std::size_t voice = 0; voice < VoiceManager::kVoiceCount; ++voice) {
+        triggerCrossfadeSegment(manager, wav.view(),
+                                static_cast<VoiceManager::PadId>(voice), voice);
+    }
+    for (std::size_t segment = 4; segment < 9; ++segment) {
+        triggerCrossfadeSegment(manager, wav.view(),
+                                static_cast<VoiceManager::PadId>(segment), segment);
+    }
+
+    float left = 0.0f;
+    float right = 0.0f;
+    manager.render(&left, &right, 1);
+    require(near(left, 14000.0f / 32768.0f),
+            "a fifth rapid steal must deterministically drop the oldest of four tails");
+}
+
+void testCrossfadeMixRemainsClamped() {
+    WavData loud;
+    loud.sampleRate = 48000;
+    loud.channels = 1;
+    loud.samples.assign(128, 32767);
+
+    VoiceManager manager(48000);
+    for (std::size_t pad = 0; pad < VoiceManager::kVoiceCount + 1; ++pad) {
+        require(manager.trigger(static_cast<VoiceManager::PadId>(pad), loud.view(),
+                                0, loud.view().frameCount(), 1.0f),
+                "loud crossfade voice must trigger");
+    }
+    float left[64]{};
+    float right[64]{};
+    manager.render(left, right, 64);
+    for (std::size_t frame = 0; frame < 64; ++frame) {
+        require(left[frame] >= -1.0f && left[frame] <= 1.0f &&
+                    right[frame] >= -1.0f && right[frame] <= 1.0f,
+                "crossfade output must remain clamped to the public range");
+    }
 }
 
 void testClampAndZeroFill() {
@@ -298,6 +429,11 @@ void testInvalidRatesAndSpeeds() {
 int main() {
     testViewAndRanges();
     testFourVoicesAndOldestSteal();
+    testStolenVoiceCrossfadeIsExactly64Frames();
+    testSamePadRetriggerDoesNotLeaveATail();
+    testStopAllCancelsCrossfadeTail();
+    testRapidStealRetirementOverflowDropsOldestTail();
+    testCrossfadeMixRemainsClamped();
     testClampAndZeroFill();
     testPadRetriggerAndDistinctPadMix();
     testNativeSampleRatesAndUserSpeed();

@@ -19,6 +19,8 @@ private:
     static constexpr std::size_t kSpeedRampFrames = 128;
 
     bool renderAdditive(float* outL, float* outR, int numFrames);
+    bool renderAdditiveScaled(float* outL, float* outR, int numFrames,
+                              float startGain, float gainIncrement);
 
     PcmView pcm_;
     std::size_t startFrame_ = 0;
