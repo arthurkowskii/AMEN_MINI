@@ -26,6 +26,7 @@
 #include "screen_ui.h"
 #include "transient_detector.h"
 #include "fx/live_repeat.h"
+#include "fx/spectral_freeze.h"
 #include "fx/spectral_gate.h"
 #include "voice_manager.h"
 #include "wav_loader.h"
@@ -68,6 +69,8 @@ std::atomic<int> g_bpm{145};
 std::atomic<bool> g_repeatActive{false};
 std::atomic<bool> g_gateActive{false};
 SpectralGate g_spectralGate{kOutputSampleRate};
+std::atomic<bool> g_freezeActive{false};
+SpectralFreeze g_spectralFreeze{kOutputSampleRate};
 std::atomic<bool> g_running{true};
 std::mutex g_audioMutex;
 
@@ -92,15 +95,17 @@ HarnessVoiceStopper g_voiceStopper;
 // Machine a etats de l'appui long E1 : press/hold/release sur une entree du
 // navigateur. Chemin de controle uniquement, jamais dans le callback audio.
 BrowserInteraction g_browserInteraction;
-// Nombre d'effets assignables hors BLANK : REPEAT, REVERSE, TRANCE GATE.
-// La liste kFxNames compte kFxCount + 1 entrees (BLANK compris) ; le modulo
-// du cycle FX est donc (kFxCount + 1) et couvre exactement les indices
-// valides. TRANCE GATE (kGateFx) etait deja navigable avant son DSP : il ne
-// faut PAS augmenter kFxCount, sinon le cycle deborde la liste.
-constexpr int kFxCount = 3;
+// Nombre d'effets assignables hors BLANK : REPEAT, REVERSE, TRANCE GATE,
+// FREEZE. La liste kFxNames compte kFxCount + 1 entrees (BLANK compris) ;
+// le modulo du cycle FX est donc (kFxCount + 1) et couvre exactement les
+// indices valides. Ne pas modifier kFxNames sans ajuster kFxCount : la
+// static_assert ci-dessous fait echouer la compilation sinon.
+constexpr int kFxCount = 4;
 constexpr int kRepeatFx = 1;
 constexpr int kGateFx = 3;
-const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE"};
+constexpr int kFreezeFx = 4;
+const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE",
+                          "FREEZE"};
 static_assert(sizeof(kFxNames) / sizeof(kFxNames[0]) ==
                   static_cast<std::size_t>(kFxCount) + 1U,
               "kFxCount doit laisser BLANK + kFxCount effets dans kFxNames");
@@ -535,6 +540,7 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
                 simulation.fxAssign[simulation.heldFxPad] = simulation.fxCandidate;
                 g_repeatActive.store(simulation.fxCandidate == kRepeatFx);
                 g_gateActive.store(simulation.fxCandidate == kGateFx);
+                g_freezeActive.store(simulation.fxCandidate == kFreezeFx);
                 screen.showFxPad(7 + simulation.heldFxPad,
                                  kFxNames[simulation.fxCandidate], 1);
                 std::printf("pad %d : FX = %s\n", 7 + simulation.heldFxPad,
@@ -617,6 +623,7 @@ void fx_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation) {
     simulation.fxCandidate = simulation.fxAssign[pad];
     g_repeatActive.store(simulation.fxCandidate == kRepeatFx);
     g_gateActive.store(simulation.fxCandidate == kGateFx);
+    g_freezeActive.store(simulation.fxCandidate == kFreezeFx);
     screen.showFxPad(7 + pad, kFxNames[simulation.fxCandidate],
                      simulation.selectedEncoder);
     std::printf("pad %d : %s\n", 7 + pad, kFxNames[simulation.fxCandidate]);
@@ -627,6 +634,7 @@ void fx_pad_up(int pad, ScreenUi& screen, UiSimulation& simulation,
     if (simulation.heldFxPad != pad) return;
     g_repeatActive.store(false);
     g_gateActive.store(false);
+    g_freezeActive.store(false);
     simulation.heldFxPad = -1;
     if (state.browserActive) {
         refresh_browser(screen, state);
@@ -932,6 +940,12 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
         g_spectralGate.setActive(targetGateActive);
         appliedGateActive = targetGateActive;
     }
+    static bool appliedFreezeActive = false;
+    const bool targetFreezeActive = g_freezeActive.load();
+    if (targetFreezeActive != appliedFreezeActive) {
+        g_spectralFreeze.setActive(targetFreezeActive);
+        appliedFreezeActive = targetFreezeActive;
+    }
 
     constexpr std::size_t kRenderBlock = 512;
     std::array<float, kRenderBlock> tmpL{};
@@ -942,6 +956,7 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
         g_voices.render(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_repeat.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_spectralGate.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
+        g_spectralFreeze.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         for (std::size_t i = 0; i < count; ++i) {
             dst[(rendered + i) * 2] = tmpL[i];
             dst[(rendered + i) * 2 + 1] = tmpR[i];

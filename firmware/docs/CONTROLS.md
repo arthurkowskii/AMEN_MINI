@@ -7,10 +7,10 @@ Ce document est la source claire des controles de performance actuels. Le harnes
 - Pads voix 1-6 (`Numpad 1-6`) : l'appui declenche le break et fait du pad la **cible des encodeurs** tant qu'il est tenu. Toujours maintenir le pad pour editer ses parametres (règle : le dernier pad appuye gagne, relacher retombe sur le pad encore tenu le plus recent).
 - Le pad voix maintenu + `E1` ouvre le navigateur SD (le relacher le ferme). L'appui seul ne change plus l'ecran.
 - Pads FX 7-9 (`Numpad 7-9`) : le maintien active l'effet assigne, le relachement le coupe.
+- Liste d'assignation : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`, `FREEZE`.
 - Le Repeat capture l'audio du mix global immediatement anterieur a l'appui. Il ne retrigger pas une voix individuelle.
-- Liste d'assignation : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`.
-- `BLANK` desassigne le pad. `REVERSE` est assignable mais n'a pas encore de DSP. `TRANCE GATE` applique la spectral gate 8 bandes decrite dans Transitions Audio.
-- **Un seul effet global est actif a la fois en V0** : le pad FX tenu gagne (REPEAT et TRANCE GATE sont mutuellement exclusifs par conception).
+- `BLANK` desassigne le pad. `REVERSE` est assignable mais n'a pas encore de DSP. `TRANCE GATE` applique la spectral gate 8 bandes et `FREEZE` le gel spectral, decrits dans Transitions Audio.
+- **Un seul effet global est actif a la fois en V0** : le pad FX tenu gagne (REPEAT, TRANCE GATE et FREEZE sont mutuellement exclusifs par conception).
 
 Chaque pad voix demarre en `ONE SHOT + GATE` et memorise independamment ses deux axes :
 
@@ -57,3 +57,12 @@ La spectral gate decoupe le mix stereo global en **8 bandes** (echelle de passe-
 - **Motif par defaut deterministe** : la bande b est ouverte tous les b+1 pas (bande 1 : un pas sur deux ; bande 4 : un pas sur cinq ; bande 8 : un pas sur huit). Pas d'editeur de motif en V0 ; les motifs restent programmables par code (`SpectralGate::setPattern`).
 - La porte traite le mix apres le Repeat (chaine : voix -> Repeat -> Spectral Gate) et n'alloue aucune memoire : tout l'etat (14 biquads, gains, phase) vit dans l'objet, pret a tourner sur Teensy.
 - Un seul effet global actif a la fois en V0 : tenir un pad FX desactive l'autre.
+
+## Spectral Freeze (FREEZE)
+
+Le freeze capture le **spectre d'amplitude des 512 dernieres frames** du mix (FFT 512, fenetre de Hann periodique), abandonne les phases, puis re-synthetise une **boucle 512-periodique** avec des phases deterministes. La boucle est rejouee en circulaire : aucune couture, aucune ondulation, et le spectre de magnitude de la sortie est exactement celui de la capture. L'activation et le relachement passent par une **rampe une-pole de ~10 ms** sur le gain wet : aucun clic, meme en plein signal. Tant que l'effet n'a pas ete actif, la chaine est un passthrough bit-exact.
+
+- Le freeze fige **le passe immediat** : l'anneau de capture suit le mix en permanence, donc l'appui gele les dernieres ~11,6 ms sans latence supplementaire.
+- Apres le relachement, le wet retombe a zero et l'etat gele est remis a zero : le passthrough exact est restaure.
+- Le freeze traite le mix apres la spectral gate (chaine : voix -> Repeat -> Gate -> Freeze) et n'alloue aucune memoire dans `process()` : tout l'etat (anneau, fenetre, boucles, FFT sans table de twiddles) vit dans l'objet.
+- Mesure native : ~5 ms CPU pour 1 s d'audio 44,1 kHz (0,5 % du temps reel), capture FFT 512 incluse.
