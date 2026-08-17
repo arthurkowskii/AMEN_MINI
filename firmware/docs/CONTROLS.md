@@ -34,6 +34,12 @@ L'arret cible uniquement le pad concerne, y compris ses queues de crossfade, san
 
 Chaque pad voix memorise sa propre vitesse, son mode de lecture et son comportement de trigger ; l'ecran d'accueil affiche le BPM et le mode de lecture du dernier pad joue.
 
+## Ecran OLED
+
+- Chaque interaction de parametre renouvelle son overlay pour exactement 1 seconde a partir de la derniere interaction. Le navigateur et l'ecran d'un pad FX restent prioritaires sur cet overlay.
+- Dans le navigateur WAV, les noms longs restent d'abord immobiles et tronques avec `..`. Apres 500 ms sans changement de selection ou de dossier, seule la ligne selectionnee defile horizontalement a 30 pixels/s, en boucle avec un espace. Une nouvelle selection, un changement de dossier ou leur rafraichissement remet le defilement au debut.
+- Les lignes non selectionnees et les noms assez courts pour tenir dans la largeur disponible ne defilent jamais.
+
 Dans le harness Windows, `F1-F7` choisit l'encodeur, les fleches le tournent et `Entree` le clique. `Espace` simule deterministiquement un nouvel appui sur le dernier pad voix avec tous ses reglages : il retrigger dans les trois premiers cas et bascule lecture/arret en `LOOP + LATCH`. `Retour arriere` remonte dans le browser et `q` quitte.
 
 ## Transitions Audio

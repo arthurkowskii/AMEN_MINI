@@ -102,6 +102,35 @@ void copyBrowserLabel(std::array<char, Size>& destination, const char* source,
     }
 }
 
+template <std::size_t Size>
+void makeBrowserPreview(std::array<char, Size>& destination, const char* source) {
+    destination.fill('\0');
+    if (source == nullptr) return;
+
+    std::size_t sourceLength = 0;
+    while (source[sourceLength] != '\0') ++sourceLength;
+    if (sourceLength < Size) {
+        std::copy_n(source, sourceLength, destination.data());
+        return;
+    }
+
+    const bool directory = sourceLength > 0U && source[sourceLength - 1U] == '/';
+    const std::size_t suffixLength = directory ? 1U : 0U;
+    const std::size_t textLength = Size - 1U - 2U - suffixLength;
+    std::copy_n(source, textLength, destination.data());
+    destination[textLength] = '.';
+    destination[textLength + 1U] = '.';
+    if (directory) destination[textLength + 2U] = '/';
+}
+
+std::size_t textLength(const char* text) {
+    std::size_t length = 0;
+    if (text != nullptr) {
+        while (text[length] != '\0') ++length;
+    }
+    return length;
+}
+
 const char* modeName(PlaybackMode mode) {
     switch (mode) {
         case PlaybackMode::OneShot:
@@ -137,7 +166,8 @@ void ScreenUi::showParameter(const char* name, int value, int minimum, int maxim
 }
 
 void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
-                           std::size_t count, std::size_t selectedIndex) {
+                           std::size_t count, std::size_t selectedIndex,
+                           std::uint64_t nowMs) {
     copyBrowserLabel(browserFolder_,
                      folderName == nullptr || folderName[0] == '\0'
                          ? "ROOT"
@@ -145,6 +175,7 @@ void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
                      false);
     browserLineCount_ = 0;
     browserSelectedLine_ = 0;
+    browserScrollStartMs_ = nowMs;
     browserActive_ = true;
     fxPadActive_ = false;
 
@@ -185,7 +216,7 @@ void ScreenUi::showPerformance() {
 void ScreenUi::render(std::uint64_t nowMs) {
     clear();
     if (browserActive_) {
-        drawBrowser();
+        drawBrowser(nowMs);
     } else if (fxPadActive_) {
         drawFxPad();
     } else if (nowMs < overlayUntilMs_) {
@@ -333,7 +364,7 @@ void ScreenUi::drawFxPad() {
     drawText(38, 24, fxPadEncoder_ == 1 ? "E1 NAV CLIC ASSIGN" : "F1 POUR E1");
 }
 
-void ScreenUi::drawBrowser() {
+void ScreenUi::drawBrowser(std::uint64_t nowMs) {
     drawText(1, 1, browserFolder_.data());
     drawHorizontalLine(0, 7, kWidth);
 
@@ -343,10 +374,40 @@ void ScreenUi::drawBrowser() {
     }
 
     constexpr int kLineY[] = {10, 18, 26};
+    constexpr int kTextX = 7;
+    constexpr int kAvailableWidth = kWidth - kTextX;
+    constexpr int kScrollGap = 16;
     for (std::size_t index = 0; index < browserLineCount_; ++index) {
+        const char* const name = browserLines_[index].name.data();
+        std::array<char, 31> preview{};
+        makeBrowserPreview(preview, name);
         if (index == browserSelectedLine_) {
             fillRect(1, kLineY[index] - 1, 3, 7);
         }
-        drawText(7, kLineY[index], browserLines_[index].name.data());
+
+        const std::size_t length = textLength(name);
+        const int textWidth = length == 0U ? 0 : static_cast<int>(length * 4U - 1U);
+        const bool selectedLong = index == browserSelectedLine_ &&
+                                  textWidth > kAvailableWidth;
+        const std::uint64_t idleMs = nowMs >= browserScrollStartMs_
+            ? nowMs - browserScrollStartMs_
+            : 0U;
+        if (!selectedLong || idleMs <= kBrowserScrollDelayMs) {
+            drawText(kTextX, kLineY[index], preview.data());
+            continue;
+        }
+
+        const int cycleWidth = textWidth + kScrollGap;
+        const std::uint64_t elapsed = idleMs - kBrowserScrollDelayMs;
+        const std::uint64_t wholeSeconds = elapsed / 1000U;
+        const std::uint64_t remainderMs = elapsed % 1000U;
+        const std::uint64_t offset =
+            ((wholeSeconds % static_cast<std::uint64_t>(cycleWidth)) *
+                 kBrowserScrollPixelsPerSecond +
+             remainderMs * kBrowserScrollPixelsPerSecond / 1000U) %
+            static_cast<std::uint64_t>(cycleWidth);
+        const int x = kTextX - static_cast<int>(offset);
+        drawText(x, kLineY[index], name);
+        drawText(x + cycleWidth, kLineY[index], name);
     }
 }

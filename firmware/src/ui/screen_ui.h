@@ -13,6 +13,8 @@ public:
     static constexpr int kHeight = 32;
     static constexpr int kBufferSize = kWidth * kHeight / 8;
     static constexpr std::uint64_t kOverlayDurationMs = 1000;
+    static constexpr std::uint64_t kBrowserScrollDelayMs = 500;
+    static constexpr std::uint64_t kBrowserScrollPixelsPerSecond = 30;
 
     using Buffer = std::array<std::uint8_t, kBufferSize>;
 
@@ -25,7 +27,8 @@ public:
     void showParameter(const char* name, int value, int minimum, int maximum,
                        std::uint64_t nowMs, const char* suffix = nullptr);
     void showBrowser(const char* folderName, const BrowserLine* lines,
-                     std::size_t count, std::size_t selectedIndex);
+                     std::size_t count, std::size_t selectedIndex,
+                     std::uint64_t nowMs);
     void showFxPad(int padNumber, const char* fxName, int selectedEncoder);
     void showPerformance();
     void render(std::uint64_t nowMs);
@@ -46,11 +49,11 @@ private:
                          const char* suffix = nullptr);
     void drawPerformance();
     void drawParameter();
-    void drawBrowser();
+    void drawBrowser(std::uint64_t nowMs);
     void drawFxPad();
 
     struct StoredBrowserLine {
-        std::array<char, 31> name{};
+        std::array<char, 256> name{};
         bool directory = false;
     };
 
@@ -67,6 +70,7 @@ private:
     int parameterMinimum_ = 0;
     int parameterMaximum_ = 10;
     std::uint64_t overlayUntilMs_ = 0;
+    std::uint64_t browserScrollStartMs_ = 0;
     std::size_t browserLineCount_ = 0;
     std::size_t browserSelectedLine_ = 0;
     int fxPadNumber_ = 0;

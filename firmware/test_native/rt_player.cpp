@@ -118,7 +118,7 @@ PlaybackMode next_mode(PlaybackMode mode) {
     return mode == PlaybackMode::Loop ? PlaybackMode::OneShot : PlaybackMode::Loop;
 }
 
-void refresh_browser(ScreenUi& screen, AppState& state) {
+void refresh_browser(ScreenUi& screen, AppState& state, std::uint64_t time) {
     state.browserEntries = state.catalog.entries(state.browserFolder);
     if (state.browserEntries.empty()) {
         state.browserSelection = 0;
@@ -135,16 +135,16 @@ void refresh_browser(ScreenUi& screen, AppState& state) {
     const char* folderName = folder && !folder->relativePath.empty()
         ? folder->relativePath.c_str()
         : "ROOT";
-    screen.showBrowser(folderName, lines.data(), lines.size(), state.browserSelection);
+    screen.showBrowser(folderName, lines.data(), lines.size(), state.browserSelection, time);
 }
 
-void load_browser_selection(ScreenUi& screen, AppState& state) {
+void load_browser_selection(ScreenUi& screen, AppState& state, std::uint64_t time) {
     if (state.browserEntries.empty()) return;
     const auto& selected = state.browserEntries[state.browserSelection];
     if (selected.kind == SampleCatalog::EntryKind::Folder) {
         state.browserFolder = selected.id;
         state.browserSelection = 0;
-        refresh_browser(screen, state);
+        refresh_browser(screen, state, time);
         return;
     }
 
@@ -297,15 +297,15 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
                 if (direction > 0) {
                     if (state.browserSelection + 1 < state.browserEntries.size()) {
                         ++state.browserSelection;
-                        refresh_browser(screen, state);
+                        refresh_browser(screen, state, time);
                     }
                 } else if (state.browserSelection > 0) {
                     --state.browserSelection;
-                    refresh_browser(screen, state);
+                    refresh_browser(screen, state, time);
                 }
             } else if (simulation.heldVoicePad >= 0) {
                 state.browserActive = true;
-                refresh_browser(screen, state);
+                refresh_browser(screen, state, time);
                 std::printf("navigateur pour pad %d (relacher pour fermer)\n",
                             simulation.heldVoicePad + 1);
             } else {
@@ -373,10 +373,10 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
                 std::printf("pad %d : FX = %s\n", 7 + simulation.heldFxPad,
                             kFxNames[simulation.fxCandidate]);
             } else if (state.browserActive) {
-                load_browser_selection(screen, state);
+                load_browser_selection(screen, state, time);
             } else if (simulation.heldVoicePad >= 0) {
                 state.browserActive = true;
-                refresh_browser(screen, state);
+                refresh_browser(screen, state, time);
                 std::printf("navigateur pour pad %d (relacher pour fermer)\n",
                             simulation.heldVoicePad + 1);
             }
@@ -461,7 +461,7 @@ void fx_pad_up(int pad, ScreenUi& screen, UiSimulation& simulation,
     g_repeatActive.store(false);
     simulation.heldFxPad = -1;
     if (state.browserActive) {
-        refresh_browser(screen, state);
+        refresh_browser(screen, state, now_ms());
     } else {
         screen.showPerformance();
     }
@@ -528,7 +528,7 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
             if (parent) {
                 state.browserFolder = *parent;
                 state.browserSelection = 0;
-                refresh_browser(screen, state);
+                refresh_browser(screen, state, now_ms());
             }
         }
     } else if (c == ' ') {
@@ -570,25 +570,25 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
     } else if (c == 'b') {
         state.browserActive = !state.browserActive;
         if (state.browserActive) {
-            refresh_browser(screen, state);
+            refresh_browser(screen, state, now_ms());
         } else {
             screen.showPerformance();
         }
     } else if (state.browserActive) {
         if (c == 'j' && state.browserSelection + 1 < state.browserEntries.size()) {
             ++state.browserSelection;
-            refresh_browser(screen, state);
+            refresh_browser(screen, state, now_ms());
         } else if (c == 'k' && state.browserSelection > 0) {
             --state.browserSelection;
-            refresh_browser(screen, state);
+            refresh_browser(screen, state, now_ms());
         } else if (c == '\r' || c == '\n') {
-            load_browser_selection(screen, state);
+            load_browser_selection(screen, state, now_ms());
         } else if (c == 8 || c == 127) {
             const auto parent = state.catalog.parent(state.browserFolder);
             if (parent) {
                 state.browserFolder = *parent;
                 state.browserSelection = 0;
-                refresh_browser(screen, state);
+                refresh_browser(screen, state, now_ms());
             }
         }
     } else if (c == 'z') {
