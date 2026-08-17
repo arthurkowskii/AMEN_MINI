@@ -1,0 +1,27 @@
+test_break.wav — authentic drum loop fixture
+============================================
+
+Source
+  Title:  Drumloop The 'Bigbeat a 100' one - 1 bar - 100 BPM (no swing)
+  Author: Bronxio (freesound.org user, id 997039)
+  URL:    https://freesound.org/people/Bronxio/sounds/240098/
+  Pack:   https://freesound.org/people/Bronxio/packs/12756/
+          ("Drumloops (beat sequences & breakbeats)", licensed CC0)
+
+License
+  Creative Commons Zero (CC0 1.0)
+  https://creativecommons.org/publicdomain/zero/1.0/
+  Declared by the uploader on the sound page.
+
+Processing
+  Downloaded 2026-08-17 from the public freesound preview CDN as
+  128 kbps MP3 and re-encoded to 16-bit PCM mono, 44.1 kHz, 105840
+  frames (~2.4 s) with ffmpeg. No content editing was applied.
+
+Verification (why it is used as the authentic transient fixture)
+  - 27098 distinct sample values (vs ~2167 for the synthetic
+    test.wav loop), broadband percussion content
+  - spectral centroid ~4.3 kHz, attacks spread across the full file
+  - 421 analysis windows above the -48 dBFS onset floor
+  Used by transient_detector_test.cpp to validate that detected
+  boundaries land on real recorded onsets.
