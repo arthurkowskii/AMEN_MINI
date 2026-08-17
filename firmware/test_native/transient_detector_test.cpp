@@ -439,6 +439,26 @@ void testRealBreakReferenceAgreement() {
     require(anchoredBoundaries == kInternalOnsetCount,
             "every detector boundary must land on a real onset location");
 
+    // On this dense loop the onset map covers the whole file, so a naive
+    // evenly-spread fallback would also "anchor" (measured 10/11). The
+    // discriminative structural invariant is non-uniformity: a detector that
+    // found the recorded hits spaces its boundaries unevenly, while the
+    // deterministic fallback bisects uniformly. Assert a gap ratio well above
+    // the ~1.0 that a fallback would produce (measured 4.1 on this fixture).
+    std::size_t minimumGap = frameCount;
+    std::size_t maximumGap = 0;
+    for (std::size_t i = 0; i + 1U < boundaries->size(); ++i) {
+        const std::size_t gap = (*boundaries)[i + 1U] - (*boundaries)[i];
+        minimumGap = std::min(minimumGap, gap);
+        maximumGap = std::max(maximumGap, gap);
+    }
+    require(minimumGap > 0U, "ranges must be non-empty");
+    const double gapRatio =
+        static_cast<double>(maximumGap) / static_cast<double>(minimumGap);
+    std::cout << "real-break gap ratio (max/min): " << gapRatio << '\n';
+    require(gapRatio >= 2.0,
+            "detected boundaries must follow recorded hits, not uniform spread");
+
     std::size_t matchedReference = 0;
     for (const std::size_t onset : reference) {
         const auto nearest = std::min_element(
@@ -470,12 +490,13 @@ void testRealBreakReferenceAgreement() {
               << matchedReference << "/11 reference onsets and "
               << matchedDetector << "/11 detector boundaries within 15 ms\n";
     // On this authentic recording the primary invariant is onset anchoring
-    // (asserted above, 11/11). Subset agreement between two independent
-    // strength-ranking strategies is a documented secondary signal: measured
-    // 6/11 both ways, because the adaptive-threshold ranking favors local
-    // contrast while the fixed-floor reference favors absolute strength. A
-    // majority overlap is required so the two selectors provably share the
-    // most prominent material.
+    // (asserted above, 11/11) plus the non-uniformity gate. Subset agreement
+    // between two independent strength-ranking strategies is a documented
+    // secondary signal: measured 6/11 both ways, because the adaptive-
+    // threshold ranking favors local contrast while the fixed-floor reference
+    // favors absolute strength. A majority overlap is required so the two
+    // selectors provably share the most prominent material; reaching >=5/11
+    // by chance has probability ~1.1% (binomial over 457 onset candidates).
     require(matchedReference >= 5U,
             "independent selectors must share most of the strongest onsets");
 
