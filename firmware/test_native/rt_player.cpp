@@ -26,6 +26,7 @@
 #include "screen_ui.h"
 #include "transient_detector.h"
 #include "fx/live_repeat.h"
+#include "fx/spectral_gate.h"
 #include "voice_manager.h"
 #include "wav_loader.h"
 
@@ -65,6 +66,8 @@ std::atomic<int> g_repeatAmountPercent{100};
 std::atomic<int> g_repeatDivision{0};
 std::atomic<int> g_bpm{145};
 std::atomic<bool> g_repeatActive{false};
+std::atomic<bool> g_gateActive{false};
+SpectralGate g_spectralGate{kOutputSampleRate};
 std::atomic<bool> g_running{true};
 std::mutex g_audioMutex;
 
@@ -89,8 +92,9 @@ HarnessVoiceStopper g_voiceStopper;
 // Machine a etats de l'appui long E1 : press/hold/release sur une entree du
 // navigateur. Chemin de controle uniquement, jamais dans le callback audio.
 BrowserInteraction g_browserInteraction;
-constexpr int kFxCount = 3;
+constexpr int kFxCount = 4;
 constexpr int kRepeatFx = 1;
+constexpr int kGateFx = 3;
 const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE"};
 const char* kDivisionNames[] = {"1/4", "1/8", "1/12", "1/16", "1/24", "1/32"};
 const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
@@ -522,6 +526,7 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
             if (simulation.heldFxPad >= 0) {
                 simulation.fxAssign[simulation.heldFxPad] = simulation.fxCandidate;
                 g_repeatActive.store(simulation.fxCandidate == kRepeatFx);
+                g_gateActive.store(simulation.fxCandidate == kGateFx);
                 screen.showFxPad(7 + simulation.heldFxPad,
                                  kFxNames[simulation.fxCandidate], 1);
                 std::printf("pad %d : FX = %s\n", 7 + simulation.heldFxPad,
@@ -603,6 +608,7 @@ void fx_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation) {
     simulation.heldFxPad = pad;
     simulation.fxCandidate = simulation.fxAssign[pad];
     g_repeatActive.store(simulation.fxCandidate == kRepeatFx);
+    g_gateActive.store(simulation.fxCandidate == kGateFx);
     screen.showFxPad(7 + pad, kFxNames[simulation.fxCandidate],
                      simulation.selectedEncoder);
     std::printf("pad %d : %s\n", 7 + pad, kFxNames[simulation.fxCandidate]);
@@ -612,6 +618,7 @@ void fx_pad_up(int pad, ScreenUi& screen, UiSimulation& simulation,
                AppState& state) {
     if (simulation.heldFxPad != pad) return;
     g_repeatActive.store(false);
+    g_gateActive.store(false);
     simulation.heldFxPad = -1;
     if (state.browserActive) {
         refresh_browser(screen, state);
@@ -890,6 +897,7 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     static int appliedDivision = -1;
     static int appliedBpm = -1;
     static bool appliedRepeatActive = false;
+    static bool appliedGateActive = false;
     const int targetAmountPercent = g_repeatAmountPercent.load();
     if (targetAmountPercent != appliedAmountPercent) {
         g_repeat.setAmount(static_cast<float>(targetAmountPercent) / 100.0f);
@@ -903,12 +911,18 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     const int targetBpm = g_bpm.load();
     if (targetBpm != appliedBpm) {
         g_repeat.setBpm(static_cast<float>(targetBpm));
+        g_spectralGate.setBpm(static_cast<float>(targetBpm));
         appliedBpm = targetBpm;
     }
     const bool targetRepeatActive = g_repeatActive.load();
     if (targetRepeatActive != appliedRepeatActive) {
         g_repeat.setActive(targetRepeatActive);
         appliedRepeatActive = targetRepeatActive;
+    }
+    const bool targetGateActive = g_gateActive.load();
+    if (targetGateActive != appliedGateActive) {
+        g_spectralGate.setActive(targetGateActive);
+        appliedGateActive = targetGateActive;
     }
 
     constexpr std::size_t kRenderBlock = 512;
@@ -919,6 +933,7 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
         const std::size_t count = std::min<std::size_t>(kRenderBlock, frames - rendered);
         g_voices.render(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_repeat.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
+        g_spectralGate.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         for (std::size_t i = 0; i < count; ++i) {
             dst[(rendered + i) * 2] = tmpL[i];
             dst[(rendered + i) * 2 + 1] = tmpR[i];

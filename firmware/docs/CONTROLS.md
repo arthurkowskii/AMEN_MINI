@@ -9,7 +9,8 @@ Ce document est la source claire des controles de performance actuels. Le harnes
 - Pads FX 7-9 (`Numpad 7-9`) : le maintien active l'effet assigne, le relachement le coupe.
 - Le Repeat capture l'audio du mix global immediatement anterieur a l'appui. Il ne retrigger pas une voix individuelle.
 - Liste d'assignation : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`.
-- `BLANK` desassigne le pad. `REVERSE` et `TRANCE GATE` sont assignables mais n'ont pas encore de DSP.
+- `BLANK` desassigne le pad. `REVERSE` est assignable mais n'a pas encore de DSP. `TRANCE GATE` applique la spectral gate 8 bandes decrite dans Transitions Audio.
+- **Un seul effet global est actif a la fois en V0** : le pad FX tenu gagne (REPEAT et TRANCE GATE sont mutuellement exclusifs par conception).
 
 Chaque pad voix demarre en `ONE SHOT + GATE` et memorise independamment ses deux axes :
 
@@ -31,7 +32,7 @@ L'arret cible uniquement le pad concerne, y compris ses queues de crossfade, san
 - `E4 SPEED` : vitesse du pad voix **tenu** (plus jamais le "dernier joue"), de 25 a 400 % par pas de 5 %. Appliquee en direct a la voix active du pad (rampe de 128 frames, sans retrigger) et memorisee pour son prochain trigger. Le clic remet **ce pad** a 100 %. Sans pad tenu : hint `E4 TENIR PAD`, aucun effet.
 - `E5 MODE` : deux axes independants pour le pad voix **tenu**. La rotation alterne uniquement le mode de lecture `ONE SHOT` / `LOOP`. Le clic alterne le comportement de trigger `GATE` / `LATCH`. L'overlay et la console affichent la valeur reelle choisie. Sans pad tenu : hint `E5 TENIR PAD`, aucun effet.
 - `E6 LFO` : reserve pour un futur LFO ; aucun controle audio dans cette tache.
-- `E7 BPM` : tempo global de 20 a 300 BPM. La longueur du Repeat est recalculee en direct.
+- `E7 BPM` : tempo global de 20 a 300 BPM. La longueur du Repeat est recalculee en direct ; la grille 16 pas de la spectral gate suit aussi ce tempo.
 
 Chaque pad voix memorise sa propre vitesse, son mode de lecture et son comportement de trigger ; l'ecran d'accueil affiche le BPM et le mode de lecture du dernier pad joue.
 
@@ -48,3 +49,11 @@ Dans le harness Windows, `F1-F7` choisit l'encodeur, les fleches le tournent et 
 ## Transitions Audio
 
 L'activation, le relachement et les changements de division/BPM utilisent des rampes ou crossfades de 128 frames. Chaque retour periodique au debut de la boucle est aussi lisse sans modifier sa periode BPM. Le moteur Repeat est place apres `VoiceManager`, traite le mix stereo global et n'alloue aucune memoire : l'appelant fournit quatre buffers float dimensionnables avec `LiveRepeat::requiredBufferFrames(sampleRate)`, prets a etre places en PSRAM par la future couche Teensy. Ce chemin n'a pas encore ete mesure sur Teensy.
+
+## Spectral Gate (TRANCE GATE)
+
+La spectral gate decoupe le mix stereo global en **8 bandes** (echelle de passe-bas Linkwitz-Riley d'ordre 2 aux coupures 200/400/800/1600/3200/6400/12800 Hz) dont la somme reconstruit le signal exactement : aucune perte de niveau quand toutes les bandes sont ouvertes. Chaque bande est ponderee par un **motif rythmique de 16 pas** (1/16 de note) synchronise au BPM global d'E7. Les ouvertures et fermetures sont **lissees par un filtre une-pole de ~5 ms** applique a chaque echantillon : aucun clic, meme en plein signal, y compris lors d'un changement de BPM en direct (la phase se cale sur le pas courant).
+
+- **Motif par defaut deterministe** : la bande b est ouverte tous les b+1 pas (bande 1 : un pas sur deux ; bande 4 : un pas sur cinq ; bande 8 : un pas sur huit). Pas d'editeur de motif en V0 ; les motifs restent programmables par code (`SpectralGate::setPattern`).
+- La porte traite le mix apres le Repeat (chaine : voix -> Repeat -> Spectral Gate) et n'alloue aucune memoire : tout l'etat (14 biquads, gains, phase) vit dans l'objet, pret a tourner sur Teensy.
+- Un seul effet global actif a la fois en V0 : tenir un pad FX desactive l'autre.
