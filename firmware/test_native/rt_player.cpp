@@ -92,10 +92,18 @@ HarnessVoiceStopper g_voiceStopper;
 // Machine a etats de l'appui long E1 : press/hold/release sur une entree du
 // navigateur. Chemin de controle uniquement, jamais dans le callback audio.
 BrowserInteraction g_browserInteraction;
-constexpr int kFxCount = 4;
+// Nombre d'effets assignables hors BLANK : REPEAT, REVERSE, TRANCE GATE.
+// La liste kFxNames compte kFxCount + 1 entrees (BLANK compris) ; le modulo
+// du cycle FX est donc (kFxCount + 1) et couvre exactement les indices
+// valides. TRANCE GATE (kGateFx) etait deja navigable avant son DSP : il ne
+// faut PAS augmenter kFxCount, sinon le cycle deborde la liste.
+constexpr int kFxCount = 3;
 constexpr int kRepeatFx = 1;
 constexpr int kGateFx = 3;
 const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE"};
+static_assert(sizeof(kFxNames) / sizeof(kFxNames[0]) ==
+                  static_cast<std::size_t>(kFxCount) + 1U,
+              "kFxCount doit laisser BLANK + kFxCount effets dans kFxNames");
 const char* kDivisionNames[] = {"1/4", "1/8", "1/12", "1/16", "1/24", "1/32"};
 const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
                                "E5 MODE", "E6 LFO", "E7 BPM"};
