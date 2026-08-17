@@ -79,10 +79,12 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : un break boucle sans artefact pendant 30 s, 2e appui stoppe net ; one-shot s'arrête à la fin du range ou au relâchement (gate).
 - Vérification : écoute + test de durée (la boucle ne retourne jamais false).
 
-## J8 — Granulaire [À FAIRE] — P2
+## J8 — Granulaire [V0 LIVRÉ — CLOUD par pad ; scan/pitch par grain à venir] — P2
 
 - Objectif : mode de lecture granulaire sur un pad (taille de grain, densité, scan, direction, pitch par grain).
-- Fichiers : `src/engine/granular.h` + `granular.cpp` (voix granulaire), intégration mode pad.
+- Fichiers : `src/engine/granular.h` + `granular.cpp` (nuage granulaire), intégration mode pad `CLOUD` (rotation E5), test `granular_test.cpp`.
+- V0 livré (plan spectral 7.3) : la plage assignée devient un nuage — grains de 30 à 150 ms, un toutes les ~22 ms, 8 grains simultanés maximum, positions/longueurs déterministes par pad, enveloppes Hann sans clic, PCM emprunté (jamais copié), arrêt en fondu ~10 ms. Mesure native : ~13 ms CPU par seconde d'audio (1,3 %).
+- Reste à venir : scan piloté (fixe/auto/encodeur), densité réglable, direction, pitch par grain, retrig synchro BPM.
 - Spec : grains de 10-100 ms lus dans le range du pad, position de scan pilotée (fixe, auto, ou encodeur), densité (grains/s), direction (avant/arrière), pitch par grain (speed_ du grain). Le retrig des grains peut être calé sur le tempo global (BPM → frames).
 - DoD : un pad granulaire joue un nuage texturé stable, sans clic ni dépassement CPU (mesure du temps de render sur PC).
 - Vérification : écoute + mesure (durée de render < budget du bloc).
@@ -97,7 +99,7 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 
 ## J10 — Live FX Repeat V1 [IMPLÉMENTÉ — ÉCOUTE À TESTER] — P1
 
-- Liste assignable (8 slots, mapping 8 pads FX) : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`, `FILTER`, `DELAY`, `BITCRUSH`, `CHAOS`. Seul REPEAT a du DSP aujourd'hui ; REVERSE est P1, TRANCE GATE/FILTER/DELAY/BITCRUSH/CHAOS sont P2 (post-démo).
+- Liste assignable (8 slots, mapping 8 pads FX) : `BLANK`, `REPEAT`, `REVERSE`, `TRANCE GATE`, `FILTER`, `DELAY`, `BITCRUSH`, `CHAOS`. DSP livrés à ce jour : `REPEAT`, `TRANCE GATE` (spectral gate 8 bandes) et `FREEZE` (gel spectral, ajouté au workflow MUTATE) ; `REVERSE` reste sans DSP, `FILTER`/`DELAY`/`BITCRUSH`/`CHAOS` sont P2 (post-démo).
 - Fichiers : `src/engine/fx/live_repeat.h/.cpp`, test ciblé `test_native/live_repeat_test.cpp`, intégration après le mix global de `VoiceManager` dans `rt_player`.
 - Spec Repeat : le maintien du pad capture et boucle l'audio immédiatement antérieur à l'appui. E2 règle le dry/wet (100 % par défaut). E3 sélectionne dynamiquement `1/4`, `1/8`, `1/8T`, `1/16`, `1/16T`, `1/32` (défaut `1/4`). Les noms affichés sont abrégés pour l'OLED 128×32 : `1/4`, `1/8`, `1/8T`, `1/16`, `1/16T`, `1/32`. E7 recalcule la longueur au BPM live. E4 reste exclusivement la vitesse sample.
 - Temps réel : `LiveRepeat` n'alloue aucune mémoire et reçoit de l'appelant quatre buffers float (historique/copie gelée stéréo) avec leur capacité. `requiredBufferFrames(sampleRate)` dimensionne le pire cas `1/4` à 20 BPM ; la future couche Teensy pourra fournir ces zones depuis la PSRAM. Activation, relâchement, amount et changement de longueur utilisent des transitions de 128 frames, et chaque couture périodique est lissée sans changer la période BPM. Le segment initial reste intact pendant un maintien prolongé.
@@ -265,3 +267,14 @@ Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis 
 - **Harness Linux** : compilation complète vers `/tmp/amen_rt_linux` avec `-Wall -Wextra -Wpedantic`, puis smoke borné à 5 s avec `test_native/test.wav` et sortie propre (`0`). ALSA/JACK signalent l'absence de périphérique audio sur cet hôte, sans blocage ; deux warnings `-Wunused-variable` restent propres à la branche Linux du simulateur (`kFxNames`, `kEncoderNames`).
 - **Deliverable Windows** : reconstruction en place par `x86_64-w64-mingw32-g++ -std=c++17 -O2 ... -lole32 -lwinmm -lgdi32 -luser32`, mode restauré à `0644`. `file`/`objdump` confirment un PE32+ x86-64 et `strings` retrouve `ONE SHOT`, `LOOP`, `GATE`, `LATCH`, `E1 NAV`, `E5 MODE`, `E6 LFO`, `1/12` et `1/24`. Le rebuild a changé les octets (`c2d70b60…` → `8409ffed…`) à taille identique (1 116 905 octets).
 - **Teensy 4.1 compile-only** : `arduino-cli compile --fqbn teensy:avr:teensy41 --output-dir /tmp/amen_mini_teensy41 firmware` réussit (FLASH code 79 576 octets ; RAM1 variables 11 072 octets ; RAM2 variables 12 416 octets). L'hôte prévient que `/etc/udev/rules.d/00-teensy.rules` manque. **Aucun upload, test audio, test PSRAM physique ni validation sur appareil n'a été réalisé.**
+
+### Checkpoint 17/08/2026 — workflow spectral LOAD → MUTATE → COMMIT
+
+- **Nouvelle priorité workflow** : le plan spectral (`~/.hermes/plans/2026-08-17_085030-amen-mini-spectral-workflow.md`) rend la boucle `LOAD → MUTATE → COMMIT` centrale. Assignation automatique du break en 12 plages, mutation par gestes (CLOUD granulaire, TRANCE GATE, FREEZE), puis COMMIT rétrospectif qui transforme les 15 dernières secondes du mix en nouvelle matière assignable.
+- **Assignation 12 pads** : `PadAssignmentPlan` (12 plages, invariants garantis : constructeur privé, factories `std::optional`, pas d'aliasing), `TransientDetector` déterministe (fenêtres 5 ms, hop 2,5 ms, séparation 20 ms, plancher −48 dBFS, cap 256 candidats, fallback déterministe, validé sur un break CC0 authentique — ancrage 11/11), `AssignmentSession` atomique (validation AVANT tout effet de bord ; stopAll → échange → publication ; l'échec laisse l'état et le plan précédents intacts).
+- **Appui long E1** : machine à états `BrowserInteraction` (600 ms, horloge injectée, une seule ouverture par pression, jamais sur dossier, relâchement sans confirmation) + menu OLED 128×32 `ALL PADS` / `TRANSIENT` / `CANCEL` (nom tronqué puis défilant, marqueur sur TRANSIENT). Entrée confirme, Retour annule sans réinitialiser le défilement.
+- **MUTATE — effets spectraux livrés** : `SpectralGate` 8 bandes (échelle LP Linkwitz-Riley télescopique à somme exactement plate, motif 16 pas synchronisé BPM, lissage one-pole 5 ms sans clic, ~1 ms CPU/s d'audio) ; `SpectralFreeze` (FFT 512, capture du spectre d'amplitude, boucle 512-périodique à phases déterministes, rampes wet 10 ms, passthrough bit-exact hors gel, ~5 ms CPU/s) ; `CLOUD` granulaire par pad (mode E5, 8 grains max, PCM emprunté, enveloppes Hann, ~13 ms CPU/s).
+- **COMMIT / Skip Back** : anneau rétrospectif statique de 15 s (buffers fournis par l'appelant, PSRAM-ready, zéro allocation dans le callback) ; geste matériel `Shift + pad voix`, touche `v` sur le harness PC ; publication atomique via `AssignmentSession` (l'ancienne matière survit à tout échec). Exercé sur le harness Linux réel : 95 256 frames capturées → 12 plages publiées.
+- **Liste FX assignable** : `BLANK`, `REPEAT`, `REVERSE` (sans DSP), `TRANCE GATE`, `FREEZE`. Un seul effet global actif à la fois en V0.
+- **Réduction du harness PC** : 6 pads voix jouables (numpad 1-6), 3 pads FX (7-9) ; les pads 7-12 reçoivent leurs plages du plan mais ne sont pas jouables sur PC (en attente du matériel).
+- **Limites honnêtes** : tout est vérifié par tests natifs stricts, sanitizers, builds Windows/Linux et revues de conformité/qualité ; **aucune écoute sur Teensy ni mesure AudioProcessorUsageMax() n'a été réalisée** (matériel en attente, règle udev absente). `Reverse`, `Resonator` et `Smear` restent derrière la porte de validation matérielle.
