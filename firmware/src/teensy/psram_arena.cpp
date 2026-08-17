@@ -33,6 +33,18 @@ bool PsramArena::begin(std::size_t capacityBytes) {
         return false;
     }
 
+    constexpr std::uintptr_t kExtmemBase = 0x70000000U;
+    const std::uintptr_t psramEnd =
+        kExtmemBase + static_cast<std::uintptr_t>(external_psram_size) * kBytesPerMib;
+    const std::uintptr_t allocationStart = reinterpret_cast<std::uintptr_t>(samples_);
+    if (allocationStart < kExtmemBase || allocationStart >= psramEnd ||
+        capacityBytes > psramEnd - allocationStart) {
+        extmem_free(samples_);
+        samples_ = nullptr;
+        error_ = Error::AllocationFailed;
+        return false;
+    }
+
     capacitySamples_ = capacityBytes / sizeof(int16_t);
     error_ = Error::None;
     return true;

@@ -7,7 +7,8 @@
 
 class PsramArena {
 public:
-    static constexpr std::size_t kDefaultCapacityBytes = 8U * 1024U * 1024U;
+    // Leave headroom for allocator metadata and future fixed PSRAM users.
+    static constexpr std::size_t kDefaultCapacityBytes = 7U * 1024U * 1024U;
 
     enum class Error {
         None,
