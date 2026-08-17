@@ -35,6 +35,13 @@ public:
     // Arret progressif (~10 ms de fondu) : aucun clic, puis inactif.
     void stop();
 
+    // Arret synchrone immediat : reserve aux chemins qui DETRUISENT le PCM
+    // emprunte juste apres (echange atomique d'assignation, chargement d'un
+    // nouveau WAV). Le fondu de stop() continuerait a lire le buffer libere.
+    // La coupure franche est inaudible en pratique : ces chemins coupent
+    // deja tout l'audio de la machine.
+    void hardStop();
+
     // Ajoute la sortie du nuage dans outLeft/outRight (non remplace).
     void render(float* outLeft, float* outRight, int numFrames);
 

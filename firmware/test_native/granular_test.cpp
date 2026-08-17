@@ -182,6 +182,30 @@ void testStopFadeAndInactive() {
     require(cloud.activeGrainCount() == 0, "grains must clear after stop");
 }
 
+// 6.5. Arret synchrone : hardStop() tue le nuage immediatement (reserve aux
+// chemins qui detruisent le PCM emprunte) ; le render suivant ne lit plus
+// rien et ne modifie pas la sortie.
+void testHardStop() {
+    constexpr std::size_t kFrames = 30000;
+    constexpr std::int16_t kDc = 600;
+    std::vector<std::int16_t> samples(kFrames, kDc);
+    const PcmView pcm = makePcm(samples);
+
+    GrainCloud cloud;
+    cloud.start(pcm, 0, kFrames, 1.0f, 21U);
+    std::vector<float> left(1024, 0.0f);
+    std::vector<float> right(1024, 0.0f);
+    cloud.render(left.data(), right.data(), 1024);
+    require(cloud.active(), "cloud must be active before hardStop");
+    cloud.hardStop();
+    require(!cloud.active(), "hardStop must deactivate immediately");
+    require(cloud.activeGrainCount() == 0, "hardStop must clear grains");
+    const std::vector<float> copy = left;
+    cloud.render(left.data(), right.data(), 512);
+    require(std::memcmp(left.data(), copy.data(), 1024 * sizeof(float)) == 0,
+            "after hardStop, render must not touch the output");
+}
+
 // 7. Defensif : PCM invalide = pas de sortie, pas de crash ; vitesse
 // clampée ; plage vide = nuage silencieux.
 void testDefensive() {
@@ -255,6 +279,7 @@ int main() {
     testNoClicksAtGrainEdges();
     testCloudProducesSoundFromRange();
     testStopFadeAndInactive();
+    testHardStop();
     testDefensive();
     testCpuBudget();
     std::cout << "All Grain Cloud tests passed\n";

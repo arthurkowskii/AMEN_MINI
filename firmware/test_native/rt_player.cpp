@@ -108,9 +108,10 @@ public:
         std::lock_guard<std::mutex> lock(g_audioMutex);
         g_voices.stopAll();
         // Les nuages CLOUD empruntent le PCM qui va etre detruit par
-        // l'echange atomique : ils doivent s'eteindre AVANT le move.
+        // l'echange atomique : hardStop (synchrone) — le fondu de stop()
+        // continuerait de lire le buffer libere pendant ~10 ms.
         for (GrainCloud& cloud : g_padClouds) {
-            cloud.stop();
+            cloud.hardStop();
         }
     }
 };
@@ -259,7 +260,7 @@ void load_browser_selection(ScreenUi& screen, AppState& state, std::uint64_t tim
         std::lock_guard<std::mutex> lock(g_audioMutex);
         g_voices.stopAll();
         for (GrainCloud& cloud : g_padClouds) {
-            cloud.stop();  // le PCM emprunte va etre detruit par le move
+            cloud.hardStop();  // le PCM emprunte est detruit par le move
         }
         state.wav = std::move(loaded);
     }

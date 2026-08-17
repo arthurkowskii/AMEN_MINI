@@ -51,6 +51,15 @@ void GrainCloud::stop() {
     }
 }
 
+void GrainCloud::hardStop() {
+    active_ = false;
+    fadingOut_ = false;
+    masterFade_ = 1.0f;
+    for (Grain& grain : grains_) {
+        grain.active = false;
+    }
+}
+
 std::size_t GrainCloud::activeGrainCount() const {
     std::size_t count = 0;
     for (const Grain& grain : grains_) {
