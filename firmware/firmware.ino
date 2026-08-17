@@ -1,13 +1,15 @@
 #include <Arduino.h>
 #include <SD.h>
-#include <extmem.h>
 
 #include "src/engine/voice_manager.h"
 #include "src/teensy/psram_arena.h"
 #include "src/teensy/sample_loader.h"
 
+extern "C" uint8_t external_psram_size;
+
 namespace {
 constexpr char kDiagnosticWavPath[] = "/test.wav";
+constexpr uint32_t kBytesPerMib = 1024U * 1024U;
 
 PsramArena psram;
 SampleLoader loader;
@@ -42,7 +44,8 @@ void setup() {
     const uint32_t serialDeadline = millis() + 2000;
     while (!Serial && millis() < serialDeadline) {}
 
-    Serial.printf("PSRAM detected: %lu bytes\n", static_cast<unsigned long>(external_psram_size));
+    const uint32_t psramBytes = static_cast<uint32_t>(external_psram_size) * kBytesPerMib;
+    Serial.printf("PSRAM detected: %lu bytes\n", static_cast<unsigned long>(psramBytes));
     if (!psram.begin()) {
         Serial.printf("PSRAM setup failed: %s\n", psramError(psram.error()));
         return;

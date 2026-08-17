@@ -1,9 +1,10 @@
 #include "psram_arena.h"
 
 #include <Arduino.h>
-#include <extmem.h>
 
 #include <limits>
+
+extern "C" uint8_t external_psram_size;
 
 bool PsramArena::begin(std::size_t capacityBytes) {
     if (samples_ != nullptr) {
@@ -19,7 +20,9 @@ bool PsramArena::begin(std::size_t capacityBytes) {
         error_ = Error::NoPsram;
         return false;
     }
-    if (external_psram_size < capacityBytes) {
+    constexpr std::size_t kBytesPerMib = 1024U * 1024U;
+    const std::size_t psramBytes = static_cast<std::size_t>(external_psram_size) * kBytesPerMib;
+    if (psramBytes < capacityBytes) {
         error_ = Error::InsufficientPsram;
         return false;
     }

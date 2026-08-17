@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pcm_view.h"
+#include "../engine/pcm_view.h"
 
 class PsramArena;
 class VoiceManager;
