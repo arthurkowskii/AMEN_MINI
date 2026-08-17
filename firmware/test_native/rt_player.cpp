@@ -229,6 +229,9 @@ void load_browser_selection(ScreenUi& screen, AppState& state, std::uint64_t tim
 void perform_transient_assignment(ScreenUi& screen, AppState& state,
                                   const char* targetName,
                                   std::uint64_t time) {
+    // time n'est plus utilise depuis que les echecs rouvrent le navigateur au
+    // lieu du menu (refresh_browser conserve la chronologie existante).
+    (void)time;
     // Recherche robuste : le nom copie par la machine a etats est borne a
     // 63 caracteres, donc un nom tronque est accepte par correspondance de
     // prefixe. Seuls les WAV sont eligibles ; la selection courante ne sert
