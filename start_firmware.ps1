@@ -83,6 +83,7 @@ Write-Host "              fleches H/B  tourner l'encodeur selectionne" -Foregrou
 Write-Host "              entree       cliquer l'encodeur selectionne" -ForegroundColor Cyan
 Write-Host "              entree tenu 600 ms sur un WAV = menu ALL PADS / TRANSIENT / CANCEL" -ForegroundColor Cyan
 Write-Host "              (entree = confirme TRANSIENT en 12 plages | retour = annule)" -ForegroundColor Cyan
+Write-Host "  COMMIT      v             capture 15 s du mix -> 12 plages (nouvelle assignation)" -ForegroundColor Cyan
 Write-Host "  roles       E1 NAV : voix = carte SD, FX = liste d'effets, clic = charger/assigner" -ForegroundColor Cyan
 Write-Host "              E2 Repeat dry/wet | E3 division 1/4-1/32 + triplets 1/12, 1/24 | E7 BPM (recalcule Repeat en live)" -ForegroundColor Cyan
 Write-Host "              E4 vitesse du pad TENU (clic = 100%) | E6 reserve au futur LFO" -ForegroundColor Cyan

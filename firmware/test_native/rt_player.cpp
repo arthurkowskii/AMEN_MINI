@@ -18,6 +18,7 @@
 
 #include "assignment_session.h"
 #include "browser_interaction.h"
+#include "capture_buffer.h"
 #include "granular.h"
 #include "pad_assignment.h"
 #include "pad_trigger_logic.h"
@@ -60,6 +61,17 @@ constexpr int kVoicePadCount = 6;
 // chemin qui detruit/remplace ces buffers DOIT arreter les nuages avant
 // (voir HarnessVoiceStopper et le chargement du navigateur).
 std::array<GrainCloud, kVoicePadCount> g_padClouds{};
+
+// Capture retrospective COMMIT (plan 8) : anneau stereo de 15 s, stockage
+// statique fourni par l'appelant (futur : PSRAM Teensy), rempli par le
+// callback audio apres la chaine d'effets.
+constexpr std::size_t kCaptureFrames =
+    CaptureBuffer::requiredBufferFrames(kOutputSampleRate,
+                                        CaptureBuffer::kDefaultWindowSeconds);
+std::array<float, kCaptureFrames> g_captureStorageL{};
+std::array<float, kCaptureFrames> g_captureStorageR{};
+CaptureBuffer g_captureBuffer{kOutputSampleRate, g_captureStorageL.data(),
+                              g_captureStorageR.data(), kCaptureFrames};
 constexpr std::size_t kRepeatBufferFrames =
     LiveRepeat::requiredBufferFrames(kOutputSampleRate);
 std::array<float, kRepeatBufferFrames> g_repeatHistoryL{};
@@ -332,6 +344,64 @@ void perform_transient_assignment(ScreenUi& screen, AppState& state,
     state.browserActive = false;
     screen.showPerformance();
     std::printf("TRANSIENT : %s -> 12 plages\n", entry->name.c_str());
+    for (std::size_t pad = 0; pad < kPadCount; ++pad) {
+        const auto range = g_assignment.plan()->range(pad);
+        if (range.has_value()) {
+            std::printf("  pad %2zu : [%zu, %zu)\n", pad + 1U,
+                        range->startFrame, range->endFrame);
+        }
+    }
+    std::printf("  (pads 7-12 assignes mais non jouables dans le harness PC)\n");
+}
+
+// COMMIT (plan 8) : fige les 15 dernieres secondes du mix global capturees
+// en continu et en fait une nouvelle assignation atomique (boucle LOAD ->
+// MUTATE -> COMMIT). Chemin de controle uniquement : la conversion
+// float->int16 et les vecteurs allouent ici (le heap est interdit dans le
+// callback audio, pas dans le chemin de controle). L'ancienne matiere reste
+// intacte jusqu'a la validation : applyTransient valide AVANT tout echange.
+void perform_commit(ScreenUi& screen, AppState& state) {
+    constexpr std::size_t kWindowFrames =
+        CaptureBuffer::requiredBufferFrames(
+            kOutputSampleRate, CaptureBuffer::kDefaultWindowSeconds);
+    std::vector<float> windowL(kWindowFrames);
+    std::vector<float> windowR(kWindowFrames);
+    std::size_t captured = 0;
+    {
+        // La lecture de l'anneau est serialisee avec l'ecriture du callback
+        // (copie < 1 ms, sans effet audible).
+        std::lock_guard<std::mutex> lock(g_audioMutex);
+        captured = g_captureBuffer.extractWindow(windowL.data(),
+                                                 windowR.data(), kWindowFrames);
+    }
+    if (captured < 2048) {
+        std::fprintf(stderr,
+                     "COMMIT impossible : capture trop courte (%zu frames)\n",
+                     captured);
+        return;
+    }
+    WavData material;
+    material.sampleRate = kOutputSampleRate;
+    material.channels = 2;
+    material.samples.resize(captured * 2);
+    for (std::size_t i = 0; i < captured; ++i) {
+        const float l = std::clamp(windowL[i], -1.0f, 1.0f);
+        const float r = std::clamp(windowR[i], -1.0f, 1.0f);
+        material.samples[i * 2] = static_cast<std::int16_t>(l * 32767.0f);
+        material.samples[i * 2 + 1] = static_cast<std::int16_t>(r * 32767.0f);
+    }
+    const PcmView pcm = material.view();
+    const auto boundaries = detectTransientBoundaries(pcm);
+    if (!boundaries.has_value() ||
+        !g_assignment.applyTransient(std::move(material), *boundaries,
+                                     g_voiceStopper)) {
+        std::fprintf(stderr, "COMMIT impossible : detection/plan invalide\n");
+        return;
+    }
+    state.transientPlanActive = true;
+    state.breakName = "COMMIT";
+    screen.showPerformance();
+    std::printf("COMMIT : %zu frames capturees -> 12 plages\n", captured);
     for (std::size_t pad = 0; pad < kPadCount; ++pad) {
         const auto range = g_assignment.plan()->range(pad);
         if (range.has_value()) {
@@ -800,6 +870,9 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
                     action == PadTriggerAction::Stop ? "stop" : "trigger",
                     mode_label(simulation.pads[pad].mode),
                     behavior_label(simulation.pads[pad].behavior));
+    } else if (c == 'v') {
+        // COMMIT : capture retrospective du mix -> nouvelle assignation.
+        perform_commit(screen, state);
     }
     // '1'-'9' ignorés : les pads numpad sont lus par poll_numpad (VK_NUMPADx).
 }
@@ -912,6 +985,9 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
                     action == PadTriggerAction::Stop ? "stop" : "trigger",
                     mode_label(simulation.pads[pad].mode),
                     behavior_label(simulation.pads[pad].behavior));
+    } else if (c == 'v') {
+        // COMMIT : capture retrospective du mix -> nouvelle assignation.
+        perform_commit(screen, state);
     } else if (c == 'm') {
         set_pad_mode(simulation.lastPadId,
                      next_mode(simulation.pads[simulation.lastPadId].mode),
@@ -1028,6 +1104,8 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
         g_repeat.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_spectralGate.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_spectralFreeze.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
+        // COMMIT : le mix final (post-FX) alimente l'anneau retrospectif.
+        g_captureBuffer.record(tmpL.data(), tmpR.data(), static_cast<int>(count));
         for (std::size_t i = 0; i < count; ++i) {
             dst[(rendered + i) * 2] = tmpL[i];
             dst[(rendered + i) * 2 + 1] = tmpR[i];
