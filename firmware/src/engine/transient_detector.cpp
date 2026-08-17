@@ -116,7 +116,7 @@ void collectCandidates(PcmView pcm,
             meanEnergy > previousEnergy ? meanEnergy - previousEnergy : 0U;
         const uint64_t localMean = historyCount == 0U ? 0U : historySum / historyCount;
         const uint64_t threshold = localMean + localMean / 2U;
-        if (onset > threshold && onset > 0U) {
+        if (onset > threshold && onset > kTransientNoiseFloorMeanEnergy) {
             const std::size_t estimatedAttack = std::min(windowStart + window, frameCount - 1U);
             if (estimatedAttack > 0U) {
                 retainCandidate(candidates, candidateCount,
