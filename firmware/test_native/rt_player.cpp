@@ -229,21 +229,34 @@ void load_browser_selection(ScreenUi& screen, AppState& state, std::uint64_t tim
 void perform_transient_assignment(ScreenUi& screen, AppState& state,
                                   const char* targetName,
                                   std::uint64_t time) {
+    // Recherche robuste : le nom copie par la machine a etats est borne a
+    // 63 caracteres, donc un nom tronque est accepte par correspondance de
+    // prefixe. Seuls les WAV sont eligibles ; la selection courante ne sert
+    // de repli que si c'est un WAV dont le nom correspond aussi.
+    auto matches = [targetName](const SampleCatalog::Entry& candidate) {
+        const std::string target(targetName == nullptr ? "" : targetName);
+        return candidate.kind == SampleCatalog::EntryKind::Wav &&
+               (candidate.name == target ||
+                (target.size() == kBrowserTargetNameMax &&
+                 candidate.name.compare(0, kBrowserTargetNameMax, target) == 0));
+    };
     const SampleCatalog::Entry* entry = nullptr;
     for (const auto& candidate : state.browserEntries) {
-        if (candidate.kind == SampleCatalog::EntryKind::Wav &&
-            candidate.name == targetName) {
+        if (matches(candidate)) {
             entry = &candidate;
             break;
         }
     }
     if (entry == nullptr &&
-        state.browserSelection < state.browserEntries.size()) {
+        state.browserSelection < state.browserEntries.size() &&
+        matches(state.browserEntries[state.browserSelection])) {
         entry = &state.browserEntries[state.browserSelection];
     }
     if (entry == nullptr) {
+        // Pas de zombie : la machine a etats est deja revenue en Browsing,
+        // le navigateur reste donc ouvert et l'erreur va en console.
         std::fprintf(stderr, "assignation impossible : cible introuvable\n");
-        screen.showAssignmentMenu(targetName, 0, time);
+        refresh_browser(screen, state);
         return;
     }
 
@@ -252,7 +265,7 @@ void perform_transient_assignment(ScreenUi& screen, AppState& state,
     if (!loaded.valid()) {
         std::fprintf(stderr, "assignation impossible : %s\n",
                      path.string().c_str());
-        screen.showAssignmentMenu(targetName, 0, time);
+        refresh_browser(screen, state);
         return;
     }
 
@@ -263,12 +276,16 @@ void perform_transient_assignment(ScreenUi& screen, AppState& state,
                                      g_voiceStopper)) {
         std::fprintf(stderr,
                      "assignation impossible : detection ou plan invalide\n");
-        screen.showAssignmentMenu(targetName, 0, time);
+        refresh_browser(screen, state);
         return;
     }
 
     state.transientPlanActive = true;
     state.breakName = entry->name;
+    // Le navigateur est reellement ferme : sans ca, la pression Enter
+    // suivante serait gobe par handle_key et un appui court rechargerait le
+    // fichier entier, detruisant le plan tout juste publie.
+    state.browserActive = false;
     screen.showPerformance();
     std::printf("TRANSIENT : %s -> 12 plages\n", entry->name.c_str());
     for (std::size_t pad = 0; pad < kPadCount; ++pad) {
@@ -423,7 +440,10 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
                                  kFxNames[simulation.fxCandidate], 1);
                 std::printf("pad %d : %s\n", 7 + simulation.heldFxPad,
                             kFxNames[simulation.fxCandidate]);
-            } else if (state.browserActive) {
+            } else if (state.browserActive &&
+                       g_browserInteraction.mode() !=
+                           BrowserMode::AssignmentMenu &&
+                       !g_browserInteraction.pressed()) {
                 if (direction > 0) {
                     if (state.browserSelection + 1 < state.browserEntries.size()) {
                         ++state.browserSelection;
@@ -627,6 +647,12 @@ void poll_numpad(ScreenUi& screen, UiSimulation& simulation, AppState& state) {
         }
     }
     if ((released & 0x3F) != 0 && (held & 0x3F) == 0 && state.browserActive) {
+        // Le relachement du pad voix ferme le navigateur ; si le menu etait
+        // ouvert, il est annule pour que la machine a etats ne confirme plus
+        // une assignation devenue invisible.
+        if (g_browserInteraction.mode() == BrowserMode::AssignmentMenu) {
+            g_browserInteraction.cancel(now_ms());
+        }
         state.browserActive = false;
         if (simulation.heldFxPad >= 0) {
             screen.showFxPad(7 + simulation.heldFxPad,
@@ -719,7 +745,10 @@ void key_loop(ScreenUi& screen, ScreenPreview& preview, AppState& state) {
         if (enterHeld) {
             const auto event = g_browserInteraction.hold(time);
             if (event.type == BrowserInteraction::Event::Type::EnterMenu) {
-                screen.showAssignmentMenu(event.name.data(), 0, time);
+                // Option surlignee = TRANSIENT (index 1) : c'est l'action que
+                // confirme Enter en V0. ALL PADS reste affiche en reserve et
+                // CANCEL correspond a Retour arriere.
+                screen.showAssignmentMenu(event.name.data(), 1, time);
             }
         }
         if (!enterHeld && enterHeldPrev) {
