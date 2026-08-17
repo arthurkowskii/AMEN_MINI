@@ -23,6 +23,7 @@ Le build impose `-std=c++17 -Wall -Wextra -Wpedantic -Werror`. Le runner unique 
 - `src/algorithms`: ordonnanceur FX sans allocation;
 - `src/ui`: modèle texte fixe;
 - `src/teensy`: pin map réel et interface d'adaptation sans Arduino;
+- `teensy/amen_midi`: sketch Teensy 4.1 (matrice, encodeurs, OLED, USB-MIDI);
 - `tests`: tests natifs; `apps`: démonstrateur console.
 
 ## Statut de validation
