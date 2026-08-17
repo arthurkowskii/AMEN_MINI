@@ -29,6 +29,14 @@ public:
     void showBrowser(const char* folderName, const BrowserLine* lines,
                      std::size_t count, std::size_t selectedIndex,
                      std::uint64_t eventTimeMs);
+    // Assignment menu (long-press E1 on a WAV). The file name is copied into a
+    // bounded internal buffer (no heap); long names truncate with '..' then
+    // scroll horizontally like a selected browser line. selectedIndex is
+    // clamped to 0..2 (ALL PADS / TRANSIENT / CANCEL); the selected option is
+    // highlighted with the browser-style marker. eventTimeMs resets the header
+    // scroll timeline, mirroring browser selection semantics.
+    void showAssignmentMenu(const char* fileName, int selectedIndex,
+                            std::uint64_t eventTimeMs);
     void showFxPad(int padNumber, const char* fxName, int selectedEncoder);
     void showPerformance();
     void render(std::uint64_t nowMs);
@@ -45,18 +53,24 @@ private:
     void fillRect(int x, int y, int width, int height);
     void drawChar(int x, int y, char character, int scale = 1);
     void drawText(int x, int y, const char* text, int scale = 1);
-    void drawBrowserText(int x, int y, const char* text, std::size_t length);
+    // Viewport-clipped text. Defaults reproduce the browser clipping exactly
+    // (marker/margin columns excluded, right edge at the framebuffer limit).
+    void drawBrowserText(int x, int y, const char* text, std::size_t length,
+                         int leftEdge = 7, int rightEdge = kWidth);
     void drawNumberRight(int right, int y, int value, int scale,
                          const char* suffix = nullptr);
     void drawPerformance();
     void drawParameter();
     void drawBrowser(std::uint64_t nowMs);
+    void drawAssignmentMenu(std::uint64_t nowMs);
     void drawFxPad();
 
     struct StoredBrowserLine {
         std::array<char, 258> name{};
         bool directory = false;
     };
+
+    static constexpr int kAssignmentOptionCount = 3;
 
     Buffer buffer_{};
     std::array<char, 22> breakName_{};
@@ -65,6 +79,7 @@ private:
     std::array<char, 32> browserFolder_{};
     std::array<StoredBrowserLine, 3> browserLines_{};
     std::array<char, 17> fxPadName_{};
+    std::array<char, 64> assignmentFileName_{};
     int bpm_ = 120;
     PlaybackMode mode_ = PlaybackMode::OneShot;
     int parameterValue_ = 0;
@@ -72,12 +87,15 @@ private:
     int parameterMaximum_ = 10;
     std::uint64_t overlayUntilMs_ = 0;
     std::uint64_t browserScrollStartMs_ = 0;
+    std::uint64_t assignmentMenuEventMs_ = 0;
     std::size_t browserLineCount_ = 0;
     std::size_t browserSelectedLine_ = 0;
     int fxPadNumber_ = 0;
     int fxPadEncoder_ = 1;
+    int assignmentSelectedOption_ = 0;
     bool browserActive_ = false;
     bool fxPadActive_ = false;
+    bool assignmentMenuActive_ = false;
 };
 
 #endif

@@ -4,6 +4,26 @@
 #include <cstdio>
 
 namespace {
+// Gap in pixels between the end of a scrolling text and its wrapped copy.
+constexpr int kBrowserScrollGapPixels = 16;
+
+// Horizontal offset in pixels of the browser-style marquee once the idle
+// delay has passed, looping every cycleWidth pixels. Pure integer math so the
+// timeline stays identical across platforms; deterministic for tests.
+int browserScrollOffset(std::uint64_t idleMs, int cycleWidth) {
+    if (idleMs <= ScreenUi::kBrowserScrollDelayMs || cycleWidth <= 0) {
+        return 0;
+    }
+    const std::uint64_t elapsed = idleMs - ScreenUi::kBrowserScrollDelayMs;
+    const std::uint64_t wholeSeconds = elapsed / 1000U;
+    const std::uint64_t remainderMs = elapsed % 1000U;
+    const std::uint64_t cycle = static_cast<std::uint64_t>(cycleWidth);
+    return static_cast<int>(
+        ((wholeSeconds % cycle) * ScreenUi::kBrowserScrollPixelsPerSecond +
+         remainderMs * ScreenUi::kBrowserScrollPixelsPerSecond / 1000U) %
+        cycle);
+}
+
 struct Glyph {
     char character;
     std::uint8_t rows[5];
@@ -178,6 +198,7 @@ void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
     browserScrollStartMs_ = eventTimeMs;
     browserActive_ = true;
     fxPadActive_ = false;
+    assignmentMenuActive_ = false;
 
     if (lines == nullptr || count == 0U) {
         return;
@@ -198,24 +219,43 @@ void ScreenUi::showBrowser(const char* folderName, const BrowserLine* lines,
     }
 }
 
+void ScreenUi::showAssignmentMenu(const char* fileName, int selectedIndex,
+                                  std::uint64_t eventTimeMs) {
+    copyBrowserLabel(assignmentFileName_,
+                     fileName == nullptr || fileName[0] == '\0' ? "UNNAMED"
+                                                               : fileName,
+                     false);
+    assignmentSelectedOption_ =
+        std::clamp(selectedIndex, 0, kAssignmentOptionCount - 1);
+    assignmentMenuEventMs_ = eventTimeMs;
+    assignmentMenuActive_ = true;
+    browserActive_ = false;
+    fxPadActive_ = false;
+    overlayUntilMs_ = 0;
+}
+
 void ScreenUi::showFxPad(int padNumber, const char* fxName, int selectedEncoder) {
     copyLabel(fxPadName_, fxName);
     fxPadNumber_ = std::clamp(padNumber, 0, 99);
     fxPadEncoder_ = std::clamp(selectedEncoder, 1, 7);
     fxPadActive_ = true;
     browserActive_ = false;
+    assignmentMenuActive_ = false;
     overlayUntilMs_ = 0;
 }
 
 void ScreenUi::showPerformance() {
     browserActive_ = false;
     fxPadActive_ = false;
+    assignmentMenuActive_ = false;
     overlayUntilMs_ = 0;
 }
 
 void ScreenUi::render(std::uint64_t nowMs) {
     clear();
-    if (browserActive_) {
+    if (assignmentMenuActive_) {
+        drawAssignmentMenu(nowMs);
+    } else if (browserActive_) {
         drawBrowser(nowMs);
     } else if (fxPadActive_) {
         drawFxPad();
@@ -302,32 +342,41 @@ void ScreenUi::drawText(int x, int y, const char* text, int scale) {
 }
 
 void ScreenUi::drawBrowserText(int x, int y, const char* text,
-                               std::size_t length) {
-    constexpr int kViewportLeft = 7;
+                               std::size_t length, int leftEdge,
+                               int rightEdge) {
     constexpr int kGlyphWidth = 3;
     constexpr int kAdvance = 4;
     if (text == nullptr || length == 0U) {
         return;
     }
+    if (leftEdge < 0) {
+        leftEdge = 0;
+    }
+    if (rightEdge > kWidth) {
+        rightEdge = kWidth;
+    }
+    if (rightEdge <= leftEdge) {
+        return;
+    }
 
     // Jump directly to the first glyph that can intersect the viewport. This
-    // keeps work bounded by the 31 visible/partial glyphs, even for 255-char names.
+    // keeps work bounded by the visible glyphs, even for 255-char names.
     std::size_t first = 0;
-    if (x + kGlyphWidth <= kViewportLeft) {
+    if (x + kGlyphWidth <= leftEdge) {
         first = std::min(length, static_cast<std::size_t>(
-            (kViewportLeft - (x + kGlyphWidth)) / kAdvance + 1));
+            (leftEdge - (x + kGlyphWidth)) / kAdvance + 1));
     }
 
     for (std::size_t index = first; index < length; ++index) {
         const int characterX = x + static_cast<int>(index) * kAdvance;
-        if (characterX >= kWidth) {
+        if (characterX >= rightEdge) {
             break;
         }
         const std::uint8_t* rows = glyphRows(text[index]);
         for (int row = 0; row < 5; ++row) {
             for (int column = 0; column < kGlyphWidth; ++column) {
                 const int pixelX = characterX + column;
-                if (pixelX >= kViewportLeft && pixelX < kWidth &&
+                if (pixelX >= leftEdge && pixelX < rightEdge &&
                     (rows[row] & (1U << (2 - column))) != 0) {
                     setPixel(pixelX, y + row);
                 }
@@ -435,15 +484,48 @@ void ScreenUi::drawBrowser(std::uint64_t nowMs) {
 
         const int cycleWidth = textWidth + kScrollGap;
         const std::uint64_t elapsed = idleMs - kBrowserScrollDelayMs;
-        const std::uint64_t wholeSeconds = elapsed / 1000U;
-        const std::uint64_t remainderMs = elapsed % 1000U;
-        const std::uint64_t offset =
-            ((wholeSeconds % static_cast<std::uint64_t>(cycleWidth)) *
-                 kBrowserScrollPixelsPerSecond +
-             remainderMs * kBrowserScrollPixelsPerSecond / 1000U) %
-            static_cast<std::uint64_t>(cycleWidth);
+        const int offset = browserScrollOffset(elapsed + kBrowserScrollDelayMs,
+                                               cycleWidth);
         const int x = kTextX - static_cast<int>(offset);
         drawBrowserText(x, kLineY[index], name, length);
         drawBrowserText(x + cycleWidth, kLineY[index], name, length);
+    }
+}
+
+void ScreenUi::drawAssignmentMenu(std::uint64_t nowMs) {
+    static constexpr int kOptionY[] = {10, 18, 26};
+    static constexpr const char* kOptionLabels[] = {"ALL PADS", "TRANSIENT",
+                                                    "CANCEL"};
+
+    // Header: scrolling file name (30 px/s after 500 ms, browser semantics)
+    // confined to x < 106 so the static E1 OK hint never overlaps it.
+    constexpr int kNameRightEdge = 106;
+    constexpr int kScrollGap = 16;
+    const std::size_t length = textLength(assignmentFileName_.data());
+    const int textWidth = length == 0U ? 0 : static_cast<int>(length * 4U - 1U);
+    const std::uint64_t idleMs = nowMs >= assignmentMenuEventMs_
+        ? nowMs - assignmentMenuEventMs_
+        : 0U;
+    if (textWidth <= kNameRightEdge) {
+        drawBrowserText(0, 1, assignmentFileName_.data(), length, 0,
+                        kNameRightEdge);
+    } else {
+        const int cycleWidth = textWidth + kScrollGap;
+        const int offset = browserScrollOffset(idleMs, cycleWidth);
+        const int x = 0 - offset;
+        drawBrowserText(x, 1, assignmentFileName_.data(), length, 0,
+                        kNameRightEdge);
+        drawBrowserText(x + cycleWidth, 1, assignmentFileName_.data(), length,
+                        0, kNameRightEdge);
+    }
+    drawText(108, 1, "E1 OK");
+    drawHorizontalLine(0, 7, kWidth);
+
+    for (int option = 0; option < kAssignmentOptionCount; ++option) {
+        if (option == assignmentSelectedOption_) {
+            fillRect(1, kOptionY[option] - 1, 3, 7);
+        }
+        drawBrowserText(7, kOptionY[option], kOptionLabels[option],
+                        textLength(kOptionLabels[option]));
     }
 }

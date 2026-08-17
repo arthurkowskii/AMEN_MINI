@@ -231,6 +231,63 @@ int main() {
     screen.showParameter("speed", 100, 25, 400, 25000);
     assert(renderAt(screen, 25000) != percentValue);
 
+    // Assignment menu (long-press E1): a distinct screen, never the browser.
+    screen.showBrowser("breaks", fileLine, 1, 0, 30000);
+    const Buffer browserForMenuCompare = renderAt(screen, 30000);
+    screen.showAssignmentMenu("amen.wav", 0, 30000);
+    const Buffer menuAllPads = renderAt(screen, 30000);
+    assert(menuAllPads != browserForMenuCompare);
+
+    // The three option positions produce three distinct coherent buffers, and
+    // the browser-style selection marker moves with the selection.
+    assert(screen.pixel(2, 12));  // marker on ALL PADS row
+    screen.showAssignmentMenu("amen.wav", 1, 30000);
+    const Buffer menuTransient = renderAt(screen, 30000);
+    assert(!screen.pixel(2, 12));
+    assert(screen.pixel(2, 20));  // marker on TRANSIENT row
+    screen.showAssignmentMenu("amen.wav", 2, 30000);
+    const Buffer menuCancel = renderAt(screen, 30000);
+    assert(!screen.pixel(2, 20));
+    assert(screen.pixel(2, 28));  // marker on CANCEL row
+    assert(menuAllPads != menuTransient);
+    assert(menuTransient != menuCancel);
+
+    // The selected option index is clamped to 0..2.
+    screen.showAssignmentMenu("amen.wav", 99, 30000);
+    assert(renderAt(screen, 30000) == menuCancel);
+    screen.showAssignmentMenu("amen.wav", -5, 30000);
+    assert(renderAt(screen, 30000) == menuAllPads);
+
+    // CANCEL label is visible: its row carries text pixels beyond the marker.
+    screen.showAssignmentMenu("amen.wav", 2, 30000);
+    const Buffer cancelShown = renderAt(screen, 30000);
+    assert(rectangleEqual(cancelShown, menuCancel, 7, ScreenUi::kWidth, 26, 31));
+    assert(anyPixels(cancelShown));
+
+    // The E1 OK hint is static: identical for two different file names.
+    screen.showAssignmentMenu("amen.wav", 0, 30000);
+    const Buffer hintA = renderAt(screen, 30000);
+    screen.showAssignmentMenu("another_file_name_here.wav", 0, 30000);
+    const Buffer hintB = renderAt(screen, 30000);
+    assert(rectangleEqual(hintA, hintB, 106, ScreenUi::kWidth, 1, 7));
+
+    // A long name scrolls in the header at 30 px/s after the 500 ms delay,
+    // staying strictly left of the hint, exactly like browser scrolling.
+    const char* longMenuName =
+        "a_very_long_break_name_that_exceeds_the_menu_header_and_scrolls.wav";
+    screen.showAssignmentMenu(longMenuName, 0, 31000);
+    const Buffer menuScroll600 = renderAt(screen, 31600);
+    const Buffer menuScroll700 = renderAt(screen, 31700);
+    assert(regionShiftedLeftBy(menuScroll600, menuScroll700, 3, 20, 90, 1, 6));
+    assert(rectangleEqual(menuScroll600, menuScroll700, 106, ScreenUi::kWidth, 1, 7));
+
+    // Re-showing with the retained timestamp keeps the scroll timeline;
+    // showPerformance returns to the plain performance screen.
+    screen.showAssignmentMenu(longMenuName, 0, 31000);
+    assert(renderAt(screen, 31700) == menuScroll700);
+    screen.showPerformance();
+    assert(renderAt(screen, 31700) == performance);
+
     assert(!screen.pixel(-1, 0));
     assert(!screen.pixel(ScreenUi::kWidth, 0));
     std::printf("screen_ui: ok\n");

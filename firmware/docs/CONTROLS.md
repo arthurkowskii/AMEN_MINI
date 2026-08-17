@@ -25,6 +25,7 @@ L'arret cible uniquement le pad concerne, y compris ses queues de crossfade, san
 ## Encodeurs
 
 - `E1 NAV` : sur un pad voix maintenu, navigue dans la SD et le clic entre/charge. Sur un pad FX maintenu, navigue dans la liste FX et le clic assigne.
+- Appui long `E1` (600 ms) sur un WAV : ouvre le menu d'assignation globale `ALL PADS` / `TRANSIENT` / `CANCEL` au lieu d'assigner le fichier au pad cible. Le relachement ne confirme pas : une nouvelle pression `E1` confirme l'action affichee, `Retour arriere` annule sans modifier l'assignation. L'appui long n'est jamais declenche par un dossier et ne se declenche qu'une seule fois par pression.
 - `E2 AMOUNT` : mix dry/wet du Repeat, de 0 a 100 %. La valeur par defaut est 100 %.
 - `E3 DIVISION` : longueur du Repeat, choix live `1/4`, `1/8`, `1/12`, `1/16`, `1/24`, `1/32` (les `1/12` et `1/24` sont les triplets de croche et de double-croche — le stutter swingue). La valeur par defaut est `1/4`.
 - `E4 SPEED` : vitesse du pad voix **tenu** (plus jamais le "dernier joue"), de 25 a 400 % par pas de 5 %. Appliquee en direct a la voix active du pad (rampe de 128 frames, sans retrigger) et memorisee pour son prochain trigger. Le clic remet **ce pad** a 100 %. Sans pad tenu : hint `E4 TENIR PAD`, aucun effet.
@@ -39,6 +40,7 @@ Chaque pad voix memorise sa propre vitesse, son mode de lecture et son comportem
 - Chaque interaction de parametre renouvelle son overlay pour exactement 1 seconde a partir de la derniere interaction. Le navigateur et l'ecran d'un pad FX restent prioritaires sur cet overlay.
 - Dans le navigateur WAV, les noms longs restent d'abord immobiles et tronques avec `..`. Apres 500 ms sans changement de selection ou de dossier, seule la ligne selectionnee defile horizontalement a 30 pixels/s, en boucle avec un espace. Seule une nouvelle selection ou un changement de dossier remet le defilement au debut ; restaurer ou rouvrir le navigateur conserve sa chronologie.
 - Les lignes non selectionnees et les noms assez courts pour tenir dans la largeur disponible ne defilent jamais.
+- Le menu d'assignation affiche le nom du fichier (tronque avec `..`, puis defile a 30 px/s apres 500 ms en restant a gauche du rappel `E1 OK`) et les trois options `ALL PADS` / `TRANSIENT` / `CANCEL`, avec un marqueur sur la ligne selectionnee. `TRANSIENT` decoupe le WAV en douze plages par detection d'attaques ; le menu ne modifie jamais le mode `E5`, le latch ni la vitesse des pads.
 
 Dans le harness Windows, `F1-F7` choisit l'encodeur, les fleches le tournent et `Entree` le clique. `Espace` simule deterministiquement un nouvel appui sur le dernier pad voix avec tous ses reglages : il retrigger dans les trois premiers cas et bascule lecture/arret en `LOOP + LATCH`. `Retour arriere` remonte dans le browser et `q` quitte.
 
