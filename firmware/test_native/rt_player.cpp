@@ -52,6 +52,14 @@
 namespace {
 constexpr uint32_t kOutputSampleRate = VoiceManager::kDefaultOutputSampleRate;
 VoiceManager g_voices{kOutputSampleRate};
+
+constexpr int kVoicePadCount = 6;
+
+// Nuage granulaire par pad voix (mode CLOUD, plan 7.3). Le PCM est emprunte
+// (jamais copie) : il vit dans state.wav ou dans la session TRANSIENT. Tout
+// chemin qui detruit/remplace ces buffers DOIT arreter les nuages avant
+// (voir HarnessVoiceStopper et le chargement du navigateur).
+std::array<GrainCloud, kVoicePadCount> g_padClouds{};
 constexpr std::size_t kRepeatBufferFrames =
     LiveRepeat::requiredBufferFrames(kOutputSampleRate);
 std::array<float, kRepeatBufferFrames> g_repeatHistoryL{};
@@ -87,6 +95,11 @@ public:
     void stopAll() override {
         std::lock_guard<std::mutex> lock(g_audioMutex);
         g_voices.stopAll();
+        // Les nuages CLOUD empruntent le PCM qui va etre detruit par
+        // l'echange atomique : ils doivent s'eteindre AVANT le move.
+        for (GrainCloud& cloud : g_padClouds) {
+            cloud.stop();
+        }
     }
 };
 
@@ -113,12 +126,6 @@ static_assert(sizeof(kFxNames) / sizeof(kFxNames[0]) ==
 const char* kDivisionNames[] = {"1/4", "1/8", "1/12", "1/16", "1/24", "1/32"};
 const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
                                "E5 MODE", "E6 LFO", "E7 BPM"};
-
-constexpr int kVoicePadCount = 6;
-
-// Nuage granulaire par pad voix (mode CLOUD, plan 7.3). Le PCM est emprunte
-// (jamais copie) : il vit dans state.wav ou dans la session TRANSIENT.
-std::array<GrainCloud, kVoicePadCount> g_padClouds{};
 
 // Réglages propres à chaque pad voix : la vitesse et le mode vivent ici,
 // jamais dans une variable globale. La cible des encodeurs E4/E5 est le pad
@@ -239,6 +246,9 @@ void load_browser_selection(ScreenUi& screen, AppState& state, std::uint64_t tim
     {
         std::lock_guard<std::mutex> lock(g_audioMutex);
         g_voices.stopAll();
+        for (GrainCloud& cloud : g_padClouds) {
+            cloud.stop();  // le PCM emprunte va etre detruit par le move
+        }
         state.wav = std::move(loaded);
     }
     // Le chargement classique d'un WAV (appui court) reprend le mode
@@ -379,6 +389,13 @@ void set_pad_mode(int pad, PlaybackMode mode, ScreenUi& screen,
                   UiSimulation& simulation, std::uint64_t time) {
     if (pad < 0 || pad >= kVoicePadCount) return;
     simulation.pads[pad].mode = mode;
+    {
+        // Toute rotation de mode eteint le nuage du pad : un CLOUD en LATCH
+        // ne doit pas survivre a la sortie du mode (sinon il jouerait du PCM
+        // emprunte indefiniment).
+        std::lock_guard<std::mutex> lock(g_audioMutex);
+        g_padClouds[pad].stop();
+    }
     show_pad_overlay(screen, pad, mode_label(mode), 0, 0, 1, time);
     std::printf("pad %d lecture : %s\n", pad + 1, mode_label(mode));
 }

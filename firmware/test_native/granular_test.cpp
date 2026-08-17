@@ -47,7 +47,8 @@ void fillSine(std::vector<std::int16_t>& samples, std::size_t begin,
 
 // 1. Bornes : la plage est silencieuse et tout ce qui est DEHORS vaut 1.0
 // (sentinelle). Toute lecture hors plage ferait apparaitre la sentinelle ;
-// la sortie doit rester exactement nulle.
+// la sortie doit rester exactement nulle, quelle que soit la vitesse (le
+// grain est plafonne a la plage meme a 400 %).
 void testNeverReadsOutsideRange() {
     constexpr std::size_t kFrames = 20000;
     constexpr std::size_t kBegin = 5000;
@@ -56,14 +57,16 @@ void testNeverReadsOutsideRange() {
     for (std::size_t n = kBegin; n < kEnd; ++n) samples[n] = 0;  // plage nulle
     const PcmView pcm = makePcm(samples);
 
-    GrainCloud cloud;
-    cloud.start(pcm, kBegin, kEnd, 1.0f, 42U);
-    std::vector<float> left(44100, 0.0f);
-    std::vector<float> right(44100, 0.0f);
-    cloud.render(left.data(), right.data(), static_cast<int>(left.size()));
-    for (float value : left) {
-        require(value == 0.0f,
-                "output must stay exactly 0 when the range is silent");
+    for (float speed : {1.0f, 4.0f, 0.25f}) {
+        GrainCloud cloud;
+        cloud.start(pcm, kBegin, kEnd, speed, 42U);
+        std::vector<float> left(44100, 0.0f);
+        std::vector<float> right(44100, 0.0f);
+        cloud.render(left.data(), right.data(), static_cast<int>(left.size()));
+        for (float value : left) {
+            require(value == 0.0f,
+                    "output must stay exactly 0 when the range is silent");
+        }
     }
 }
 
@@ -152,7 +155,6 @@ void testCloudProducesSoundFromRange() {
     for (float value : left) energy += static_cast<double>(value) * value;
     require(energy > 1.0,
             "the cloud must render audible material from its range");
-    require(cloud.active() || true, "activity state remains readable");
 }
 
 // 6. Arret progressif : stop() fait fondre la sortie vers 0 en ~10 ms puis

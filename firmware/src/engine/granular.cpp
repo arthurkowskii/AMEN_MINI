@@ -36,10 +36,13 @@ void GrainCloud::start(PcmView pcm, std::size_t rangeStart,
     masterFade_ = 1.0f;
     fadingOut_ = false;
     active_ = true;
-    // Fondu de sortie ~10 ms, applique par frame de sortie.
+    // Fondu de sortie ~10 ms, applique par frame de sortie. Plafonne a 1
+    // pour les frequences d'echantillonnage degenerees (sinon le fondu
+    // s'effondrerait en une frame et cliquerait).
     const float fadeFrames =
         0.010f * static_cast<float>(pcm.sampleRate > 0 ? pcm.sampleRate : 44100);
-    fadeStep_ = fadeFrames > 0.0f ? 1.0f / fadeFrames : 1.0f;
+    fadeStep_ =
+        std::min(1.0f, fadeFrames > 0.0f ? 1.0f / fadeFrames : 1.0f);
 }
 
 void GrainCloud::stop() {
@@ -129,10 +132,14 @@ void GrainCloud::render(float* outLeft, float* outRight, int numFrames) {
                 continue;
             }
             anyActive = true;
-            const std::size_t position = static_cast<std::size_t>(grain.sourcePosF);
-            const std::size_t source = std::min(
-                rangeStart_ + position,
-                pcm_.sampleCount / channels > 0 ? pcm_.sampleCount / channels - 1U : 0U);
+            // Position source plafonnee a la plage assignee : a vitesse > 1
+            // (E4 jusqu'a 400 %), le grain ne doit JAMAIS lire au-dela de
+            // la fin de la plage (les slices voisines ne sont pas sa matiere).
+            const std::size_t rangeLength = rangeEnd_ - rangeStart_;
+            std::size_t position = static_cast<std::size_t>(grain.sourcePosF);
+            position = std::min(position, rangeLength - 1U);
+            const std::size_t source =
+                rangeStart_ + position;
             const float sample = static_cast<float>(
                 pcm_.samples[source * channels]);
             const float envelope =

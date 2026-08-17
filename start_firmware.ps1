@@ -76,7 +76,7 @@ Write-Host "sequenceur pret."
 Write-Host ""
 Write-Host "  CONTROLES" -ForegroundColor Yellow
 Write-Host "  pads voix   numpad 1-6   appui = joue le break et devient la cible (tenir le pad pour editer)" -ForegroundColor Cyan
-Write-Host "              pad tenu + E1 = navigateur SD | + E4 = vitesse | + E5 tourne = ONE SHOT/LOOP, clic = GATE/LATCH" -ForegroundColor Cyan
+Write-Host "              pad tenu + E1 = navigateur SD | + E4 = vitesse | + E5 tourne = ONE SHOT/LOOP/CLOUD, clic = GATE/LATCH" -ForegroundColor Cyan
 Write-Host "  pads FX     numpad 7-9   maintien = active le FX assigne" -ForegroundColor Cyan
 Write-Host "  encodeurs   F1-F7        selectionner l'encodeur actif" -ForegroundColor Cyan
 Write-Host "              fleches H/B  tourner l'encodeur selectionne" -ForegroundColor Cyan

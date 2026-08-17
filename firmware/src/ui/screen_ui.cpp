@@ -158,7 +158,7 @@ const char* modeName(PlaybackMode mode) {
         case PlaybackMode::Loop:
             return "LOOP";
         case PlaybackMode::Granular:
-            return "GRAIN";
+            return "CLOUD";
         case PlaybackMode::SliceSync:
             return "SYNC";
     }
