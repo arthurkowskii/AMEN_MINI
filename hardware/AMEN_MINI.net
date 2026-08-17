@@ -1,0 +1,5923 @@
+(export
+	(version "E")
+	(design
+		(source "/home/randomaccessmemories/GIT/AMEN_MINI/hardware/AMEN_MINI.kicad_sch")
+		(date "2026-08-15T10:05:55")
+		(tool "Eeschema 10.0.5-10.0.5~ubuntu26.04.1")
+		(sheet
+			(number "1")
+			(name "/")
+			(tstamps "/")
+			(title_block
+				(title "AKOR_01_SCH")
+				(company "Kowskii")
+				(rev)
+				(date "2026-07-29")
+				(source "AMEN_MINI.kicad_sch")
+				(comment
+					(number "1")
+					(value "")
+				)
+				(comment
+					(number "2")
+					(value "")
+				)
+				(comment
+					(number "3")
+					(value "")
+				)
+				(comment
+					(number "4")
+					(value "")
+				)
+				(comment
+					(number "5")
+					(value "")
+				)
+				(comment
+					(number "6")
+					(value "")
+				)
+				(comment
+					(number "7")
+					(value "")
+				)
+				(comment
+					(number "8")
+					(value "")
+				)
+				(comment
+					(number "9")
+					(value "")
+				)
+			)
+		)
+	)
+	(components
+		(comp
+			(ref "C3")
+			(value "100nF")
+			(footprint "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm")
+			(description "Unpolarized capacitor")
+			(fields
+				(field
+					(name "Footprint") "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Unpolarized capacitor")
+			)
+			(libsource
+				(lib "Device")
+				(part "C")
+				(description "Unpolarized capacitor")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "cap capacitor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "C_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "27235610-5c3b-420c-a2a4-09943bdbc692")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D1")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "7c7f9f40-edf8-40c2-9662-6030a6349eaa")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D2")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "c8e954f4-3736-4485-8422-c68441dba5a8")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D3")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "f6977ab8-cc9b-4298-ba68-d7f7e8c6bf89")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D4")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "e2807201-cce1-479f-a494-1ea295633bf7")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D5")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "215f2755-b80d-47e5-8652-b8c8782bc2c2")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D6")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "dd785af4-d3de-4205-9014-64479796841f")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D7")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "88a65cad-2991-438a-a69c-6f386121dfa4")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D8")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "f11877f2-2592-4009-8698-ddb6555dbec0")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D9")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "9ae27fcd-0b53-4b07-b591-c8fb56b10660")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D10")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "9a9a44a5-2e3c-4b2d-9025-f9f5fcd4a772")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D11")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "94d95e20-ed21-4d02-9fcf-7afdc5b9bc4e")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D12")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "ca29a284-508c-469b-8e47-a04564b0e43d")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D13")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "f7e6d28f-b84e-45e7-80d7-ab5ed74305a4")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D14")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "cc61ff9f-6025-4184-9c4d-04cc27a6a604")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D15")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "e6513218-a450-47e7-853e-eab8fb81259e")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D16")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "fe1b7c04-3fe1-4e0a-8caa-bf45a978ab94")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D17")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "10369c68-88e9-4021-8f7a-1c155c9e319e")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D18")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "bdc65b7f-7071-4152-976c-5a754db84a98")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D19")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "6c233ca5-c8ed-4349-ac28-d21d70900514")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D20")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "10e94951-704a-4012-bf6f-ccbf054c01ed")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "D21")
+			(value "1N4148")
+			(footprint "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+			(description "Diode")
+			(fields
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+				(field
+					(name "Footprint") "Diode_THT:D_DO-35_SOD27_P10.16mm_Horizontal")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+			)
+			(libsource
+				(lib "Device")
+				(part "D")
+				(description "Diode")
+			)
+			(property
+				(name "Sim.Device")
+				(value "D")
+			)
+			(property
+				(name "Sim.Pins")
+				(value "1=K 2=A")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "diode")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "TO-???* *_Diode_* *SingleDiode* D_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "d2514748-79cd-44f3-af8a-ed7f9aea6635")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "ENC1")
+			(value "RotaryEncoder_Switch")
+			(footprint "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+			(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			(fields
+				(field
+					(name "Footprint") "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(libsource
+				(lib "Device")
+				(part "RotaryEncoder_Switch")
+				(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "rotary switch encoder switch push button")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "RotaryEncoder*Switch*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "8071f15c-a2cc-477e-9970-4a791a6c8753")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "A")
+						)
+						(pin
+							(num "C")
+						)
+						(pin
+							(num "B")
+						)
+						(pin
+							(num "S1")
+						)
+						(pin
+							(num "S2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "ENC2")
+			(value "RotaryEncoder_Switch")
+			(footprint "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+			(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			(fields
+				(field
+					(name "Footprint") "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(libsource
+				(lib "Device")
+				(part "RotaryEncoder_Switch")
+				(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "rotary switch encoder switch push button")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "RotaryEncoder*Switch*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "9ec50a95-37f9-440a-b18f-bcf45ffb5901")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "A")
+						)
+						(pin
+							(num "C")
+						)
+						(pin
+							(num "B")
+						)
+						(pin
+							(num "S1")
+						)
+						(pin
+							(num "S2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "ENC3")
+			(value "RotaryEncoder_Switch")
+			(footprint "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+			(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			(fields
+				(field
+					(name "Footprint") "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(libsource
+				(lib "Device")
+				(part "RotaryEncoder_Switch")
+				(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "rotary switch encoder switch push button")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "RotaryEncoder*Switch*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "6e5d7b8a-2bd2-4fbd-82a7-a337e9aa0446")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "A")
+						)
+						(pin
+							(num "C")
+						)
+						(pin
+							(num "B")
+						)
+						(pin
+							(num "S1")
+						)
+						(pin
+							(num "S2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "ENC4")
+			(value "RotaryEncoder_Switch")
+			(footprint "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+			(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			(fields
+				(field
+					(name "Footprint") "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(libsource
+				(lib "Device")
+				(part "RotaryEncoder_Switch")
+				(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "rotary switch encoder switch push button")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "RotaryEncoder*Switch*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "aee94791-0f31-451b-81a8-d8ff49d2ecc1")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "A")
+						)
+						(pin
+							(num "C")
+						)
+						(pin
+							(num "B")
+						)
+						(pin
+							(num "S1")
+						)
+						(pin
+							(num "S2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "ENC5")
+			(value "RotaryEncoder_Switch")
+			(footprint "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+			(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			(fields
+				(field
+					(name "Footprint") "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(libsource
+				(lib "Device")
+				(part "RotaryEncoder_Switch")
+				(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "rotary switch encoder switch push button")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "RotaryEncoder*Switch*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "5e4a6b85-5d26-4d9a-a1e1-e4f00e03650f")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "A")
+						)
+						(pin
+							(num "C")
+						)
+						(pin
+							(num "B")
+						)
+						(pin
+							(num "S1")
+						)
+						(pin
+							(num "S2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "ENC6")
+			(value "RotaryEncoder_Switch")
+			(footprint "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+			(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			(fields
+				(field
+					(name "Footprint") "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(libsource
+				(lib "Device")
+				(part "RotaryEncoder_Switch")
+				(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "rotary switch encoder switch push button")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "RotaryEncoder*Switch*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "39b376e5-93aa-4a9a-a677-4da27c91908c")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "A")
+						)
+						(pin
+							(num "C")
+						)
+						(pin
+							(num "B")
+						)
+						(pin
+							(num "S1")
+						)
+						(pin
+							(num "S2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "ENC7")
+			(value "RotaryEncoder_Switch")
+			(footprint "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+			(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			(fields
+				(field
+					(name "Footprint") "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(libsource
+				(lib "Device")
+				(part "RotaryEncoder_Switch")
+				(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "rotary switch encoder switch push button")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "RotaryEncoder*Switch*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "bcc83b96-23e3-44f2-b510-ced751d611b6")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "A")
+						)
+						(pin
+							(num "C")
+						)
+						(pin
+							(num "B")
+						)
+						(pin
+							(num "S1")
+						)
+						(pin
+							(num "S2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "J2")
+			(value "Conn_01x04_Pin")
+			(footprint "Display:ER_OLEDM0.91_1x-I2C")
+			(description "Generic connector, single row, 01x04, script generated")
+			(fields
+				(field
+					(name "Footprint") "Display:ER_OLEDM0.91_1x-I2C")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Generic connector, single row, 01x04, script generated")
+			)
+			(libsource
+				(lib "Connector")
+				(part "Conn_01x04_Pin")
+				(description "Generic connector, single row, 01x04, script generated")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "connector")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Connector*:*_1x??_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "7cfb719a-e752-4b84-a6dc-976260e1422c")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "4")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "J3")
+			(value "Conn_01x14")
+			(footprint "Connector_PinHeader_2.54mm:PinHeader_1x14_P2.54mm_Vertical")
+			(description "Generic connector, single row, 01x14, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			(fields
+				(field
+					(name "Footprint") "Connector_PinHeader_2.54mm:PinHeader_1x14_P2.54mm_Vertical")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Generic connector, single row, 01x14, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			)
+			(libsource
+				(lib "Connector_Generic")
+				(part "Conn_01x14")
+				(description "Generic connector, single row, 01x14, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "connector")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Connector*:*_1x??_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "5de4cbac-c759-4395-afd2-41f11549c061")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "4")
+						)
+						(pin
+							(num "5")
+						)
+						(pin
+							(num "6")
+						)
+						(pin
+							(num "7")
+						)
+						(pin
+							(num "8")
+						)
+						(pin
+							(num "9")
+						)
+						(pin
+							(num "10")
+						)
+						(pin
+							(num "11")
+						)
+						(pin
+							(num "12")
+						)
+						(pin
+							(num "13")
+						)
+						(pin
+							(num "14")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "J4")
+			(value "Conn_01x14")
+			(footprint "Connector_PinHeader_2.54mm:PinHeader_1x14_P2.54mm_Vertical")
+			(description "Generic connector, single row, 01x14, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			(fields
+				(field
+					(name "Footprint") "Connector_PinHeader_2.54mm:PinHeader_1x14_P2.54mm_Vertical")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Generic connector, single row, 01x14, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			)
+			(libsource
+				(lib "Connector_Generic")
+				(part "Conn_01x14")
+				(description "Generic connector, single row, 01x14, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "connector")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Connector*:*_1x??_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "3da0d4d5-50c9-4a23-8706-4b66ca358e10")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "4")
+						)
+						(pin
+							(num "5")
+						)
+						(pin
+							(num "6")
+						)
+						(pin
+							(num "7")
+						)
+						(pin
+							(num "8")
+						)
+						(pin
+							(num "9")
+						)
+						(pin
+							(num "10")
+						)
+						(pin
+							(num "11")
+						)
+						(pin
+							(num "12")
+						)
+						(pin
+							(num "13")
+						)
+						(pin
+							(num "14")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW1")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "1e52e0a4-d277-41a2-b42a-b1c67d40fa86")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW2")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "216276c9-ec0e-480c-8d08-7115dbfbd6bb")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW3")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "1df2b0ec-b0dd-4928-a7a5-87cebb249bdf")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW4")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "4888cdfc-8dd3-458b-b960-5e5d4203aa41")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW5")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "cc9dcff7-882d-41ed-b53a-af98844897b4")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW6")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "8adcf9df-5cc3-4a6c-92fc-cb3f30d36460")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW7")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "7d309144-4e70-4618-b5d6-317c8124593f")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW8")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "851d35c3-df38-4686-acbd-e399b999008c")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW9")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "83eae546-a2e7-4132-b0b4-acb72181946f")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW10")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "6639a370-1291-4c8e-9874-126244cd0275")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW11")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "29803d55-9aaa-4ef0-aea7-135face74b7d")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW12")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "7df6559e-fa66-4c6c-80f4-814a9e55d46c")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW13")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "28cc62f5-7f82-4f5d-ac63-aff35fb080fc")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW14")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "5824cca8-23e2-4be7-b524-20fea30fc22f")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW15")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "f5c4a9d3-75e6-48b9-80c0-dd4008d94f8e")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW16")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "d98987db-ab12-4f91-b5ce-c59bde8e08bb")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW17")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "a6361cfd-ad2e-4c2b-972e-28ffb9f68408")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW18")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "c6b2a7d9-2468-4c21-b348-8c0d18f0fc0e")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW19")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "47d72814-60b8-46aa-bd92-37a9365e1df4")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW20")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "867c34e7-7b14-41bc-8792-777d767abe62")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW21")
+			(value "SW_Push_45deg")
+			(footprint "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_Keyboard:SW_Cherry_MX_1.00u_PCB")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Push_45deg")
+				(description "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "a403ce10-7e31-4e12-b241-b10b6a30f1d8")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "U2")
+			(value "Teensy4.1")
+			(footprint "teensy:Teensy41")
+			(fields
+				(field
+					(name "Footprint") "teensy:Teensy41")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "teensy")
+				(part "Teensy4.1")
+				(description "")
+			)
+			(property
+				(name "Sheetname")
+				(value "AMEN_MINI")
+			)
+			(property
+				(name "Sheetfile")
+				(value "AMEN_MINI.kicad_sch")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "4dd473ea-5ad8-4983-a4ea-6a8c8df33545")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "4")
+						)
+						(pin
+							(num "5")
+						)
+						(pin
+							(num "6")
+						)
+						(pin
+							(num "7")
+						)
+						(pin
+							(num "8")
+						)
+						(pin
+							(num "9")
+						)
+						(pin
+							(num "10")
+						)
+						(pin
+							(num "11")
+						)
+						(pin
+							(num "12")
+						)
+						(pin
+							(num "13")
+						)
+						(pin
+							(num "14")
+						)
+						(pin
+							(num "15")
+						)
+						(pin
+							(num "16")
+						)
+						(pin
+							(num "17")
+						)
+						(pin
+							(num "18")
+						)
+						(pin
+							(num "19")
+						)
+						(pin
+							(num "20")
+						)
+						(pin
+							(num "21")
+						)
+						(pin
+							(num "22")
+						)
+						(pin
+							(num "23")
+						)
+						(pin
+							(num "24")
+						)
+						(pin
+							(num "66")
+						)
+						(pin
+							(num "67")
+						)
+						(pin
+							(num "55")
+						)
+						(pin
+							(num "56")
+						)
+						(pin
+							(num "57")
+						)
+						(pin
+							(num "58")
+						)
+						(pin
+							(num "59")
+						)
+						(pin
+							(num "50")
+						)
+						(pin
+							(num "51")
+						)
+						(pin
+							(num "52")
+						)
+						(pin
+							(num "53")
+						)
+						(pin
+							(num "54")
+						)
+						(pin
+							(num "49")
+						)
+						(pin
+							(num "48")
+						)
+						(pin
+							(num "47")
+						)
+						(pin
+							(num "46")
+						)
+						(pin
+							(num "45")
+						)
+						(pin
+							(num "44")
+						)
+						(pin
+							(num "43")
+						)
+						(pin
+							(num "42")
+						)
+						(pin
+							(num "41")
+						)
+						(pin
+							(num "40")
+						)
+						(pin
+							(num "39")
+						)
+						(pin
+							(num "38")
+						)
+						(pin
+							(num "37")
+						)
+						(pin
+							(num "36")
+						)
+						(pin
+							(num "35")
+						)
+						(pin
+							(num "34")
+						)
+						(pin
+							(num "33")
+						)
+						(pin
+							(num "32")
+						)
+						(pin
+							(num "31")
+						)
+						(pin
+							(num "30")
+						)
+						(pin
+							(num "29")
+						)
+						(pin
+							(num "28")
+						)
+						(pin
+							(num "27")
+						)
+						(pin
+							(num "26")
+						)
+						(pin
+							(num "25")
+						)
+						(pin
+							(num "65")
+						)
+						(pin
+							(num "64")
+						)
+						(pin
+							(num "63")
+						)
+						(pin
+							(num "62")
+						)
+						(pin
+							(num "61")
+						)
+						(pin
+							(num "60")
+						)
+					)
+				)
+			)
+		)
+	)
+	(groups)
+	(variants)
+	(libparts
+		(libpart
+			(lib "Connector")
+			(part "Conn_01x04_Pin")
+			(description "Generic connector, single row, 01x04, script generated")
+			(footprints
+				(fp "Connector*:*_1x??_*")
+			)
+			(fields
+				(field
+					(name "Reference") "J")
+				(field
+					(name "Value") "Conn_01x04_Pin")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Generic connector, single row, 01x04, script generated")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "Pin_1")
+					(type "passive")
+				)
+				(pin
+					(num "2")
+					(name "Pin_2")
+					(type "passive")
+				)
+				(pin
+					(num "3")
+					(name "Pin_3")
+					(type "passive")
+				)
+				(pin
+					(num "4")
+					(name "Pin_4")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "Connector_Generic")
+			(part "Conn_01x14")
+			(description "Generic connector, single row, 01x14, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			(footprints
+				(fp "Connector*:*_1x??_*")
+			)
+			(fields
+				(field
+					(name "Reference") "J")
+				(field
+					(name "Value") "Conn_01x14")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Generic connector, single row, 01x14, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "Pin_1")
+					(type "passive")
+				)
+				(pin
+					(num "2")
+					(name "Pin_2")
+					(type "passive")
+				)
+				(pin
+					(num "3")
+					(name "Pin_3")
+					(type "passive")
+				)
+				(pin
+					(num "4")
+					(name "Pin_4")
+					(type "passive")
+				)
+				(pin
+					(num "5")
+					(name "Pin_5")
+					(type "passive")
+				)
+				(pin
+					(num "6")
+					(name "Pin_6")
+					(type "passive")
+				)
+				(pin
+					(num "7")
+					(name "Pin_7")
+					(type "passive")
+				)
+				(pin
+					(num "8")
+					(name "Pin_8")
+					(type "passive")
+				)
+				(pin
+					(num "9")
+					(name "Pin_9")
+					(type "passive")
+				)
+				(pin
+					(num "10")
+					(name "Pin_10")
+					(type "passive")
+				)
+				(pin
+					(num "11")
+					(name "Pin_11")
+					(type "passive")
+				)
+				(pin
+					(num "12")
+					(name "Pin_12")
+					(type "passive")
+				)
+				(pin
+					(num "13")
+					(name "Pin_13")
+					(type "passive")
+				)
+				(pin
+					(num "14")
+					(name "Pin_14")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "Device")
+			(part "C")
+			(description "Unpolarized capacitor")
+			(footprints
+				(fp "C_*")
+			)
+			(fields
+				(field
+					(name "Reference") "C")
+				(field
+					(name "Value") "C")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Unpolarized capacitor")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "")
+					(type "passive")
+				)
+				(pin
+					(num "2")
+					(name "")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "Device")
+			(part "D")
+			(description "Diode")
+			(footprints
+				(fp "TO-???*")
+				(fp "*_Diode_*")
+				(fp "*SingleDiode*")
+				(fp "D_*")
+			)
+			(fields
+				(field
+					(name "Reference") "D")
+				(field
+					(name "Value") "D")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Diode")
+				(field
+					(name "Sim.Device") "D")
+				(field
+					(name "Sim.Pins") "1=K 2=A")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "K")
+					(type "passive")
+				)
+				(pin
+					(num "2")
+					(name "A")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "Device")
+			(part "RotaryEncoder_Switch")
+			(description "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			(footprints
+				(fp "RotaryEncoder*Switch*")
+			)
+			(fields
+				(field
+					(name "Reference") "SW")
+				(field
+					(name "Value") "RotaryEncoder_Switch")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Rotary encoder, dual channel, incremental quadrate outputs, with switch")
+			)
+			(pins
+				(pin
+					(num "A")
+					(name "A")
+					(type "passive")
+				)
+				(pin
+					(num "B")
+					(name "B")
+					(type "passive")
+				)
+				(pin
+					(num "C")
+					(name "C")
+					(type "passive")
+				)
+				(pin
+					(num "S1")
+					(name "S1")
+					(type "passive")
+				)
+				(pin
+					(num "S2")
+					(name "S2")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "Switch")
+			(part "SW_Push_45deg")
+			(description "Push button switch, normally open, two pins, 45° tilted")
+			(fields
+				(field
+					(name "Reference") "SW")
+				(field
+					(name "Value") "SW_Push_45deg")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Push button switch, normally open, two pins, 45° tilted")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "1")
+					(type "passive")
+				)
+				(pin
+					(num "2")
+					(name "2")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "teensy")
+			(part "Teensy4.1")
+			(fields
+				(field
+					(name "Reference") "U2")
+				(field
+					(name "Value") "Teensy4.1")
+				(field
+					(name "Footprint") "teensy:Teensy41")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "2")
+					(name "0_RX1_CRX2_CS1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "3")
+					(name "1_TX1_CTX2_MISO1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "4")
+					(name "2_OUT2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "5")
+					(name "3_LRCLK2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "6")
+					(name "4_BCLK2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "7")
+					(name "5_IN2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "8")
+					(name "6_OUT1D")
+					(type "bidirectional")
+				)
+				(pin
+					(num "9")
+					(name "7_RX2_OUT1A")
+					(type "bidirectional")
+				)
+				(pin
+					(num "10")
+					(name "8_TX2_IN1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "11")
+					(name "9_OUT1C")
+					(type "bidirectional")
+				)
+				(pin
+					(num "12")
+					(name "10_CS_MQSR")
+					(type "bidirectional")
+				)
+				(pin
+					(num "13")
+					(name "11_MOSI_CTX1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "14")
+					(name "12_MISO_MQSL")
+					(type "bidirectional")
+				)
+				(pin
+					(num "15")
+					(name "3V3")
+					(type "power_in")
+				)
+				(pin
+					(num "16")
+					(name "24_A10_TX6_SCL2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "17")
+					(name "25_A11_RX6_SDA2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "18")
+					(name "26_A12_MOSI1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "19")
+					(name "27_A13_SCK1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "20")
+					(name "28_RX7")
+					(type "bidirectional")
+				)
+				(pin
+					(num "21")
+					(name "29_TX7")
+					(type "bidirectional")
+				)
+				(pin
+					(num "22")
+					(name "30_CRX3")
+					(type "bidirectional")
+				)
+				(pin
+					(num "23")
+					(name "31_CTX3")
+					(type "bidirectional")
+				)
+				(pin
+					(num "24")
+					(name "32_OUT1B")
+					(type "bidirectional")
+				)
+				(pin
+					(num "25")
+					(name "33_MCLK2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "26")
+					(name "34_RX8")
+					(type "bidirectional")
+				)
+				(pin
+					(num "27")
+					(name "35_TX8")
+					(type "bidirectional")
+				)
+				(pin
+					(num "28")
+					(name "36_CS")
+					(type "bidirectional")
+				)
+				(pin
+					(num "29")
+					(name "37_CS")
+					(type "bidirectional")
+				)
+				(pin
+					(num "30")
+					(name "38_CS1_IN1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "31")
+					(name "39_MISO1_OUT1A")
+					(type "bidirectional")
+				)
+				(pin
+					(num "32")
+					(name "40_A16")
+					(type "bidirectional")
+				)
+				(pin
+					(num "33")
+					(name "41_A17")
+					(type "bidirectional")
+				)
+				(pin
+					(num "34")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "35")
+					(name "13_SCK_LED")
+					(type "bidirectional")
+				)
+				(pin
+					(num "36")
+					(name "14_A0_TX3_SPDIF_OUT")
+					(type "bidirectional")
+				)
+				(pin
+					(num "37")
+					(name "15_A1_RX3_SPDIF_IN")
+					(type "bidirectional")
+				)
+				(pin
+					(num "38")
+					(name "16_A2_RX4_SCL1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "39")
+					(name "17_A3_TX4_SDA1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "40")
+					(name "18_A4_SDA")
+					(type "bidirectional")
+				)
+				(pin
+					(num "41")
+					(name "19_A5_SCL")
+					(type "bidirectional")
+				)
+				(pin
+					(num "42")
+					(name "20_A6_TX5_LRCLK1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "43")
+					(name "21_A7_RX5_BCLK1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "44")
+					(name "22_A8_CTX1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "45")
+					(name "23_A9_CRX1_MCLK1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "46")
+					(name "3V3")
+					(type "power_out")
+				)
+				(pin
+					(num "47")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "48")
+					(name "VIN")
+					(type "power_in")
+				)
+				(pin
+					(num "49")
+					(name "VUSB")
+					(type "power_out")
+				)
+				(pin
+					(num "50")
+					(name "VBAT")
+					(type "power_in")
+				)
+				(pin
+					(num "51")
+					(name "3V3")
+					(type "power_in")
+				)
+				(pin
+					(num "52")
+					(name "GND")
+					(type "input")
+				)
+				(pin
+					(num "53")
+					(name "PROGRAM")
+					(type "input")
+				)
+				(pin
+					(num "54")
+					(name "ON_OFF")
+					(type "input")
+				)
+				(pin
+					(num "55")
+					(name "5V")
+					(type "power_out")
+				)
+				(pin
+					(num "56")
+					(name "D-")
+					(type "bidirectional")
+				)
+				(pin
+					(num "57")
+					(name "D+")
+					(type "bidirectional")
+				)
+				(pin
+					(num "58")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "59")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "60")
+					(name "R+")
+					(type "bidirectional")
+				)
+				(pin
+					(num "61")
+					(name "LED")
+					(type "bidirectional")
+				)
+				(pin
+					(num "62")
+					(name "T-")
+					(type "bidirectional")
+				)
+				(pin
+					(num "63")
+					(name "T+")
+					(type "bidirectional")
+				)
+				(pin
+					(num "64")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "65")
+					(name "R-")
+					(type "bidirectional")
+				)
+				(pin
+					(num "66")
+					(name "D-")
+					(type "bidirectional")
+				)
+				(pin
+					(num "67")
+					(name "D+")
+					(type "bidirectional")
+				)
+			)
+		)
+	)
+	(libraries)
+	(nets
+		(net
+			(code "1")
+			(name "+3V3")
+			(class "Default")
+			(node
+				(ref "C3")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "J2")
+				(pin "2")
+				(pinfunction "Pin_2_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "J4")
+				(pin "12")
+				(pinfunction "Pin_12_12")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "15")
+				(pinfunction "3V3_15")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U2")
+				(pin "46")
+				(pinfunction "3V3_46")
+				(pintype "power_out")
+			)
+			(node
+				(ref "U2")
+				(pin "51")
+				(pinfunction "3V3_51")
+				(pintype "power_in")
+			)
+		)
+		(net
+			(code "2")
+			(name "/+5V_USB")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "14")
+				(pinfunction "Pin_14_14")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "48")
+				(pinfunction "VIN_48")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U2")
+				(pin "49")
+				(pinfunction "VUSB_49")
+				(pintype "power_out")
+			)
+		)
+		(net
+			(code "3")
+			(name "/COL0")
+			(class "Default")
+			(node
+				(ref "SW1")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW13")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW17")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW5")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW9")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "2")
+				(pinfunction "0_RX1_CRX2_CS1_2")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "4")
+			(name "/COL1")
+			(class "Default")
+			(node
+				(ref "SW10")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW14")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW18")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW2")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW6")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "3")
+				(pinfunction "1_TX1_CTX2_MISO1_3")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "5")
+			(name "/COL2")
+			(class "Default")
+			(node
+				(ref "SW11")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW15")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW19")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW3")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW7")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "4")
+				(pinfunction "2_OUT2_4")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "6")
+			(name "/COL3")
+			(class "Default")
+			(node
+				(ref "SW12")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW16")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW20")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW4")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW8")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "5")
+				(pinfunction "3_LRCLK2_5")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "7")
+			(name "/COL_SHIFT")
+			(class "Default")
+			(node
+				(ref "SW21")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "6")
+				(pinfunction "4_BCLK2_6")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "8")
+			(name "/E1_A")
+			(class "Default")
+			(node
+				(ref "ENC1")
+				(pin "A")
+				(pinfunction "A_A")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "38")
+				(pinfunction "16_A2_RX4_SCL1_38")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "9")
+			(name "/E1_B")
+			(class "Default")
+			(node
+				(ref "ENC1")
+				(pin "B")
+				(pinfunction "B_B")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "39")
+				(pinfunction "17_A3_TX4_SDA1_39")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "10")
+			(name "/E1_SW")
+			(class "Default")
+			(node
+				(ref "ENC1")
+				(pin "S1")
+				(pinfunction "S1_S1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "27")
+				(pinfunction "35_TX8_27")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "11")
+			(name "/E2_A")
+			(class "Default")
+			(node
+				(ref "ENC2")
+				(pin "A")
+				(pinfunction "A_A")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "44")
+				(pinfunction "22_A8_CTX1_44")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "12")
+			(name "/E2_B")
+			(class "Default")
+			(node
+				(ref "ENC2")
+				(pin "B")
+				(pinfunction "B_B")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "16")
+				(pinfunction "24_A10_TX6_SCL2_16")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "13")
+			(name "/E2_SW")
+			(class "Default")
+			(node
+				(ref "ENC2")
+				(pin "S1")
+				(pinfunction "S1_S1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "28")
+				(pinfunction "36_CS_28")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "14")
+			(name "/E3_A")
+			(class "Default")
+			(node
+				(ref "ENC3")
+				(pin "A")
+				(pinfunction "A_A")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "17")
+				(pinfunction "25_A11_RX6_SDA2_17")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "15")
+			(name "/E3_B")
+			(class "Default")
+			(node
+				(ref "ENC3")
+				(pin "B")
+				(pinfunction "B_B")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "18")
+				(pinfunction "26_A12_MOSI1_18")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "16")
+			(name "/E3_SW")
+			(class "Default")
+			(node
+				(ref "ENC3")
+				(pin "S1")
+				(pinfunction "S1_S1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "29")
+				(pinfunction "37_CS_29")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "17")
+			(name "/E4_A")
+			(class "Default")
+			(node
+				(ref "ENC4")
+				(pin "A")
+				(pinfunction "A_A")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "19")
+				(pinfunction "27_A13_SCK1_19")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "18")
+			(name "/E4_B")
+			(class "Default")
+			(node
+				(ref "ENC4")
+				(pin "B")
+				(pinfunction "B_B")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "20")
+				(pinfunction "28_RX7_20")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "19")
+			(name "/E4_SW")
+			(class "Default")
+			(node
+				(ref "ENC4")
+				(pin "S1")
+				(pinfunction "S1_S1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "30")
+				(pinfunction "38_CS1_IN1_30")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "20")
+			(name "/E5_A")
+			(class "Default")
+			(node
+				(ref "ENC5")
+				(pin "A")
+				(pinfunction "A_A")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "21")
+				(pinfunction "29_TX7_21")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "21")
+			(name "/E5_B")
+			(class "Default")
+			(node
+				(ref "ENC5")
+				(pin "B")
+				(pinfunction "B_B")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "22")
+				(pinfunction "30_CRX3_22")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "22")
+			(name "/E5_SW")
+			(class "Default")
+			(node
+				(ref "ENC5")
+				(pin "S1")
+				(pinfunction "S1_S1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "31")
+				(pinfunction "39_MISO1_OUT1A_31")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "23")
+			(name "/E6_A")
+			(class "Default")
+			(node
+				(ref "ENC6")
+				(pin "A")
+				(pinfunction "A_A")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "23")
+				(pinfunction "31_CTX3_23")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "24")
+			(name "/E6_B")
+			(class "Default")
+			(node
+				(ref "ENC6")
+				(pin "B")
+				(pinfunction "B_B")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "24")
+				(pinfunction "32_OUT1B_24")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "25")
+			(name "/E6_SW")
+			(class "Default")
+			(node
+				(ref "ENC6")
+				(pin "S1")
+				(pinfunction "S1_S1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "32")
+				(pinfunction "40_A16_32")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "26")
+			(name "/E7_A")
+			(class "Default")
+			(node
+				(ref "ENC7")
+				(pin "A")
+				(pinfunction "A_A")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "25")
+				(pinfunction "33_MCLK2_25")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "27")
+			(name "/E7_B")
+			(class "Default")
+			(node
+				(ref "ENC7")
+				(pin "B")
+				(pinfunction "B_B")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "26")
+				(pinfunction "34_RX8_26")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "28")
+			(name "/E7_SW")
+			(class "Default")
+			(node
+				(ref "ENC7")
+				(pin "S1")
+				(pinfunction "S1_S1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "33")
+				(pinfunction "41_A17_33")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "29")
+			(name "/I2S_BCLK")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "9")
+				(pinfunction "Pin_9_9")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "43")
+				(pinfunction "21_A7_RX5_BCLK1_43")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "30")
+			(name "/I2S_DIN")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "9")
+				(pinfunction "Pin_9_9")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "9")
+				(pinfunction "7_RX2_OUT1A_9")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "31")
+			(name "/I2S_DOUT")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "10")
+				(pinfunction "Pin_10_10")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "10")
+				(pinfunction "8_TX2_IN1_10")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "32")
+			(name "/I2S_LRCLK")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "8")
+				(pinfunction "Pin_8_8")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "42")
+				(pinfunction "20_A6_TX5_LRCLK1_42")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "33")
+			(name "/I2S_MCLK")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "11")
+				(pinfunction "Pin_11_11")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "45")
+				(pinfunction "23_A9_CRX1_MCLK1_45")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "34")
+			(name "/ROW0")
+			(class "Default")
+			(node
+				(ref "D17")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D18")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D19")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D20")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "7")
+				(pinfunction "5_IN2_7")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "35")
+			(name "/ROW1")
+			(class "Default")
+			(node
+				(ref "D13")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D14")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D15")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D16")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "8")
+				(pinfunction "6_OUT1D_8")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "36")
+			(name "/ROW2")
+			(class "Default")
+			(node
+				(ref "D10")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D11")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D12")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D9")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "11")
+				(pinfunction "9_OUT1C_11")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "37")
+			(name "/ROW3")
+			(class "Default")
+			(node
+				(ref "D5")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D6")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D7")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D8")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "36")
+				(pinfunction "14_A0_TX3_SPDIF_OUT_36")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "38")
+			(name "/ROW4")
+			(class "Default")
+			(node
+				(ref "D1")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D2")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D21")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D3")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "D4")
+				(pin "1")
+				(pinfunction "K_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "37")
+				(pinfunction "15_A1_RX3_SPDIF_IN_37")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "39")
+			(name "/SCL")
+			(class "Default")
+			(node
+				(ref "J2")
+				(pin "3")
+				(pinfunction "Pin_3_3")
+				(pintype "passive")
+			)
+			(node
+				(ref "J4")
+				(pin "7")
+				(pinfunction "Pin_7_7")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "41")
+				(pinfunction "19_A5_SCL_41")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "40")
+			(name "/SDA")
+			(class "Default")
+			(node
+				(ref "J2")
+				(pin "4")
+				(pinfunction "Pin_4_4")
+				(pintype "passive")
+			)
+			(node
+				(ref "J4")
+				(pin "6")
+				(pinfunction "Pin_6_6")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "40")
+				(pinfunction "18_A4_SDA_40")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "41")
+			(name "GND")
+			(class "Default")
+			(node
+				(ref "C3")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC1")
+				(pin "C")
+				(pinfunction "C_C")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC1")
+				(pin "S2")
+				(pinfunction "S2_S2")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC2")
+				(pin "C")
+				(pinfunction "C_C")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC2")
+				(pin "S2")
+				(pinfunction "S2_S2")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC3")
+				(pin "C")
+				(pinfunction "C_C")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC3")
+				(pin "S2")
+				(pinfunction "S2_S2")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC4")
+				(pin "C")
+				(pinfunction "C_C")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC4")
+				(pin "S2")
+				(pinfunction "S2_S2")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC5")
+				(pin "C")
+				(pinfunction "C_C")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC5")
+				(pin "S2")
+				(pinfunction "S2_S2")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC6")
+				(pin "C")
+				(pinfunction "C_C")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC6")
+				(pin "S2")
+				(pinfunction "S2_S2")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC7")
+				(pin "C")
+				(pinfunction "C_C")
+				(pintype "passive")
+			)
+			(node
+				(ref "ENC7")
+				(pin "S2")
+				(pinfunction "S2_S2")
+				(pintype "passive")
+			)
+			(node
+				(ref "J2")
+				(pin "1")
+				(pinfunction "Pin_1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "J3")
+				(pin "1")
+				(pinfunction "Pin_1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "J4")
+				(pin "13")
+				(pinfunction "Pin_13_13")
+				(pintype "passive")
+			)
+			(node
+				(ref "U2")
+				(pin "1")
+				(pinfunction "GND_1")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U2")
+				(pin "34")
+				(pinfunction "GND_34")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U2")
+				(pin "47")
+				(pinfunction "GND_47")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U2")
+				(pin "52")
+				(pinfunction "GND_52")
+				(pintype "input")
+			)
+			(node
+				(ref "U2")
+				(pin "58")
+				(pinfunction "GND_58")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U2")
+				(pin "59")
+				(pinfunction "GND_59")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U2")
+				(pin "64")
+				(pinfunction "GND_64")
+				(pintype "power_in")
+			)
+		)
+		(net
+			(code "42")
+			(name "Net-(D1-A)")
+			(class "Default")
+			(node
+				(ref "D1")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW1")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "43")
+			(name "Net-(D2-A)")
+			(class "Default")
+			(node
+				(ref "D2")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW2")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "44")
+			(name "Net-(D3-A)")
+			(class "Default")
+			(node
+				(ref "D3")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW3")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "45")
+			(name "Net-(D4-A)")
+			(class "Default")
+			(node
+				(ref "D4")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW4")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "46")
+			(name "Net-(D5-A)")
+			(class "Default")
+			(node
+				(ref "D5")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW5")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "47")
+			(name "Net-(D6-A)")
+			(class "Default")
+			(node
+				(ref "D6")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW6")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "48")
+			(name "Net-(D7-A)")
+			(class "Default")
+			(node
+				(ref "D7")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW7")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "49")
+			(name "Net-(D8-A)")
+			(class "Default")
+			(node
+				(ref "D8")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW8")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "50")
+			(name "Net-(D9-A)")
+			(class "Default")
+			(node
+				(ref "D9")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW9")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "51")
+			(name "Net-(D10-A)")
+			(class "Default")
+			(node
+				(ref "D10")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW10")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "52")
+			(name "Net-(D11-A)")
+			(class "Default")
+			(node
+				(ref "D11")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW11")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "53")
+			(name "Net-(D12-A)")
+			(class "Default")
+			(node
+				(ref "D12")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW12")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "54")
+			(name "Net-(D13-A)")
+			(class "Default")
+			(node
+				(ref "D13")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW13")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "55")
+			(name "Net-(D14-A)")
+			(class "Default")
+			(node
+				(ref "D14")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW14")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "56")
+			(name "Net-(D15-A)")
+			(class "Default")
+			(node
+				(ref "D15")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW15")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "57")
+			(name "Net-(D16-A)")
+			(class "Default")
+			(node
+				(ref "D16")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW16")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "58")
+			(name "Net-(D17-A)")
+			(class "Default")
+			(node
+				(ref "D17")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW17")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "59")
+			(name "Net-(D18-A)")
+			(class "Default")
+			(node
+				(ref "D18")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW18")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "60")
+			(name "Net-(D19-A)")
+			(class "Default")
+			(node
+				(ref "D19")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW19")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "61")
+			(name "Net-(D20-A)")
+			(class "Default")
+			(node
+				(ref "D20")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW20")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "62")
+			(name "Net-(D21-A)")
+			(class "Default")
+			(node
+				(ref "D21")
+				(pin "2")
+				(pinfunction "A_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "SW21")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "63")
+			(name "unconnected-(J3-Pin_2-Pad2)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "2")
+				(pinfunction "Pin_2_2")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "64")
+			(name "unconnected-(J3-Pin_3-Pad3)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "3")
+				(pinfunction "Pin_3_3")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "65")
+			(name "unconnected-(J3-Pin_4-Pad4)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "4")
+				(pinfunction "Pin_4_4")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "66")
+			(name "unconnected-(J3-Pin_5-Pad5)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "5")
+				(pinfunction "Pin_5_5")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "67")
+			(name "unconnected-(J3-Pin_6-Pad6)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "6")
+				(pinfunction "Pin_6_6")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "68")
+			(name "unconnected-(J3-Pin_7-Pad7)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "7")
+				(pinfunction "Pin_7_7")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "69")
+			(name "unconnected-(J3-Pin_8-Pad8)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "8")
+				(pinfunction "Pin_8_8")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "70")
+			(name "unconnected-(J3-Pin_11-Pad11)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "11")
+				(pinfunction "Pin_11_11")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "71")
+			(name "unconnected-(J3-Pin_12-Pad12)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "12")
+				(pinfunction "Pin_12_12")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "72")
+			(name "unconnected-(J3-Pin_13-Pad13)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "13")
+				(pinfunction "Pin_13_13")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "73")
+			(name "unconnected-(J3-Pin_14-Pad14)")
+			(class "Default")
+			(node
+				(ref "J3")
+				(pin "14")
+				(pinfunction "Pin_14_14")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "74")
+			(name "unconnected-(J4-Pin_1-Pad1)")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "1")
+				(pinfunction "Pin_1_1")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "75")
+			(name "unconnected-(J4-Pin_2-Pad2)")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "2")
+				(pinfunction "Pin_2_2")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "76")
+			(name "unconnected-(J4-Pin_3-Pad3)")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "3")
+				(pinfunction "Pin_3_3")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "77")
+			(name "unconnected-(J4-Pin_4-Pad4)")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "4")
+				(pinfunction "Pin_4_4")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "78")
+			(name "unconnected-(J4-Pin_5-Pad5)")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "5")
+				(pinfunction "Pin_5_5")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "79")
+			(name "unconnected-(J4-Pin_10-Pad10)")
+			(class "Default")
+			(node
+				(ref "J4")
+				(pin "10")
+				(pinfunction "Pin_10_10")
+				(pintype "passive+no_connect")
+			)
+		)
+		(net
+			(code "80")
+			(name "unconnected-(U2-5V-Pad55)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "55")
+				(pinfunction "5V_55")
+				(pintype "power_out+no_connect")
+			)
+		)
+		(net
+			(code "81")
+			(name "unconnected-(U2-10_CS_MQSR-Pad12)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "12")
+				(pinfunction "10_CS_MQSR_12")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "82")
+			(name "unconnected-(U2-11_MOSI_CTX1-Pad13)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "13")
+				(pinfunction "11_MOSI_CTX1_13")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "83")
+			(name "unconnected-(U2-12_MISO_MQSL-Pad14)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "14")
+				(pinfunction "12_MISO_MQSL_14")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "84")
+			(name "unconnected-(U2-13_SCK_LED-Pad35)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "35")
+				(pinfunction "13_SCK_LED_35")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "85")
+			(name "unconnected-(U2-D+-Pad57)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "57")
+				(pinfunction "D+_57")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "86")
+			(name "unconnected-(U2-D+-Pad67)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "67")
+				(pinfunction "D+_67")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "87")
+			(name "unconnected-(U2-D--Pad56)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "56")
+				(pinfunction "D-_56")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "88")
+			(name "unconnected-(U2-D--Pad66)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "66")
+				(pinfunction "D-_66")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "89")
+			(name "unconnected-(U2-LED-Pad61)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "61")
+				(pinfunction "LED_61")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "90")
+			(name "unconnected-(U2-ON_OFF-Pad54)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "54")
+				(pinfunction "ON_OFF_54")
+				(pintype "input+no_connect")
+			)
+		)
+		(net
+			(code "91")
+			(name "unconnected-(U2-PROGRAM-Pad53)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "53")
+				(pinfunction "PROGRAM_53")
+				(pintype "input+no_connect")
+			)
+		)
+		(net
+			(code "92")
+			(name "unconnected-(U2-R+-Pad60)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "60")
+				(pinfunction "R+_60")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "93")
+			(name "unconnected-(U2-R--Pad65)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "65")
+				(pinfunction "R-_65")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "94")
+			(name "unconnected-(U2-T+-Pad63)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "63")
+				(pinfunction "T+_63")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "95")
+			(name "unconnected-(U2-T--Pad62)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "62")
+				(pinfunction "T-_62")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "96")
+			(name "unconnected-(U2-VBAT-Pad50)")
+			(class "Default")
+			(node
+				(ref "U2")
+				(pin "50")
+				(pinfunction "VBAT_50")
+				(pintype "power_in+no_connect")
+			)
+		)
+	)
+)
