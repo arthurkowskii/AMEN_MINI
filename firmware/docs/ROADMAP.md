@@ -79,12 +79,13 @@ AMEN_MINI est une machine à breaks autonome : on pose un break sur la SD, elle 
 - DoD : un break boucle sans artefact pendant 30 s, 2e appui stoppe net ; one-shot s'arrête à la fin du range ou au relâchement (gate).
 - Vérification : écoute + test de durée (la boucle ne retourne jamais false).
 
-## J8 — Granulaire [V0 LIVRÉ — CLOUD par pad ; scan/pitch par grain à venir] — P2
+## J8 — Granulaire [V1 — GRANULAR par pad : modes CLOUD/PITCH/RISE ; scan à venir] — P2
 
 - Objectif : mode de lecture granulaire sur un pad (taille de grain, densité, scan, direction, pitch par grain).
-- Fichiers : `src/engine/granular.h` + `granular.cpp` (nuage granulaire), intégration mode pad `CLOUD` (rotation E5), test `granular_test.cpp`.
-- V0 livré (plan spectral 7.3) : la plage assignée devient un nuage — grains de 30 à 150 ms, un toutes les ~22 ms, 8 grains simultanés maximum, positions/longueurs déterministes par pad, enveloppes Hann sans clic, PCM emprunté (jamais copié), arrêt en fondu ~10 ms. Mesure native : ~13 ms CPU par seconde d'audio (1,3 %).
-- Reste à venir : scan piloté (fixe/auto/encodeur), densité réglable, direction, pitch par grain, retrig synchro BPM.
+- Fichiers : `src/engine/granular.h` + `granular.cpp` (nuage granulaire), intégration mode pad `GRANULAR` (rotation E5), test `granular_test.cpp`.
+- V0 livré (plan spectral 7.3) : la plage assignée devient un nuage — grains de 30 à 150 ms, un toutes les ~22 ms, 8 grains simultanés maximum, positions/longueurs déterministes par pad, enveloppes Hann sans clic, PCM emprunté (jamais copié), arrêt en fondu ~10 ms.
+- V1 (P0 slew/granulaire, inspiré Kentaro + (un)familiar.) : le mode pad devient `GRANULAR`, `CLOUD` devient un mode de grains parmi trois — `CLOUD` (lecture naturelle), `PITCH` (hauteur par grain tirée dans +/- 0..24 st, réglage E2), `RISE` (glide par grain de -plage à +plage). Densité réglable x0.25..x4.0 (E3, cadence recalculée à chaque spawn : réglage live), lecture interpolée linéairement (jamais hors plage, même à 400 %). Mesure native : ~3 ms CPU par seconde d'audio (0,3 %).
+- Reste à venir : scan piloté (fixe/auto/encodeur), direction, retrig synchro BPM.
 - Spec : grains de 10-100 ms lus dans le range du pad, position de scan pilotée (fixe, auto, ou encodeur), densité (grains/s), direction (avant/arrière), pitch par grain (speed_ du grain). Le retrig des grains peut être calé sur le tempo global (BPM → frames).
 - DoD : un pad granulaire joue un nuage texturé stable, sans clic ni dépassement CPU (mesure du temps de render sur PC).
 - Vérification : écoute + mesure (durée de render < budget du bloc).

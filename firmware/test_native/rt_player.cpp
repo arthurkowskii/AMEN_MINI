@@ -28,6 +28,8 @@
 #include "screen_ui.h"
 #include "transient_detector.h"
 #include "fx/live_repeat.h"
+#include "fx/phase_distortion.h"
+#include "fx/reverse_player.h"
 #include "fx/spectral_freeze.h"
 #include "fx/spectral_gate.h"
 #include "voice_manager.h"
@@ -88,10 +90,29 @@ std::atomic<int> g_repeatAmountPercent{100};
 std::atomic<int> g_repeatDivision{0};
 std::atomic<int> g_bpm{145};
 std::atomic<bool> g_repeatActive{false};
+std::atomic<int> g_repeatMode{0};  // 0 = LOOP, 1 = SHEPARD
 std::atomic<bool> g_gateActive{false};
 SpectralGate g_spectralGate{kOutputSampleRate};
 std::atomic<bool> g_freezeActive{false};
 SpectralFreeze g_spectralFreeze{kOutputSampleRate};
+// REVERSE (pad FX) : boucle inversee de la fenetre precedant l'appui (2 s).
+constexpr std::size_t kReverseBufferFrames =
+    ReversePlayer::requiredBufferFrames(kOutputSampleRate);
+std::array<float, kReverseBufferFrames> g_reverseHistoryL{};
+std::array<float, kReverseBufferFrames> g_reverseHistoryR{};
+std::array<float, kReverseBufferFrames> g_reverseFrozenL{};
+std::array<float, kReverseBufferFrames> g_reverseFrozenR{};
+ReversePlayer g_reverse{kOutputSampleRate,
+                        g_reverseHistoryL.data(),
+                        g_reverseHistoryR.data(),
+                        g_reverseFrozenL.data(),
+                        g_reverseFrozenR.data(),
+                        kReverseBufferFrames};
+std::atomic<bool> g_reverseActive{false};
+// PHASE DIST (pad FX) : allpass a coefficient variable, sans buffer.
+PhaseDistortion g_phase{kOutputSampleRate};
+std::atomic<bool> g_phaseActive{false};
+std::atomic<int> g_phaseMode{0};  // index PhaseDistMode
 std::atomic<bool> g_running{true};
 std::mutex g_audioMutex;
 
@@ -123,30 +144,75 @@ HarnessVoiceStopper g_voiceStopper;
 // navigateur. Chemin de controle uniquement, jamais dans le callback audio.
 BrowserInteraction g_browserInteraction;
 // Nombre d'effets assignables hors BLANK : REPEAT, REVERSE, TRANCE GATE,
-// FREEZE. La liste kFxNames compte kFxCount + 1 entrees (BLANK compris) ;
-// le modulo du cycle FX est donc (kFxCount + 1) et couvre exactement les
-// indices valides. Ne pas modifier kFxNames sans ajuster kFxCount : la
-// static_assert ci-dessous fait echouer la compilation sinon.
-constexpr int kFxCount = 4;
+// FREEZE, PHASE DIST. La liste kFxNames compte kFxCount + 1 entrees
+// (BLANK compris) ; le modulo du cycle FX est donc (kFxCount + 1) et couvre
+// exactement les indices valides. Ne pas modifier kFxNames sans ajuster
+// kFxCount : la static_assert ci-dessous fait echouer la compilation sinon.
+constexpr int kFxCount = 5;
 constexpr int kRepeatFx = 1;
+constexpr int kReverseFx = 2;
 constexpr int kGateFx = 3;
 constexpr int kFreezeFx = 4;
+constexpr int kPhaseFx = 5;
 const char* kFxNames[] = {"BLANK", "REPEAT", "REVERSE", "TRANCE GATE",
-                          "FREEZE"};
+                          "FREEZE", "PHASE DIST"};
 static_assert(sizeof(kFxNames) / sizeof(kFxNames[0]) ==
                   static_cast<std::size_t>(kFxCount) + 1U,
               "kFxCount doit laisser BLANK + kFxCount effets dans kFxNames");
 const char* kDivisionNames[] = {"1/4", "1/8", "1/12", "1/16", "1/24", "1/32"};
 const char* kEncoderNames[] = {"E1 NAV", "E2 AMOUNT", "E3 DIVISION", "E4 SPEED",
-                               "E5 MODE", "E6 LFO", "E7 BPM"};
+                               "E5 MODE", "E6 MODE", "E7 BPM"};
+
+// Libelles des modes granulaires (cycle E6, pad GRANULAR tenu) et des modes
+// de PHASE DIST (cycle E6, pad PHASE DIST tenu).
+const char* grain_mode_label(int grainMode) {
+    switch (grainMode) {
+        case 1:
+            return "PITCH";
+        case 2:
+            return "RISE";
+        default:
+            return "CLOUD";
+    }
+}
+
+const char* phase_mode_label(int phaseMode) {
+    switch (phaseMode) {
+        case 1:
+            return "PHASE SAW";
+        case 2:
+            return "PHASE SQUARE";
+        case 3:
+            return "PHASE SELF";
+        default:
+            return "PHASE SINE";
+    }
+}
+
+PhaseDistMode phase_mode(int index) {
+    switch (index) {
+        case 1:
+            return PhaseDistMode::Saw;
+        case 2:
+            return PhaseDistMode::Square;
+        case 3:
+            return PhaseDistMode::Self;
+        default:
+            return PhaseDistMode::Sine;
+    }
+}
 
 // Réglages propres à chaque pad voix : la vitesse et le mode vivent ici,
 // jamais dans une variable globale. La cible des encodeurs E4/E5 est le pad
-// tenu (heldVoicePad), pas le dernier pad joué.
+// tenu (heldVoicePad), pas le dernier pad joué. Le mode granulaire, la plage
+// de hauteur et la densite du pad GRANULAR vivent ici aussi (E6/E2/E3).
 struct PadSettings {
     int speedPercent = 100;
     PlaybackMode mode = PlaybackMode::OneShot;
     TriggerBehavior behavior = TriggerBehavior::Gate;
+    int grainMode = 0;       // GrainMode::Cloud
+    int grainPitchSt = 12;   // plage de hauteur +/- demi-tons (0..24)
+    int grainDensity = 4;    // x0.25 => 1.0 (0.25..4.0 par pas de 1)
 };
 
 struct UiSimulation {
@@ -449,7 +515,7 @@ const char* mode_label(PlaybackMode mode) {
         case PlaybackMode::Loop:
             return "LOOP";
         case PlaybackMode::Granular:
-            return "CLOUD";
+            return "GRANULAR";
         case PlaybackMode::SliceSync:
             return "SLICE SYNC";
     }
@@ -519,15 +585,17 @@ PadTriggerAction apply_pad_down_audio(int pad, const UiSimulation& simulation,
     const auto padId = static_cast<VoiceManager::PadId>(pad);
 
     if (settings.mode == PlaybackMode::Granular) {
-        // CLOUD (plan 7.3) : la plage assignee devient un nuage granulaire.
-        // Meme logique GATE/LATCH que les autres modes, mais sans passer par
+        // GRANULAR (plan 7.3 / J8) : la plage assignee devient un nuage de
+        // grains (mode CLOUD/PITCH/RISE, hauteur, densite). Meme logique
+        // GATE/LATCH que les autres modes, mais sans passer par
         // VoiceManager : le nuage emprunte le PCM (jamais copie) et rend dans
         // le callback audio, sous le meme verrou.
-        const bool playing = g_padClouds[pad].active();
+        GrainCloud& cloud = g_padClouds[pad];
+        const bool playing = cloud.active();
         const PadTriggerAction action =
             padDownAction(settings.mode, settings.behavior, playing);
         if (action == PadTriggerAction::Stop) {
-            g_padClouds[pad].stop();
+            cloud.stop();
         } else {
             std::size_t start = 0;
             std::size_t end = pcm.frameCount();
@@ -542,7 +610,10 @@ PadTriggerAction apply_pad_down_audio(int pad, const UiSimulation& simulation,
             // propre nuage, reproductible a l'identique.
             const std::uint32_t seed =
                 static_cast<std::uint32_t>(pad + 1U) * 2654435761U;
-            g_padClouds[pad].start(pcm, start, end, speed, seed);
+            cloud.setMode(static_cast<GrainMode>(settings.grainMode));
+            cloud.setPitchRangeSemitones(settings.grainPitchSt);
+            cloud.setDensity(static_cast<float>(settings.grainDensity) * 0.25f);
+            cloud.start(pcm, start, end, speed, seed);
         }
         return action;
     }
@@ -616,20 +687,52 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
             }
             break;
         case 2:
-            simulation.effectAmount =
-                std::clamp(simulation.effectAmount + direction * 5, 0, 100);
-            g_repeatAmountPercent.store(simulation.effectAmount);
-            screen.showParameter("FX AMOUNT", simulation.effectAmount, 0, 100, time, "%");
-            std::printf("repeat amount : %d%%\n", simulation.effectAmount);
+            if (simulation.heldVoicePad >= 0 &&
+                simulation.pads[simulation.heldVoicePad].mode ==
+                    PlaybackMode::Granular) {
+                // Pad GRANULAR tenu : E2 regle la plage de hauteur par
+                // grain (+/- demi-tons), sinon FX AMOUNT global.
+                PadSettings& settings =
+                    simulation.pads[simulation.heldVoicePad];
+                settings.grainPitchSt =
+                    std::clamp(settings.grainPitchSt + direction, 0, 24);
+                std::printf("pad %d pitch : +/-%d st\n",
+                            simulation.heldVoicePad + 1,
+                            settings.grainPitchSt);
+                screen.showParameter("PITCH RANGE", settings.grainPitchSt, 0,
+                                     24, time, "ST");
+            } else {
+                simulation.effectAmount =
+                    std::clamp(simulation.effectAmount + direction * 5, 0, 100);
+                g_repeatAmountPercent.store(simulation.effectAmount);
+                screen.showParameter("FX AMOUNT", simulation.effectAmount, 0, 100, time, "%");
+                std::printf("repeat amount : %d%%\n", simulation.effectAmount);
+            }
             break;
         case 3:
-            simulation.repeatDivision =
-                (simulation.repeatDivision + direction + 6) % 6;
-            g_repeatDivision.store(simulation.repeatDivision);
-            screen.showParameter(kDivisionNames[simulation.repeatDivision],
-                                  simulation.repeatDivision, 0, 5, time);
-            std::printf("repeat division : %s\n",
-                        kDivisionNames[simulation.repeatDivision]);
+            if (simulation.heldVoicePad >= 0 &&
+                simulation.pads[simulation.heldVoicePad].mode ==
+                    PlaybackMode::Granular) {
+                // Pad GRANULAR tenu : E3 regle la densite de grains
+                // (x0.25 par pas), sinon division du REPEAT.
+                PadSettings& settings =
+                    simulation.pads[simulation.heldVoicePad];
+                settings.grainDensity =
+                    std::clamp(settings.grainDensity + direction, 1, 16);
+                std::printf("pad %d densite : x%.2f\n",
+                            simulation.heldVoicePad + 1,
+                            static_cast<float>(settings.grainDensity) * 0.25f);
+                screen.showParameter("DENSITY", settings.grainDensity, 1, 16,
+                                     time);
+            } else {
+                simulation.repeatDivision =
+                    (simulation.repeatDivision + direction + 6) % 6;
+                g_repeatDivision.store(simulation.repeatDivision);
+                screen.showParameter(kDivisionNames[simulation.repeatDivision],
+                                     simulation.repeatDivision, 0, 5, time);
+                std::printf("repeat division : %s\n",
+                            kDivisionNames[simulation.repeatDivision]);
+            }
             break;
         case 4:
             if (simulation.heldVoicePad >= 0) {
@@ -652,7 +755,38 @@ void encoder_turn(int direction, ScreenUi& screen, UiSimulation& simulation,
             }
             break;
         case 6:
-            screen.showParameter("E6 LFO RESERVE", 0, 0, 0, time);
+            // E6 est contextuel : mode granulaire sur pad voix GRANULAR
+            // tenu (CLOUD/PITCH/RISE), mode LOOP/SHEPARD sur pad FX REPEAT
+            // tenu, forme du modulateur sur pad FX PHASE DIST tenu.
+            if (simulation.heldVoicePad >= 0 &&
+                simulation.pads[simulation.heldVoicePad].mode ==
+                    PlaybackMode::Granular) {
+                PadSettings& settings =
+                    simulation.pads[simulation.heldVoicePad];
+                settings.grainMode = (settings.grainMode + 1) % 3;
+                std::printf("pad %d granulaire : %s\n",
+                            simulation.heldVoicePad + 1,
+                            grain_mode_label(settings.grainMode));
+                screen.showParameter(grain_mode_label(settings.grainMode),
+                                     settings.grainMode, 0, 2, time);
+            } else if (simulation.heldFxPad >= 0 &&
+                       simulation.fxAssign[simulation.heldFxPad] == kRepeatFx) {
+                const int next = (g_repeatMode.load() + 1) % 2;
+                g_repeatMode.store(next);
+                std::printf("repeat mode : %s\n",
+                            next == 0 ? "LOOP" : "SHEPARD");
+                screen.showParameter(next == 0 ? "REPEAT LOOP"
+                                               : "REPEAT SHEPARD",
+                                     next, 0, 1, time);
+            } else if (simulation.heldFxPad >= 0 &&
+                       simulation.fxAssign[simulation.heldFxPad] == kPhaseFx) {
+                const int next = (g_phaseMode.load() + 1) % 4;
+                g_phaseMode.store(next);
+                std::printf("phase mode : %s\n", phase_mode_label(next));
+                screen.showParameter(phase_mode_label(next), next, 0, 3, time);
+            } else {
+                screen.showParameter("E6 LFO RESERVE", 0, 0, 0, time);
+            }
             break;
         case 7:
             simulation.bpm = std::clamp(simulation.bpm + direction, 20, 300);
@@ -671,8 +805,10 @@ void encoder_click(ScreenUi& screen, UiSimulation& simulation, AppState& state) 
             if (simulation.heldFxPad >= 0) {
                 simulation.fxAssign[simulation.heldFxPad] = simulation.fxCandidate;
                 g_repeatActive.store(simulation.fxCandidate == kRepeatFx);
+                g_reverseActive.store(simulation.fxCandidate == kReverseFx);
                 g_gateActive.store(simulation.fxCandidate == kGateFx);
                 g_freezeActive.store(simulation.fxCandidate == kFreezeFx);
+                g_phaseActive.store(simulation.fxCandidate == kPhaseFx);
                 screen.showFxPad(7 + simulation.heldFxPad,
                                  kFxNames[simulation.fxCandidate], 1);
                 std::printf("pad %d : FX = %s\n", 7 + simulation.heldFxPad,
@@ -758,8 +894,10 @@ void fx_pad_down(int pad, ScreenUi& screen, UiSimulation& simulation) {
     simulation.heldFxPad = pad;
     simulation.fxCandidate = simulation.fxAssign[pad];
     g_repeatActive.store(simulation.fxCandidate == kRepeatFx);
+    g_reverseActive.store(simulation.fxCandidate == kReverseFx);
     g_gateActive.store(simulation.fxCandidate == kGateFx);
     g_freezeActive.store(simulation.fxCandidate == kFreezeFx);
+    g_phaseActive.store(simulation.fxCandidate == kPhaseFx);
     screen.showFxPad(7 + pad, kFxNames[simulation.fxCandidate],
                      simulation.selectedEncoder);
     std::printf("pad %d : %s\n", 7 + pad, kFxNames[simulation.fxCandidate]);
@@ -769,8 +907,10 @@ void fx_pad_up(int pad, ScreenUi& screen, UiSimulation& simulation,
                AppState& state) {
     if (simulation.heldFxPad != pad) return;
     g_repeatActive.store(false);
+    g_reverseActive.store(false);
     g_gateActive.store(false);
     g_freezeActive.store(false);
+    g_phaseActive.store(false);
     simulation.heldFxPad = -1;
     if (state.browserActive) {
         refresh_browser(screen, state);
@@ -993,6 +1133,17 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
         set_pad_mode(simulation.lastPadId,
                      next_mode(simulation.pads[simulation.lastPadId].mode),
                      screen, simulation, time);
+    } else if (c == 'p') {
+        // Cycle du mode granulaire du dernier pad (CLOUD/PITCH/RISE).
+        PadSettings& settings = simulation.pads[simulation.lastPadId];
+        settings.grainMode = (settings.grainMode + 1) % 3;
+        std::printf("pad %d granulaire : %s\n", simulation.lastPadId + 1,
+                    grain_mode_label(settings.grainMode));
+    } else if (c == 's') {
+        // Bascule du mode REPEAT (LOOP/SHEPARD).
+        const int next = (g_repeatMode.load() + 1) % 2;
+        g_repeatMode.store(next);
+        std::printf("repeat mode : %s\n", next == 0 ? "LOOP" : "SHEPARD");
     } else if (c == 'g') {
         toggle_pad_behavior(simulation.lastPadId, screen, simulation, time);
     } else if (c == 'e') {
@@ -1058,7 +1209,10 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     static bool appliedGateActive = false;
     const int targetAmountPercent = g_repeatAmountPercent.load();
     if (targetAmountPercent != appliedAmountPercent) {
-        g_repeat.setAmount(static_cast<float>(targetAmountPercent) / 100.0f);
+        const float amount = static_cast<float>(targetAmountPercent) / 100.0f;
+        g_repeat.setAmount(amount);
+        g_reverse.setAmount(amount);
+        g_phase.setAmount(amount);
         appliedAmountPercent = targetAmountPercent;
     }
     const int targetDivision = g_repeatDivision.load();
@@ -1076,6 +1230,31 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
     if (targetRepeatActive != appliedRepeatActive) {
         g_repeat.setActive(targetRepeatActive);
         appliedRepeatActive = targetRepeatActive;
+    }
+    static int appliedRepeatMode = 0;
+    const int targetRepeatMode = g_repeatMode.load();
+    if (targetRepeatMode != appliedRepeatMode) {
+        g_repeat.setMode(targetRepeatMode == 0 ? RepeatMode::Loop
+                                               : RepeatMode::Shepard);
+        appliedRepeatMode = targetRepeatMode;
+    }
+    static int appliedPhaseMode = 0;
+    const int targetPhaseMode = g_phaseMode.load();
+    if (targetPhaseMode != appliedPhaseMode) {
+        g_phase.setMode(phase_mode(targetPhaseMode));
+        appliedPhaseMode = targetPhaseMode;
+    }
+    const bool targetReverseActive = g_reverseActive.load();
+    static bool appliedReverseActive = false;
+    if (targetReverseActive != appliedReverseActive) {
+        g_reverse.setActive(targetReverseActive);
+        appliedReverseActive = targetReverseActive;
+    }
+    const bool targetPhaseActive = g_phaseActive.load();
+    static bool appliedPhaseActive = false;
+    if (targetPhaseActive != appliedPhaseActive) {
+        g_phase.setActive(targetPhaseActive);
+        appliedPhaseActive = targetPhaseActive;
     }
     const bool targetGateActive = g_gateActive.load();
     if (targetGateActive != appliedGateActive) {
@@ -1103,6 +1282,8 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
                                     static_cast<int>(count));
         }
         g_repeat.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
+        g_reverse.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
+        g_phase.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_spectralGate.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         g_spectralFreeze.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         // COMMIT : le mix final (post-FX) alimente l'anneau retrospectif.
@@ -1163,8 +1344,15 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "impossible d'ouvrir l'apercu OLED\n");
     }
 
-    std::printf("numpad 1-6 : pads voix (appui selon ONE SHOT/LOOP + GATE/LATCH ; tenir + E1 navigateur, + E4 vitesse, + E5 rotation lecture/clic comportement)\n");
-    std::printf("numpad 7-9 : pads FX | F1-F7 : encodeurs | espace : simule appui dernier pad | E6 : LFO reserve | q : quitter\n");
+    // Slew de transition des FX : 15 ms de glissement a l'activation
+    // (courbe de transition "liquide", aucun clic de commutation).
+    g_repeat.setSlewFrames(720U);
+    g_reverse.setSlewFrames(720U);
+    g_phase.setSlewFrames(720U);
+    g_phase.setRateHz(1.0f);
+
+    std::printf("numpad 1-6 : pads voix (appui selon ONE SHOT/LOOP/GRANULAR + GATE/LATCH ; tenir + E1 navigateur, + E4 vitesse, + E5 rotation lecture/clic comportement, + E6 mode granulaire CLOUD/PITCH/RISE, + E2 pitch +/-st, + E3 densite)\n");
+    std::printf("numpad 7-9 : pads FX (BLANK/REPEAT/REVERSE/TRANCE GATE/FREEZE/PHASE DIST ; E6 sur REPEAT = LOOP/SHEPARD, sur PHASE DIST = SINE/SAW/SQUARE/SELF) | F1-F7 : encodeurs | espace : simule appui dernier pad | q : quitter\n");
     std::printf("entree : clic | tenir entree 600 ms sur un WAV : menu ALL PADS / TRANSIENT / CANCEL (entree confirme, retour arriere annule)\n");
     key_loop(screen, preview, state);
 

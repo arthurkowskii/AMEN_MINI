@@ -17,7 +17,7 @@ constexpr PadTriggerAction padDownAction(PlaybackMode mode,
                                          TriggerBehavior behavior,
                                          bool isPlaying) {
     // Un deuxieme appui en LATCH arrete la lecture pour les modes qui
-    // tournent en continu (LOOP et CLOUD), et seulement eux : ONE SHOT en
+    // tournent en continu (LOOP et GRANULAR), et seulement eux : ONE SHOT en
     // LATCH se rejoue a chaque appui tant que la voix vit.
     if ((mode == PlaybackMode::Loop || mode == PlaybackMode::Granular) &&
         behavior == TriggerBehavior::Latch && isPlaying) {
