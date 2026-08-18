@@ -232,9 +232,20 @@ Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis 
 - L'overlay paramètre reste affiché tant que l'encodeur sélectionné tourne (disparaît 1 s après la dernière interaction, pas 1 s fixe).
 - Les noms techniques longs utilisent des abréviations : `1/8T` (Eighth Triplet), `1/16T` (Sixteenth Triplet). Gain de place immédiat sur le 128×32.
 
+## J15 — Micro intégré façon "pocket operator" [À PLANIFIER] — P1
+
+- Objectif : enregistrer des sons directement dans la machine via un micro intégré (supprime le flux Zoom → SD → AMEN). Workflow : pointer la machine, faire le bruit, Shift+pad = COMMIT rétrospectif 15 s → 12 chops auto.
+- Hardware (ZÉRO PCB) : le shield Audio Adapter expose **2 pads dédiés MIC + GND** (points de soudure sur la carte, µ officiel PJRC = capsule électret PUI AOM-6738P, 2 fils, ~1,25 $ chez SparkFun ; équivalent capsule électret 2 tubes ~1 € sur AliExpress ou récup'd'un micro usagé). Le codec SGTL5000 fournit bias + préampli micro (rien à ajouter). La carte AMEN_MINI ne transporte aucun signal analogique (vérifié netlist : J3/J4 = I2C + I2S + alim uniquement) → aucun port consommé, J3/J4 inchangés.
+- Firmware (J12/J4, couche Teensy) :
+  - graine d'entrée AudioInputI2S dans le graphe ; sgtl5000.inputSelect(AUDIO_INPUT_MIC) + réglage micGain ;
+  - diriger l'entrée micro vers le ring buffer 15 s du COMMIT (mono dupliqué sur les 2 canaux pour ne pas toucher au ring existant ; 2,6 Mo déjà budgétés en PSRAM) ;
+  - source de capture sélectionnable MIX / LINE / MIC (candidat : menu Shift ou E6 réservé).
+- Limites V0 : mono (dupliqué), une seule source d'entrée à la fois (ADC unique du codec), 15 s max par prise.
+- Après validation à l'écoute (P2) : limiteur/AGC façon PO côté moteur portable, micro déporté en façade via fil blindé court, puis (v2 PCB seulement) micro + trou de fixation intégrés à la carte.
+
 ## Priorités
 
-- P1 (chemin critique démo) : J3 + **crossfade vol de voix 64 frames**, J4, J5, J7 + **mode=latch**, J10 Repeat V1 + **Triplets E3** + **noms abrégés (1/8T, 1/16T)**, **REVERSE DSP**, J12 + **AudioStream/SGTL5000 callback**, J13 + **overlay persistant + scroll horizontal SD**, J14.
+- P1 (chemin critique démo) : J3 + **crossfade vol de voix 64 frames**, J4, J5, J7 + **mode=latch**, J10 Repeat V1 + **Triplets E3** + **noms abrégés (1/8T, 1/16T)**, **REVERSE DSP**, J12 + **AudioStream/SGTL5000 callback**, J13 + **overlay persistant + scroll horizontal SD**, J14, **J15 (graphe d'entrée micro → ring COMMIT)**.
 - P2 (glisse après rentrée si retard, la démo tient quand même) : J8, J9, J11, **Skip Back 15 s**, **Checkpoint**, TRANCE GATE, FILTER, DELAY, BITCRUSH, CHAOS, E6/LFO, recherches suspendues (J6, loop bed, fill).
 
 ### Checkpoint 16/08/2026 (session 4) — Triplets Repeat
