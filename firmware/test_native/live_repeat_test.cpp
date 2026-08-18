@@ -198,6 +198,116 @@ void testEveryLoopWrapIsSmoothed() {
     require(near(outputL[170], outputL[270]),
             "seam smoothing must preserve the exact BPM period");
 }
+
+void testModeDefaultsToLoopAndRoundTrips() {
+    RepeatFixture fixture;
+    LiveRepeat& repeat = fixture.repeat;
+    require(repeat.mode() == RepeatMode::Loop,
+            "repeat must default to LOOP mode");
+    repeat.setMode(RepeatMode::Shepard);
+    require(repeat.mode() == RepeatMode::Shepard, "setMode must select SHEPARD");
+    repeat.setMode(RepeatMode::Loop);
+    require(repeat.mode() == RepeatMode::Loop, "setMode must return to LOOP");
+}
+
+void testShepardDepthClamped() {
+    RepeatFixture fixture;
+    LiveRepeat& repeat = fixture.repeat;
+    repeat.setShepardDepth(5.0f);
+    require(near(repeat.shepardDepth(), LiveRepeat::kMaxShepardDepth),
+            "shepard depth must clamp to kMaxShepardDepth");
+    repeat.setShepardDepth(-1.0f);
+    require(near(repeat.shepardDepth(), 0.0f),
+            "shepard depth must clamp to 0");
+}
+
+// Le coeur du geste : en SHEPARD, la position de lecture accelere
+// lineairement (deltas strictement croissants sur le cycle de rampe) puis
+// retombe au wrap de phase. Boucle de 100 frames, depth 1.0 => taux
+// 1 -> 2 sur 400 frames (4 boucles par cycle).
+void testShepardAcceleratesThenResets() {
+    RepeatFixture fixture;
+    LiveRepeat& repeat = fixture.repeat;
+    repeat.setBpm(60.0f);
+    fillHistory(repeat);
+    repeat.setMode(RepeatMode::Shepard);
+    repeat.setShepardDepth(1.0f);
+    repeat.setActive(true);
+
+    std::array<float, 420> deltas{};
+    float previous = repeat.loopPositionF();
+    float silent[1]{};
+    for (std::size_t frame = 0; frame < deltas.size(); ++frame) {
+        repeat.process(silent, silent, 1);
+        const float position = repeat.loopPositionF();
+        deltas[frame] = position >= previous
+                             ? position - previous
+                             : position + 100.0f - previous;
+        previous = position;
+        require(position >= 0.0f && position < 100.0f,
+                "shepard position must stay inside the loop");
+    }
+    require(near(deltas[0], 1.0f), "shepard starts at natural rate");
+    require(deltas[100] > deltas[0] && deltas[200] > deltas[100] &&
+                deltas[399] > deltas[200],
+            "shepard read rate must accelerate over the ramp cycle");
+    require(deltas[401] < deltas[399],
+            "shepard rate must drop back after the cycle wrap");
+}
+
+void testSlewFramesControlRampLength() {
+    // Contenu DC constant : wet == dry == 0.5, donc mix = 2 * sortie.
+    RepeatFixture fixture;
+    LiveRepeat& repeat = fixture.repeat;
+    repeat.setBpm(60.0f);
+
+    float historyL[100]{};
+    float historyR[100]{};
+    for (int i = 0; i < 100; ++i) {
+        historyL[i] = 0.5f;
+        historyR[i] = 0.5f;
+    }
+    repeat.process(historyL, historyR, 100);
+    repeat.setAmount(1.0f);
+
+    const auto runWithSlew = [&repeat](std::uint32_t slewFrames) {
+        // Re-remplit l'historique de DC : sans ca, le run lirait les zeros
+        // ecrits par la queue du run precedent (capture = 100 dernieres
+        // frames avant activation).
+        float dc[100]{};
+        for (int i = 0; i < 100; ++i) dc[i] = 0.5f;
+        repeat.process(dc, dc, 100);
+        repeat.setSlewFrames(slewFrames);
+        repeat.setActive(true);
+        float left[60]{};
+        float right[60]{};
+        repeat.process(left, right, 60);
+        repeat.setActive(false);
+        float tail[300]{};
+        repeat.process(tail, tail, 300);
+        return 2.0f * left[50];  // mix atteinte a la frame 50
+    };
+
+    const float mixDefault = runWithSlew(RampGain::kDefaultFrames);
+    const float mixLong = runWithSlew(240U);
+    require(near(mixDefault, 51.0f / 128.0f),
+            "default slew must reach 51/128 after 50 frames");
+    require(near(mixLong, 51.0f / 240.0f),
+            "custom slew must reach 51/240 after 50 frames");
+    require(mixLong < mixDefault,
+            "a longer slew must rise more slowly");
+}
+
+void testSlewFramesClamped() {
+    RepeatFixture fixture;
+    LiveRepeat& repeat = fixture.repeat;
+    repeat.setSlewFrames(0U);
+    require(repeat.slewFrames() >= 1U,
+            "slew frames must clamp to at least 1");
+    repeat.setSlewFrames(999999U);
+    require(repeat.slewFrames() <= 48000U,
+            "slew frames must clamp to the upper bound");
+}
 }  // namespace
 
 int main() {
@@ -208,6 +318,11 @@ int main() {
     testLongHoldDoesNotOverwriteCapturedLoop();
     testInsufficientHistoryUsesAvailableAudio();
     testEveryLoopWrapIsSmoothed();
+    testModeDefaultsToLoopAndRoundTrips();
+    testShepardDepthClamped();
+    testShepardAcceleratesThenResets();
+    testSlewFramesControlRampLength();
+    testSlewFramesClamped();
     std::cout << "All Live Repeat tests passed\n";
     return 0;
 }

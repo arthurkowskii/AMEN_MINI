@@ -49,20 +49,27 @@ void LiveRepeat::setActive(bool active) {
         captureEnd_ = framesWritten_;
         loopFrames_ = availableLoopFrames();
         loopPosition_ = 0;
+        loopPositionF_ = 0.0f;
+        shepardPhase_ = 0.0f;
         oldLoopFrames_ = 0;
         loopCrossfadeRemaining_ = 0;
     }
-    targetMix_ = active ? amount_ : 0.0f;
-    mixRampRemaining_ = kRampFrames;
-    mixStep_ = (targetMix_ - mix_) / static_cast<float>(kRampFrames);
+    mixRamp_.setTarget(active ? amount_ : 0.0f);
 }
 
 void LiveRepeat::setAmount(float amount) {
     if (!std::isfinite(amount)) return;
     amount_ = std::clamp(amount, 0.0f, 1.0f);
-    targetMix_ = requestedActive_ ? amount_ : 0.0f;
-    mixRampRemaining_ = kRampFrames;
-    mixStep_ = (targetMix_ - mix_) / static_cast<float>(kRampFrames);
+    mixRamp_.setTarget(requestedActive_ ? amount_ : 0.0f);
+}
+
+void LiveRepeat::setMode(RepeatMode mode) {
+    mode_ = mode;
+}
+
+void LiveRepeat::setShepardDepth(float depth) {
+    if (!std::isfinite(depth)) return;
+    shepardDepth_ = std::clamp(depth, 0.0f, kMaxShepardDepth);
 }
 
 void LiveRepeat::setBpm(float bpm) {
@@ -96,6 +103,14 @@ std::size_t LiveRepeat::availableLoopFrames() const {
 void LiveRepeat::beginLoopChange() {
     const std::size_t nextFrames = availableLoopFrames();
     if (nextFrames == loopFrames_) return;
+    if (mode_ == RepeatMode::Shepard) {
+        // Pas de crossfade en SHEPARD : la rampe de vitesse tolere le
+        // changement de longueur (le lissage de couture masque le wrap).
+        loopFrames_ = nextFrames;
+        loopPositionF_ = 0.0f;
+        shepardPhase_ = 0.0f;
+        return;
+    }
     oldLoopFrames_ = loopFrames_;
     oldLoopPosition_ = loopPosition_;
     loopFrames_ = nextFrames;
@@ -139,6 +154,36 @@ float LiveRepeat::smoothedLoopSample(const float* history, const float* frozen,
     return seam + (sample - seam) * fade;
 }
 
+float LiveRepeat::smoothedLoopSampleF(const float* history, const float* frozen,
+                                      std::size_t loopFrames,
+                                      float position) const {
+    if (loopFrames == 0 || bufferCapacity_ == 0) return 0.0f;
+    // Lecture interpolee pour la position fractionnaire SHEPARD.
+    const float clamped =
+        std::clamp(position, 0.0f, static_cast<float>(loopFrames - 1U));
+    const std::size_t i0 = static_cast<std::size_t>(clamped);
+    const std::size_t i1 = i0 + 1U < loopFrames ? i0 + 1U : i0;
+    const float frac = clamped - static_cast<float>(i0);
+    const float s0 = historySample(history, frozen, loopFrames, i0);
+    const float s1 = historySample(history, frozen, loopFrames, i1);
+    float sample = s0 + (s1 - s0) * frac;
+
+    // Meme lissage de couture que la lecture entiere, en distance flottante.
+    const std::size_t fadeFrames =
+        std::min<std::size_t>(kSeamFrames, loopFrames / 4U);
+    if (fadeFrames == 0) return sample;
+
+    const float distanceToSeam =
+        std::min(position, static_cast<float>(loopFrames - 1U) - position);
+    if (distanceToSeam >= static_cast<float>(fadeFrames)) return sample;
+
+    const float first = historySample(history, frozen, loopFrames, 0);
+    const float last = historySample(history, frozen, loopFrames, loopFrames - 1U);
+    const float seam = (first + last) * 0.5f;
+    const float fade = distanceToSeam / static_cast<float>(fadeFrames);
+    return seam + (sample - seam) * fade;
+}
+
 void LiveRepeat::process(float* left, float* right, int numFrames) {
     if (left == nullptr || right == nullptr || numFrames <= 0 ||
         bufferCapacity_ == 0) return;
@@ -148,7 +193,8 @@ void LiveRepeat::process(float* left, float* right, int numFrames) {
         const float dryR = right[frame];
         const std::size_t writeIndex =
             static_cast<std::size_t>(framesWritten_ % bufferCapacity_);
-        if ((requestedActive_ || mix_ > 0.0f) && framesWritten_ >= bufferCapacity_) {
+        const float mix = mixRamp_.get();
+        if ((requestedActive_ || mix > 0.0f) && framesWritten_ >= bufferCapacity_) {
             const std::uint64_t overwrittenFrame = framesWritten_ - bufferCapacity_;
             const std::uint64_t captureStart =
                 captureEnd_ > bufferCapacity_
@@ -165,31 +211,45 @@ void LiveRepeat::process(float* left, float* right, int numFrames) {
 
         float wetL = dryL;
         float wetR = dryR;
-        if (loopFrames_ > 0 && (requestedActive_ || mix_ > 0.0f)) {
-            wetL = smoothedLoopSample(historyL_, frozenL_, loopFrames_, loopPosition_);
-            wetR = smoothedLoopSample(historyR_, frozenR_, loopFrames_, loopPosition_);
+        if (loopFrames_ > 0 && (requestedActive_ || mix > 0.0f)) {
+            if (mode_ == RepeatMode::Shepard) {
+                // Montee infinie : taux de lecture 1 -> 1+depth sur
+                // kShepardCyclesPerRise boucles, puis retombee au wrap.
+                const float rateMul = 1.0f + shepardDepth_ * shepardPhase_;
+                wetL = smoothedLoopSampleF(historyL_, frozenL_, loopFrames_,
+                                           loopPositionF_);
+                wetR = smoothedLoopSampleF(historyR_, frozenR_, loopFrames_,
+                                           loopPositionF_);
+                loopPositionF_ += rateMul;
+                if (loopPositionF_ >= static_cast<float>(loopFrames_)) {
+                    loopPositionF_ -= static_cast<float>(loopFrames_);
+                }
+                shepardPhase_ += 1.0f / (static_cast<float>(loopFrames_) *
+                                         static_cast<float>(kShepardCyclesPerRise));
+                if (shepardPhase_ >= 1.0f) shepardPhase_ -= 1.0f;
+            } else {
+                wetL = smoothedLoopSample(historyL_, frozenL_, loopFrames_, loopPosition_);
+                wetR = smoothedLoopSample(historyR_, frozenR_, loopFrames_, loopPosition_);
 
-            if (loopCrossfadeRemaining_ > 0 && oldLoopFrames_ > 0) {
-                const float fade = 1.0f - static_cast<float>(loopCrossfadeRemaining_) /
-                                                static_cast<float>(kRampFrames);
-                const float oldL =
-                    smoothedLoopSample(historyL_, frozenL_, oldLoopFrames_, oldLoopPosition_);
-                const float oldR =
-                    smoothedLoopSample(historyR_, frozenR_, oldLoopFrames_, oldLoopPosition_);
-                wetL = oldL + (wetL - oldL) * fade;
-                wetR = oldR + (wetR - oldR) * fade;
-                oldLoopPosition_ = (oldLoopPosition_ + 1U) % oldLoopFrames_;
-                --loopCrossfadeRemaining_;
+                if (loopCrossfadeRemaining_ > 0 && oldLoopFrames_ > 0) {
+                    const float fade = 1.0f - static_cast<float>(loopCrossfadeRemaining_) /
+                                                    static_cast<float>(kRampFrames);
+                    const float oldL =
+                        smoothedLoopSample(historyL_, frozenL_, oldLoopFrames_, oldLoopPosition_);
+                    const float oldR =
+                        smoothedLoopSample(historyR_, frozenR_, oldLoopFrames_, oldLoopPosition_);
+                    wetL = oldL + (wetL - oldL) * fade;
+                    wetR = oldR + (wetR - oldR) * fade;
+                    oldLoopPosition_ = (oldLoopPosition_ + 1U) % oldLoopFrames_;
+                    --loopCrossfadeRemaining_;
+                }
+                loopPosition_ = (loopPosition_ + 1U) % loopFrames_;
             }
-            loopPosition_ = (loopPosition_ + 1U) % loopFrames_;
         }
 
-        if (mixRampRemaining_ > 0) {
-            mix_ += mixStep_;
-            --mixRampRemaining_;
-            if (mixRampRemaining_ == 0) mix_ = targetMix_;
-        }
-        left[frame] = std::clamp(dryL + (wetL - dryL) * mix_, -1.0f, 1.0f);
-        right[frame] = std::clamp(dryR + (wetR - dryR) * mix_, -1.0f, 1.0f);
+        // Ordre historique : on avance la rampe PUIS on lit la valeur.
+        const float appliedMix = mixRamp_.tick();
+        left[frame] = std::clamp(dryL + (wetL - dryL) * appliedMix, -1.0f, 1.0f);
+        right[frame] = std::clamp(dryR + (wetR - dryR) * appliedMix, -1.0f, 1.0f);
     }
 }
