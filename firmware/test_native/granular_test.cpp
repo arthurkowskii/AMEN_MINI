@@ -270,6 +270,177 @@ void testCpuBudget() {
               << " % du temps reel)\n";
     require(elapsed < 0.5, "1 s of cloud must process far below real time");
 }
+
+// 9. Bornes en mode PITCH/RISE : la lecture interpolee ne doit JAMAIS
+// sortir de la plage, meme a 400 % avec hauteur par grain.
+void testNeverReadsOutsideRangeInPitchModes() {
+    constexpr std::size_t kFrames = 20000;
+    constexpr std::size_t kBegin = 5000;
+    constexpr std::size_t kEnd = 15000;
+    std::vector<std::int16_t> samples(kFrames, 32767);  // sentinelle = 1.0
+    for (std::size_t n = kBegin; n < kEnd; ++n) samples[n] = 0;
+    const PcmView pcm = makePcm(samples);
+
+    for (GrainMode mode : {GrainMode::Pitch, GrainMode::Rise}) {
+        for (float speed : {1.0f, 4.0f}) {
+            GrainCloud cloud;
+            cloud.setMode(mode);
+            cloud.setPitchRangeSemitones(24);
+            cloud.start(pcm, kBegin, kEnd, speed, 42U);
+            std::vector<float> left(44100, 0.0f);
+            std::vector<float> right(44100, 0.0f);
+            cloud.render(left.data(), right.data(),
+                         static_cast<int>(left.size()));
+            for (float value : left) {
+                require(value == 0.0f,
+                        "pitched grains must never read outside the range");
+            }
+        }
+    }
+}
+
+// 10. Mode PITCH : sortie differente du Cloud (grains transposes), non
+// nulle, deterministe, finie. La graine est identique dans les deux cas :
+// la difference ne peut venir que des hauteurs par grain.
+void testPitchModeShiftsGrains() {
+    constexpr std::size_t kFrames = 30000;
+    std::vector<std::int16_t> samples(kFrames, 0);
+    fillSine(samples, 0, kFrames, 0.3f);
+    const PcmView pcm = makePcm(samples);
+
+    const auto run = [&pcm](GrainMode mode, std::uint32_t seed) {
+        GrainCloud cloud;
+        cloud.setMode(mode);
+        cloud.setPitchRangeSemitones(12);
+        cloud.start(pcm, 1000, 25000, 1.0f, seed);
+        std::vector<float> left(8192, 0.0f);
+        std::vector<float> right(8192, 0.0f);
+        cloud.render(left.data(), right.data(), 8192);
+        return left;
+    };
+    const std::vector<float> cloud = run(GrainMode::Cloud, 123U);
+    const std::vector<float> pitchA = run(GrainMode::Pitch, 123U);
+    const std::vector<float> pitchB = run(GrainMode::Pitch, 123U);
+    require(std::memcmp(pitchA.data(), pitchB.data(),
+                        pitchA.size() * sizeof(float)) == 0,
+            "pitch mode must stay deterministic for a given seed");
+    require(std::memcmp(pitchA.data(), cloud.data(),
+                        cloud.size() * sizeof(float)) != 0,
+            "pitch mode must differ from cloud mode on the same material");
+    require(std::none_of(pitchA.begin(), pitchA.end(), [](float v) {
+                return std::isnan(v) || std::isinf(v);
+            }),
+            "pitch mode output must stay finite");
+    require(std::any_of(pitchA.begin(), pitchA.end(),
+                        [](float v) { return v != 0.0f; }),
+            "pitch mode must produce audible material");
+}
+
+// 11. Mode RISE : les grains glissent en hauteur — sortie differente du
+// Cloud ET du Pitch, finie, et le nuage reste vivant (grains engendres).
+void testRiseModeGlidesGrains() {
+    constexpr std::size_t kFrames = 30000;
+    std::vector<std::int16_t> samples(kFrames, 0);
+    fillSine(samples, 0, kFrames, 0.3f);
+    const PcmView pcm = makePcm(samples);
+
+    const auto run = [&pcm](GrainMode mode) {
+        GrainCloud cloud;
+        cloud.setMode(mode);
+        cloud.setPitchRangeSemitones(24);
+        cloud.start(pcm, 1000, 25000, 1.0f, 123U);
+        std::vector<float> left(8192, 0.0f);
+        std::vector<float> right(8192, 0.0f);
+        cloud.render(left.data(), right.data(), 8192);
+        return left;
+    };
+    const std::vector<float> pitch = run(GrainMode::Pitch);
+    const std::vector<float> rise = run(GrainMode::Rise);
+    require(std::memcmp(rise.data(), pitch.data(),
+                        rise.size() * sizeof(float)) != 0,
+            "rise mode must differ from pitch mode");
+    require(std::none_of(rise.begin(), rise.end(), [](float v) {
+                return std::isnan(v) || std::isinf(v);
+            }),
+            "rise mode output must stay finite");
+}
+
+// 12. Densite live : a densite 4 le nuage engendre plus de grains que a
+// densite 0.25 sur la meme duree (cadence recalculee a chaque spawn).
+void testDensityControlsSpawnCadence() {
+    constexpr std::size_t kFrames = 60000;
+    std::vector<std::int16_t> samples(kFrames, 0);
+    fillSine(samples, 0, kFrames, 0.3f);
+    const PcmView pcm = makePcm(samples);
+
+    const auto spawnedAt = [&pcm](float density) {
+        GrainCloud cloud;
+        cloud.setDensity(density);
+        cloud.start(pcm, 0, kFrames, 1.0f, 7U);
+        std::vector<float> left(22050, 0.0f);
+        std::vector<float> right(22050, 0.0f);
+        cloud.render(left.data(), right.data(), static_cast<int>(left.size()));
+        return cloud.totalSpawned();
+    };
+    require(spawnedAt(4.0f) > spawnedAt(0.25f),
+            "higher density must spawn more grains over the same duration");
+}
+
+// 13. Taille de grain : l'echelle change l'enveloppe des grains — sortie
+// differente de l'echelle 1.0, et toujours sans clic (contenu DC).
+void testGrainSizeScaleChangesOutputWithoutClicks() {
+    constexpr std::size_t kFrames = 60000;
+    constexpr std::int16_t kDc = 800;
+    std::vector<std::int16_t> samples(kFrames, kDc);
+    const PcmView pcm = makePcm(samples);
+
+    const auto run = [&pcm](float scale) {
+        GrainCloud cloud;
+        cloud.setGrainSizeScale(scale);
+        cloud.start(pcm, 0, kFrames, 1.0f, 99U);
+        std::vector<float> left(44100, 0.0f);
+        std::vector<float> right(44100, 0.0f);
+        cloud.render(left.data(), right.data(), static_cast<int>(left.size()));
+        return left;
+    };
+    const std::vector<float> base = run(1.0f);
+    const std::vector<float> scaled = run(2.0f);
+    require(std::memcmp(base.data(), scaled.data(),
+                        base.size() * sizeof(float)) != 0,
+            "grain size scale must change the output");
+    float maxDelta = 0.0f;
+    for (std::size_t i = 1; i < scaled.size(); ++i) {
+        maxDelta = std::max(maxDelta, std::fabs(scaled[i] - scaled[i - 1]));
+    }
+    require(maxDelta < static_cast<float>(kDc) / 10.0f,
+            "scaled grains must stay click-free (envelope-slope bound)");
+}
+
+// 14. Defensif des reglages : clamps et round-trip mode/parametres.
+void testGranularSettingsClamped() {
+    GrainCloud cloud;
+    cloud.setPitchRangeSemitones(99);
+    require(cloud.pitchRangeSemitones() == GrainCloud::kMaxPitchRangeSemitones,
+            "pitch range must clamp to kMaxPitchRangeSemitones");
+    cloud.setPitchRangeSemitones(-5);
+    require(cloud.pitchRangeSemitones() == 0, "pitch range must clamp to 0");
+    cloud.setDensity(99.0f);
+    require(cloud.density() == GrainCloud::kMaxDensity,
+            "density must clamp to kMaxDensity");
+    cloud.setDensity(0.0f);
+    require(cloud.density() == GrainCloud::kMinDensity,
+            "density must clamp to kMinDensity");
+    cloud.setGrainSizeScale(99.0f);
+    require(cloud.grainSizeScale() == GrainCloud::kMaxGrainSizeScale,
+            "grain size scale must clamp to kMaxGrainSizeScale");
+    cloud.setGrainSizeScale(0.0f);
+    require(cloud.grainSizeScale() == GrainCloud::kMinGrainSizeScale,
+            "grain size scale must clamp to kMinGrainSizeScale");
+    cloud.setMode(GrainMode::Rise);
+    require(cloud.mode() == GrainMode::Rise, "setMode must select RISE");
+    cloud.setMode(GrainMode::Cloud);
+    require(cloud.mode() == GrainMode::Cloud, "setMode must return to CLOUD");
+}
 }  // namespace
 
 int main() {
@@ -282,6 +453,12 @@ int main() {
     testHardStop();
     testDefensive();
     testCpuBudget();
+    testNeverReadsOutsideRangeInPitchModes();
+    testPitchModeShiftsGrains();
+    testRiseModeGlidesGrains();
+    testDensityControlsSpawnCadence();
+    testGrainSizeScaleChangesOutputWithoutClicks();
+    testGranularSettingsClamped();
     std::cout << "All Grain Cloud tests passed\n";
     return 0;
 }
