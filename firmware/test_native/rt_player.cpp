@@ -32,6 +32,7 @@
 #include "fx/reverse_player.h"
 #include "fx/spectral_freeze.h"
 #include "fx/spectral_gate.h"
+#include "pad_recorder.h"
 #include "voice_manager.h"
 #include "wav_loader.h"
 
@@ -113,6 +114,15 @@ std::atomic<bool> g_reverseActive{false};
 PhaseDistortion g_phase{kOutputSampleRate};
 std::atomic<bool> g_phaseActive{false};
 std::atomic<int> g_phaseMode{0};  // index PhaseDistMode
+// Enregistrement direct par pad (J15, Shift + pad maintenu) : source = mix
+// post-FX, 6 s par pad, matiere persistante (seul un re-arm efface).
+constexpr std::size_t kPadRecordSeconds = 6;
+constexpr std::size_t kPadRecordFrames = kPadRecordSeconds * kOutputSampleRate;
+std::array<std::int16_t,
+           PadRecorder::requiredSamples(kVoicePadCount, kPadRecordFrames)>
+    g_padRecordStorage{};
+PadRecorder g_padRecorder{kVoicePadCount, g_padRecordStorage.data(),
+                          kPadRecordFrames};
 std::atomic<bool> g_running{true};
 std::mutex g_audioMutex;
 
@@ -228,6 +238,7 @@ struct UiSimulation {
     int heldFxPad = -1;
     int fxCandidate = 0;
     std::array<int, 3> fxAssign{};
+    int recordingPad = -1;  // pad en cours d'enregistrement (Shift+pad)
     std::uint16_t numpadPrev = 0;
 };
 
@@ -570,6 +581,46 @@ RepeatDivision repeat_division(int index) {
     }
 }
 
+// J15 : demarre l'enregistrement direct sur un pad. La lecture du pad est
+// arretee d'abord (son bloc va etre reecrit — contrat de borrow du
+// recorder), puis arm : le callback audio consignera le mix post-FX.
+void start_pad_recording(int pad, ScreenUi& screen, UiSimulation& simulation,
+                         std::uint64_t time) {
+    if (pad < 0 || pad >= kVoicePadCount) return;
+    {
+        std::lock_guard<std::mutex> lock(g_audioMutex);
+        g_voices.stopPad(static_cast<VoiceManager::PadId>(pad));
+        g_padClouds[pad].hardStop();
+        g_padRecorder.arm(static_cast<std::size_t>(pad), kOutputSampleRate);
+    }
+    simulation.recordingPad = pad;
+    std::printf("pad %d : REC (source = mix post-FX, %zu s max)\n", pad + 1,
+                kPadRecordSeconds);
+    char label[24]{};
+    std::snprintf(label, sizeof(label), "REC PAD %d", pad + 1);
+    screen.showParameter(label, 0, 0, static_cast<int>(kPadRecordSeconds),
+                         time, "S");
+}
+
+void stop_pad_recording(ScreenUi& screen, UiSimulation& simulation,
+                        std::uint64_t time) {
+    const int pad = simulation.recordingPad;
+    {
+        std::lock_guard<std::mutex> lock(g_audioMutex);
+        g_padRecorder.stop();
+    }
+    simulation.recordingPad = -1;
+    if (pad < 0 || pad >= kVoicePadCount) return;
+    const std::size_t frames = g_padRecorder.framesRecorded(
+        static_cast<std::size_t>(pad));
+    const double seconds =
+        static_cast<double>(frames) / static_cast<double>(kOutputSampleRate);
+    std::printf("pad %d : REC stop, %zu frames (%.2f s)\n", pad + 1, frames,
+                seconds);
+    screen.showPerformance();
+    (void)time;
+}
+
 PadTriggerAction apply_pad_down_audio(int pad, const UiSimulation& simulation,
                                       const AppState& state) {
     const PadSettings& settings = simulation.pads[pad];
@@ -583,6 +634,40 @@ PadTriggerAction apply_pad_down_audio(int pad, const UiSimulation& simulation,
     const float speed = static_cast<float>(settings.speedPercent) / 100.0f;
     std::lock_guard<std::mutex> lock(g_audioMutex);
     const auto padId = static_cast<VoiceManager::PadId>(pad);
+
+    // Source par pad (J15) : la matiere enregistree prime sur le plan
+    // partage et survit a tout chargement (seul un nouvel enregistrement
+    // sur ce pad la remplace). Granulaire et voix suivent la meme regle.
+    const PcmView recorded = g_padRecorder.pcm(static_cast<std::size_t>(pad));
+    if (recorded.valid()) {
+        if (settings.mode == PlaybackMode::Granular) {
+            GrainCloud& cloud = g_padClouds[pad];
+            const bool playing = cloud.active();
+            const PadTriggerAction action =
+                padDownAction(settings.mode, settings.behavior, playing);
+            if (action == PadTriggerAction::Stop) {
+                cloud.stop();
+            } else {
+                const std::uint32_t seed =
+                    static_cast<std::uint32_t>(pad + 1U) * 2654435761U;
+                cloud.setMode(static_cast<GrainMode>(settings.grainMode));
+                cloud.setPitchRangeSemitones(settings.grainPitchSt);
+                cloud.setDensity(
+                    static_cast<float>(settings.grainDensity) * 0.25f);
+                cloud.start(recorded, 0, recorded.frameCount(), speed, seed);
+            }
+            return action;
+        }
+        const PadTriggerAction action = padDownAction(
+            settings.mode, settings.behavior, g_voices.isPadPlaying(padId));
+        if (action == PadTriggerAction::Stop) {
+            g_voices.stopPad(padId);
+        } else {
+            g_voices.trigger(padId, recorded, 0, recorded.frameCount(), speed,
+                             settings.mode);
+        }
+        return action;
+    }
 
     if (settings.mode == PlaybackMode::Granular) {
         // GRANULAR (plan 7.3 / J8) : la plage assignee devient un nuage de
@@ -932,13 +1017,30 @@ void poll_numpad(ScreenUi& screen, UiSimulation& simulation, AppState& state) {
         static_cast<std::uint16_t>(simulation.numpadPrev & ~held);
     simulation.numpadPrev = held;
 
+    const bool shiftHeld = ((GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0) ||
+                           ((GetAsyncKeyState(VK_RSHIFT) & 0x8000) != 0);
+    const std::uint64_t now = now_ms();
     for (int pad = 0; pad < 6; ++pad) {
         if ((pressed & (1U << pad)) != 0) {
-            voice_pad_down(pad, screen, simulation, state);
+            if (shiftHeld) {
+                // Shift + pad = enregistrement direct (J15) au lieu du
+                // trigger : le press est consomme par le recorder.
+                start_pad_recording(pad, screen, simulation, now);
+            } else {
+                voice_pad_down(pad, screen, simulation, state);
+            }
         }
         if ((released & (1U << pad)) != 0) {
-            voice_pad_up(pad, screen, simulation, state);
+            if (simulation.recordingPad == pad) {
+                stop_pad_recording(screen, simulation, now);
+            } else {
+                voice_pad_up(pad, screen, simulation, state);
+            }
         }
+    }
+    // Relacher Shift pendant l'enregistrement l'arrete aussi.
+    if (!shiftHeld && simulation.recordingPad >= 0) {
+        stop_pad_recording(screen, simulation, now);
     }
     for (int pad = 6; pad < 9; ++pad) {
         if ((pressed & (1U << pad)) != 0) {
@@ -1064,6 +1166,27 @@ void key_loop(ScreenUi& screen, ScreenPreview& preview, AppState& state) {
         }
         enterHeldPrev = enterHeld;
         poll_numpad(screen, simulation, state);
+        // Overlay REC : secondes ecoulees tant que le recorder tourne ;
+        // l'arret automatique (capacite) est detecte ici (chemin controle).
+        if (simulation.recordingPad >= 0) {
+            const int recPad = simulation.recordingPad;
+            const std::size_t recFrames = g_padRecorder.framesRecorded(
+                static_cast<std::size_t>(recPad));
+            const int recSeconds =
+                static_cast<int>(recFrames / kOutputSampleRate);
+            if (g_padRecorder.recording()) {
+                char label[24]{};
+                std::snprintf(label, sizeof(label), "REC PAD %d", recPad + 1);
+                screen.showParameter(label, recSeconds, 0,
+                                     static_cast<int>(kPadRecordSeconds),
+                                     now_ms(), "S");
+            } else {
+                std::printf("pad %d : REC capacite atteinte (%zu frames)\n",
+                            recPad + 1, recFrames);
+                simulation.recordingPad = -1;
+                screen.showPerformance();
+            }
+        }
         if (!preview.pumpEvents()) {
             g_running.store(false);
         }
@@ -1129,6 +1252,18 @@ void handle_key(int c, ScreenUi& screen, UiSimulation& simulation, AppState& sta
     } else if (c == 'v') {
         // COMMIT : capture retrospective du mix -> nouvelle assignation.
         perform_commit(screen, state);
+    } else if (c == 'r') {
+        // J15 : bascule de l'enregistrement direct sur le dernier pad
+        // (source = mix post-FX, 6 s max).
+        if (simulation.recordingPad == simulation.lastPadId) {
+            stop_pad_recording(screen, simulation, time);
+        } else {
+            if (simulation.recordingPad >= 0) {
+                stop_pad_recording(screen, simulation, time);
+            }
+            start_pad_recording(simulation.lastPadId, screen, simulation,
+                                time);
+        }
     } else if (c == 'm') {
         set_pad_mode(simulation.lastPadId,
                      next_mode(simulation.pads[simulation.lastPadId].mode),
@@ -1181,6 +1316,26 @@ void key_loop(ScreenUi& screen, ScreenPreview& preview, AppState& state) {
         char c = 0;
         if (read(STDIN_FILENO, &c, 1) == 1) {
             handle_key(c, screen, simulation, state);
+        }
+        // Overlay REC : secondes ecoulees ; arret auto (capacite) detecte.
+        if (simulation.recordingPad >= 0) {
+            const int recPad = simulation.recordingPad;
+            const std::size_t recFrames = g_padRecorder.framesRecorded(
+                static_cast<std::size_t>(recPad));
+            const int recSeconds =
+                static_cast<int>(recFrames / kOutputSampleRate);
+            if (g_padRecorder.recording()) {
+                char label[24]{};
+                std::snprintf(label, sizeof(label), "REC PAD %d", recPad + 1);
+                screen.showParameter(label, recSeconds, 0,
+                                     static_cast<int>(kPadRecordSeconds),
+                                     now_ms(), "S");
+            } else {
+                std::printf("pad %d : REC capacite atteinte (%zu frames)\n",
+                            recPad + 1, recFrames);
+                simulation.recordingPad = -1;
+                screen.showPerformance();
+            }
         }
         screen.setPerformance(state.breakName.c_str(), simulation.bpm,
                               simulation.pads[simulation.lastPadId].mode);
@@ -1288,6 +1443,12 @@ void audio_callback(ma_device* dev, void* out, const void* in, ma_uint32 frames)
         g_spectralFreeze.process(tmpL.data(), tmpR.data(), static_cast<int>(count));
         // COMMIT : le mix final (post-FX) alimente l'anneau retrospectif.
         g_captureBuffer.record(tmpL.data(), tmpR.data(), static_cast<int>(count));
+        // J15 : le meme mix post-FX alimente l'enregistrement direct
+        // Shift+pad (source = ce qu'on entend).
+        if (g_padRecorder.recording()) {
+            g_padRecorder.record(tmpL.data(), tmpR.data(),
+                                 static_cast<int>(count));
+        }
         for (std::size_t i = 0; i < count; ++i) {
             dst[(rendered + i) * 2] = tmpL[i];
             dst[(rendered + i) * 2 + 1] = tmpR[i];
@@ -1353,6 +1514,7 @@ int main(int argc, char** argv) {
 
     std::printf("numpad 1-6 : pads voix (appui selon ONE SHOT/LOOP/GRANULAR + GATE/LATCH ; tenir + E1 navigateur, + E4 vitesse, + E5 rotation lecture/clic comportement, + E6 mode granulaire CLOUD/PITCH/RISE, + E2 pitch +/-st, + E3 densite)\n");
     std::printf("numpad 7-9 : pads FX (BLANK/REPEAT/REVERSE/TRANCE GATE/FREEZE/PHASE DIST ; E6 sur REPEAT = LOOP/SHEPARD, sur PHASE DIST = SINE/SAW/SQUARE/SELF) | F1-F7 : encodeurs | espace : simule appui dernier pad | q : quitter\n");
+    std::printf("Shift + numpad 1-6 : enregistre le mix post-FX sur ce pad (6 s max, relacher pour stopper) | Linux : r = REC du dernier pad\n");
     std::printf("entree : clic | tenir entree 600 ms sur un WAV : menu ALL PADS / TRANSIENT / CANCEL (entree confirme, retour arriere annule)\n");
     key_loop(screen, preview, state);
 
