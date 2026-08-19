@@ -195,7 +195,7 @@ Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis 
 ### ✅ ADOPTÉ — Skip Back V1 (P2, après démo)
 
 - Buffer rétrospectif du mix de **15 s** en PSRAM (15 s stéréo 16-bit 44,1 kHz = 2,6 Mo ; break 6 s ≈ 1 Mo ; marge PSRAM ≈ 4,4 Mo restants).
-- Capture = **Shift + pad voix** → assigne les 15 dernières secondes au pad. Fusionne l'ancienne idée « resample-to-commit » : même mécanisme de capture rétrospective (jouer d'abord, décider après).
+- Capture rétrospective = 15 dernières secondes → 12 plages auto (geste harness : `v` ; **le geste matériel Shift + pad voix est RECODÉ par J15** en enregistrement direct — le geste hardware du Skip Back reste à réassigner, candidat : Shift + pad FX). Fusionne l'ancienne idée « resample-to-commit » : même mécanisme de capture rétrospective (jouer d'abord, décider après).
 - Écriture annulaire par blocs de 512 frames dans le callback, aucune allocation. Mesurer `AudioProcessorUsageMax()` sur Teensy avant d'étendre à 20-30 s.
 - **Pas de provenance/takes numérotés en V1** (suspendu) : capture simple, éventuelle méta « capturé à HH:MM:SS » plus tard.
 
@@ -233,20 +233,22 @@ Suite au rapport d'investigation samplers (SP-404 / Elektron / MPC) et aux avis 
 - L'overlay paramètre reste affiché tant que l'encodeur sélectionné tourne (disparaît 1 s après la dernière interaction, pas 1 s fixe).
 - Les noms techniques longs utilisent des abréviations : `1/8T` (Eighth Triplet), `1/16T` (Sixteenth Triplet). Gain de place immédiat sur le 128×32.
 
-## J15 — Micro intégré façon "pocket operator" [À PLANIFIER] — P1
+## J15 — Micro intégré façon "pocket operator" [V0 engine+harness livrés — couche Teensy à faire] — P1
 
-- Objectif : enregistrer des sons directement dans la machine via un micro intégré (supprime le flux Zoom → SD → AMEN). Workflow : pointer la machine, faire le bruit, Shift+pad = COMMIT rétrospectif 15 s → 12 chops auto.
+- Objectif : enregistrer des sons directement dans la machine via un micro intégré (supprime le flux Zoom → SD → AMEN). Workflow : pointer la machine, faire le bruit, **Shift + pad maintenu = enregistrement direct sur CE pad** (relâcher stoppe ; le pad joue ensuite sa propre matière dans tous ses modes). Décisions actées 19/08 : source = post-FX sur PC (ce qu'on entend) / MIC sur Teensy ; 6 s par pad ; **une source par pad, persistante** (survit à tout chargement WAV/TRANSIENT/COMMIT, seul un nouvel enregistrement la remplace) ; tap tempo déménage sur la couche Shift des pads FX (zone 13-20, défaut pad 20).
 - Hardware (ZÉRO PCB) : le shield Audio Adapter expose **2 pads dédiés MIC + GND** (points de soudure sur la carte, µ officiel PJRC = capsule électret PUI AOM-6738P, 2 fils, ~1,25 $ chez SparkFun ; équivalent capsule électret 2 tubes ~1 € sur AliExpress ou récup'd'un micro usagé). Le codec SGTL5000 fournit bias + préampli micro (rien à ajouter). La carte AMEN_MINI ne transporte aucun signal analogique (vérifié netlist : J3/J4 = I2C + I2S + alim uniquement) → aucun port consommé, J3/J4 inchangés.
-- Firmware (J12/J4, couche Teensy) :
+- V0 livré (moteur portable + harness PC) : `PadRecorder` (engine, stockage fourni par l'appelant, zéro allocation dans le callback, mono int16 arrondi symétrique clampé, un seul pad à la fois, auto-stop à capacité, PcmView emprunté par pad) ; harness : Shift + numpad 1-6 (Windows) / `r` (Linux), source = mix post-FX (même point de prélèvement que le ring COMMIT), overlay REC + secondes, capacité 6 s. Tests stricts + ASan/UBSan ; lecture mono voix prouvée par test.
+- Firmware (J12/J4, couche Teensy, à faire) :
   - graine d'entrée AudioInputI2S dans le graphe ; sgtl5000.inputSelect(AUDIO_INPUT_MIC) + réglage micGain ;
-  - diriger l'entrée micro vers le ring buffer 15 s du COMMIT (mono dupliqué sur les 2 canaux pour ne pas toucher au ring existant ; 2,6 Mo déjà budgétés en PSRAM) ;
-  - source de capture sélectionnable MIX / LINE / MIC (candidat : menu Shift ou E6 réservé).
-- Limites V0 : mono (dupliqué), une seule source d'entrée à la fois (ADC unique du codec), 15 s max par prise.
+  - dans le callback de rendu : si `g_padRecorder.recording()`, `g_padRecorder.record(inL, inR, block)` (mono dupliqué sur les 2 canaux en entrée) ;
+  - matrice : lecture SW21 (shift) dans le scan ; press/release des 12 pads chops ; tap tempo = Shift + pad FX ;
+  - stockage : blocs du recorder en PSRAM (6 s × 12 pads mono 44,1 kHz ≈ 6,35 Mo au pire cas — à arbitrer avec les breaks ; constante `kPadRecordSeconds` comme point d'ajustement).
+- Limites V0 : mono, une seule source d'entrée à la fois (ADC unique du codec), 6 s max par prise.
 - Après validation à l'écoute (P2) : limiteur/AGC façon PO côté moteur portable, micro déporté en façade via fil blindé court, puis (v2 PCB seulement) micro + trou de fixation intégrés à la carte.
 
 ## Priorités
 
-- P1 (chemin critique démo) : J3 + **crossfade vol de voix 64 frames**, J4, J5, J7 + **mode=latch**, J10 Repeat V1 + **Triplets E3** + **noms abrégés (1/8T, 1/16T)**, **REVERSE DSP**, J12 + **AudioStream/SGTL5000 callback**, J13 + **overlay persistant + scroll horizontal SD**, J14, **J15 (graphe d'entrée micro → ring COMMIT)**.
+- P1 (chemin critique démo) : J3 + **crossfade vol de voix 64 frames**, J4, J5, J7 + **mode=latch**, J10 Repeat V1 + **Triplets E3** + **noms abrégés (1/8T, 1/16T)**, **REVERSE DSP**, J12 + **AudioStream/SGTL5000 callback**, J13 + **overlay persistant + scroll horizontal SD**, J14, **J15 (graphe d'entrée micro → PadRecorder, couche Teensy)**.
 - P2 (glisse après rentrée si retard, la démo tient quand même) : J8, J9, J11, **Skip Back 15 s**, **Checkpoint**, TRANCE GATE, FILTER, DELAY, BITCRUSH, CHAOS, E6/LFO, recherches suspendues (J6, loop bed, fill).
 
 ### Checkpoint 16/08/2026 (session 4) — Triplets Repeat

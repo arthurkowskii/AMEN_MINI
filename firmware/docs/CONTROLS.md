@@ -88,3 +88,14 @@ Le mode `GRANULAR` transforme la **plage assignee** du pad en nuage granulaire :
 ## Shepard (mode SHEPARD du REPEAT)
 
 Le mode `SHEPARD` du Repeat accelere lineairement la position de lecture de la boucle capturee sur 4 passages puis retombe au wrap : chaque repetition est plus aigue que la precedente, l'effet "montee infinie" (riser par rampe de temps de lecture, aucun pitch shifter). La profondeur de la pente est liee au `E2 AMOUNT` (taux de lecture 1x -> 2x a 100 %). Le lissage de couture masque le retour de la rampe. Le mode `LOOP` reste le comportement historique.
+
+## Enregistrement direct (Shift + pad, J15)
+
+`Shift` maintenu + pad voix appuye = **enregistrement direct sur CE pad** : le press demarre la prise, le relachement (du pad ou du Shift) la stoppe. La source est le **mix post-FX** (exactement ce qu'on entend — meme point de prelevement que le ring COMMIT) ; sur Teensy ce sera le micro J15. Capacite : **6 s par pad**, arret automatique avec message console si la capacite est atteinte. L'overlay affiche `REC PAD n` avec les secondes ecoulees.
+
+- **Une source par pad, persistante** : la matiere enregistree survit a tout chargement WAV, TRANSIENT ou COMMIT. Seul un nouvel enregistrement sur ce pad la remplace. Le pad enregistre joue sa matiere en entier dans tous ses modes (ONE SHOT / LOOP / GRANULAR), vitesse et latch inchanges.
+- La matiere est **mono int16** (somme L+R, arrondi symetrique, clamp) : le rendu stereo duplique le mono sur les deux canaux.
+- Un seul pad enregistre a la fois : armer un autre pad arrete le precedent (ses frames restent).
+- Le press est **consomme** par l'enregistrement : pendant la prise, le pad n'est ni declenche ni cible des encodeurs.
+- Harness Windows : `Shift` gauche ou droit + `Numpad 1-6`. Harness Linux : touche `r` (bascule sur le dernier pad).
+- Le COMMIT retrospectif (`v`, 15 s -> 12 plages) reste intact : c'est le pipeline du break partage, orthogonal a la matiere par pad. Son geste materiel reste a reassigner (candidat : Shift + pad FX).

@@ -61,7 +61,7 @@ Shredder, Tasty Chips GR-2).
 
 ## 7. Hors V1
 
-- Pas d'enregistrement / resampling (exclu du plan verrouillé)
+- Pas d'enregistrement / resampling (exclu du plan verrouillé) — **DÉPASSÉ le 19/08/2026 par J15** : Shift + pad maintenu = enregistrement direct (micro sur Teensy, mix post-FX sur PC), 6 s par pad, une source par pad persistante. Voir `docs/ROADMAP.md` (J15).
 - Pas d'écran couleur, pas de LED par touche
 - Pas de lecture SD directe en voix
 - Séquenceur : V1 en version minimale — pattern unique 16 pas, trigger + chance,
