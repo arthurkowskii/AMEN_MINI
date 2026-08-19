@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <vector>
 
 namespace {
 constexpr float kTolerance = 0.00001f;
@@ -649,6 +650,34 @@ void testInvalidRatesAndSpeeds() {
     require(manager.setPadSpeed(5, VoiceManager::kMinUserSpeed),
             "minimum live speed must be accepted");
 }
+
+// T4 (J15) : la matiere enregistree d'un pad (mono int16, channels=1, taux
+// natif) se joue comme n'importe quel WAV : le rendu stereo duplique le
+// mono sur les deux canaux, sans artefact ni silence.
+void testRecordedMonoMaterialPlaysOnBothChannels() {
+    // Forme exacte d'un PcmView sorti de PadRecorder::pcm() : mono, 48 kHz.
+    constexpr std::size_t kFrames = 1024;
+    std::vector<std::int16_t> recorded(kFrames, 8192);  // DC 0.25
+    PcmView pcm;
+    pcm.sampleRate = 48000;
+    pcm.channels = 1;
+    pcm.samples = recorded.data();
+    pcm.sampleCount = recorded.size();
+
+    VoiceManager manager;
+    require(manager.trigger(1, pcm, 0, pcm.frameCount(), 1.0f),
+            "recorded mono material must trigger like a WAV");
+    float left[4] = {9.0f, 9.0f, 9.0f, 9.0f};
+    float right[4] = {9.0f, 9.0f, 9.0f, 9.0f};
+    manager.render(left, right, 4);
+    for (std::size_t i = 0; i < 4; ++i) {
+        require(near(left[i], 8192.0f / 32768.0f),
+                "recorded material must render at the right level (L)");
+        require(near(right[i], left[i]),
+                "mono material must be duplicated on both channels");
+    }
+    manager.stopAll();
+}
 }  // namespace
 
 int main() {
@@ -674,6 +703,7 @@ int main() {
     testLiveSpeedRampConvergesAfter128Frames();
     testLiveSpeedChangeOnlyAffectsSelectedPad();
     testInvalidRatesAndSpeeds();
+    testRecordedMonoMaterialPlaysOnBothChannels();
     std::cout << "All portable audio engine tests passed\n";
     return 0;
 }
