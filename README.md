@@ -1,56 +1,41 @@
-# AKOR_01
+# AMEN_MINI
 
-AKOR_01 is a compact hardware controller for playing notes, chords, and simple sequences.
+AMEN_MINI is a standalone break machine: drop a break on the SD card, slice it, and play it live on 12 pads.
 
-![AKOR_01 NO_LED PCB — component side](images/PCB_NO_LED_TOP.png)
+## The PCB
 
-![AKOR_01 NO_LED PCB — solder side](images/PCB_NO_LED_BOTTOM.png)
+### Blueprints (KiCad)
 
-These renders show the current NO_LED PCB revision: the RGB subsystem is absent, the matrix and encoder controls are routed, and the diode matrix is on the solder side.
+![AMEN_MINI PCB — blueprint 1/2](images/pcb/blueprint_01.png)
 
-The confirmed V0 interface contains a 4 × 5 performance grid plus Shift (21 MX switches total), seven push encoders, and an OLED display.
+![AMEN_MINI PCB — blueprint 2/2](images/pcb/blueprint_02.png)
 
-## Architecture locked on 2026-07-31
+### The assembled board
 
-**V0 is an independent USB-MIDI controller based on Raspberry Pi Pico 2 H.**
+![AMEN_MINI PCB — real photo 1/2](images/pcb/real_01.jpg)
 
-A future standalone synthesizer is a separate V2 project. V2 is intentionally not a compatibility constraint for the V0 PCB.
+![AMEN_MINI PCB — real photo 2/2](images/pcb/real_02.jpg)
 
-### V0 hardware target
+The board is a 2-layer, 1.6 mm PCB hosting a socketed Teensy 4.1, with the PJRC Audio Adapter (SGTL5000) plugged into J3/J4. Ordering and assembly details live in `hardware/BOM_AMEN_MINI.csv`.
 
-- Raspberry Pi Pico 2 H as the USB-MIDI device and control processor;
-- 21 MX-compatible switches and 21 × 1N4148 in a scanned matrix;
-- 7 bare EC11-style encoders with integrated push switches;
-- 1 × MCP23017 I²C GPIO expander;
-- 1 × SSD1306-compatible I²C OLED module;
-- no onboard audio or DSP output stage.
+## Hardware
 
-The intended signal allocation is:
+- **Teensy 4.1** (Cortex-M7, 600 MHz) — control processor, native microSD, USB, 8 MB PSRAM;
+- **PJRC Audio Adapter SGTL5000** — headphone + line output, onboard mic input pads (direct recording, J15);
+- 21 MX-compatible switches: 12 chop pads + 8 FX pads + Shift;
+- 7 EC11 push encoders;
+- SSD1306 I²C OLED, 0.91″, 128 × 32;
+- WAV 16-bit / 44.1 kHz loaded from SD and decoded once into PSRAM — voices read from RAM (random access), never from the SD card inside the audio callback.
 
-- encoder `A/B`: 14 direct Pico GPIO inputs;
-- one encoder push switch: one direct Pico GPIO input;
-- matrix rows/columns plus six encoder push switches: one MCP23017;
-- OLED and MCP23017: shared 3.3 V I²C bus;
-- USB: Pico 2 H onboard micro-USB, carrying power and class-compliant MIDI.
+## Firmware
 
-## Software state
+- `firmware/src/engine/` — portable C++17 audio engine (WAV loader, sample player, voice pool with oldest-voice stealing, granular mode, FX: repeat, reverse, phase distortion, spectral gate, spectral freeze), zero Arduino/Teensy includes;
+- `firmware/test_native/` — PC listening harness (`amen_rt.exe`) simulating the front panel: pads, encoders, OLED preview, SD browser;
+- `firmware/src/teensy/` — Teensy layer: PSRAM arena, SD WAV reader, sample loader, `firmware.ino`;
+- Workflow LOAD → MUTATE → COMMIT: auto-assign a break into 12 slices, mutate it live (granular cloud, trance gate, freeze), and commit the last 15 seconds of the mix as new assignable material;
+- Docs: `firmware/docs/CONCEPT.md`, `firmware/docs/CONTROLS.md`, `firmware/docs/ROADMAP.md`.
 
-The existing C++ prototype can:
+## Status
 
-- generate sine, square, triangle, and sawtooth waveforms;
-- convert MIDI note numbers into frequencies;
-- map a 16-key input across a chromatic octave range;
-- apply an ADSR-style envelope;
-- write mono 16-bit, 48 kHz WAV output.
-
-That offline audio work is preserved for the separate V2. The V0 software goal is musical-state handling, control scanning, OLED feedback, and USB MIDI Note On/Off/Panic.
-
-## Fabrication status
-
-The NO_LED PCB layout has completed its routing and DRC checkpoint. It still requires a mechanical review and Gerber/NC Drill inspection before any fabrication order.
-
-## Repository state (2026-08-08)
-
-- `main` is the **single build source**: NO_LED V0 PCB (incl. MIDI DIN-5) + firmware.
-- The RGB LED add-on work (SK6812MINI-E chain, 74AHCT1G125 buffer, associated SMD passives) is **archived, not part of V0**: see branch `archive/rgb-led` (commandes RGB, préservée). `archive/no-led-old` preserves the pre-DIN5 NO_LED branch (also deleted).
-- `hardware/BOM_AKOR_01.csv` = buying/assembly list exported from Notion `Composants AKOR_01`, scoped to the NO_LED build only.
+- **Hardware**: PCB fabricated and photographed (above). The Teensy 4.1 + Audio Adapter build is the current target.
+- **Firmware**: active development on the `dev` branch (never `main`). The engine and the PC harness are shipped; the Teensy integration layer (J12/J13) is in progress. See `firmware/docs/ROADMAP.md` for milestones and verification criteria.

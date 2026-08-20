@@ -3,10 +3,10 @@
 ## Source Of Truth
 
 - Active development is on `dev`, not the default `main` branch; `firmware/docs/ROADMAP.md` records the current milestones and verification criteria.
-- The current `dev` hardware and firmware target is AMEN_MINI on Teensy 4.1. Root `README.md` and `hardware/COMPONENT_HANDOFF.md` still describe an older AKOR_01/Pico design and contradict the actual `hardware/AMEN_MINI.*` files; do not use them to infer the active architecture.
-- `firmware/src/engine/` is the portable C++17 audio engine. It must remain free of Arduino/Teensy includes; hardware integration belongs under the future `firmware/src/teensy/` layer.
+- The current `dev` hardware and firmware target is AMEN_MINI on Teensy 4.1. Root `README.md` reflects the active architecture; `hardware/COMPONENT_HANDOFF.md` still describes the older AKOR_01/Pico design and contradicts the actual `hardware/AMEN_MINI.*` files, so do not use it to infer the active architecture.
+- `firmware/src/engine/` is the portable C++17 audio engine. It must remain free of Arduino/Teensy includes; hardware integration belongs under the `firmware/src/teensy/` layer.
 - Root-level C++ files and `compOut/` are standalone learning prototypes, not firmware entrypoints.
-- There is currently no build system, `firmware.ino`, or `src/teensy/`; Arduino commands in the roadmap describe future work, not a verification step that works today.
+- `firmware.ino` and `src/teensy/` are the Teensy integration layer in progress; Arduino commands in the roadmap describe future work, not a verification step that works today.
 
 ## Native Verification
 
