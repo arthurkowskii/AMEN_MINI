@@ -39,3 +39,15 @@ The board is a 2-layer, 1.6 mm PCB hosting a socketed Teensy 4.1, with the PJRC 
 
 - **Hardware**: PCB fabricated and photographed (above). The Teensy 4.1 + Audio Adapter build is the current target.
 - **Firmware**: active development on the `dev` branch (never `main`). The engine and the PC harness are shipped; the Teensy integration layer (J12/J13) is in progress. See `firmware/docs/ROADMAP.md` for milestones and verification criteria.
+
+## License
+
+The repository is licensed under **CC BY-NC 4.0** — see [LICENSE](LICENSE) for the full legal text.
+
+In plain words:
+
+- **Anyone can use, build, modify, and share AMEN_MINI** — for personal or any **non-commercial** use.
+- **Commercial use is not allowed** (no selling units, no commercial productions) without prior written permission from the author.
+- **Credit**: if you publish content *made with* AMEN_MINI on the internet (music, video, images), credit **Arthur Kowskii Croquebois** (kowskii.com). For personal or offline use, no credit is required.
+
+Made by [Arthur Kowskii Croquebois](https://kowskii.com) — sound designer & game developer.
