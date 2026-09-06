@@ -9,6 +9,11 @@
 
 namespace amen {
 
+enum class E2Page : uint8_t {
+    Root,
+    Scale
+};
+
 class MonoFramebuffer {
 public:
     static constexpr int kWidth = 128;
@@ -39,6 +44,8 @@ public:
 private:
     static std::array<uint8_t, 5> glyph(char c) noexcept {
         switch (c) {
+            case '(': return {1, 2, 2, 2, 1};
+            case ')': return {4, 2, 2, 2, 4};
             case '#': return {5, 7, 5, 7, 5};
             case '+': return {0, 2, 7, 2, 0};
             case '-': return {0, 0, 7, 0, 0};
@@ -78,6 +85,7 @@ private:
             case 'X': return {5, 5, 2, 5, 5};
             case 'Y': return {5, 5, 2, 2, 2};
             case 'Z': return {7, 1, 2, 4, 7};
+            case 'b': return {4, 4, 6, 5, 6};
             default: return {0, 0, 0, 0, 0};
         }
     }
@@ -98,68 +106,102 @@ private:
 class OledUi {
 public:
     void showOctave(uint32_t now) noexcept {
-        octaveOverlay_ = true;
-        octaveChangedAt_ = now;
+        overlay_ = Overlay::Octave;
+        overlayChangedAt_ = now;
+    }
+
+    void showE2(E2Page page, uint32_t now) noexcept {
+        overlay_ = page == E2Page::Root ? Overlay::Root : Overlay::Scale;
+        overlayChangedAt_ = now;
     }
 
     const MonoFramebuffer& render(const SimpleMidiController& controller, uint32_t now) noexcept {
         framebuffer_.clear();
-        if (octaveOverlay_ && now - octaveChangedAt_ < 800U) renderOctave(controller);
+        if (overlay_ != Overlay::None && now - overlayChangedAt_ < 800U) renderOverlay(controller);
         else {
-            octaveOverlay_ = false;
+            overlay_ = Overlay::None;
             renderHome(controller);
         }
         return framebuffer_;
     }
 
-    bool overlayVisible() const noexcept { return octaveOverlay_; }
+    bool overlayVisible() const noexcept { return overlay_ != Overlay::None; }
 
 private:
-    static const char* noteName(uint8_t note) noexcept {
-        static constexpr const char* names[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-        return names[note % 12];
-    }
+    enum class Overlay : uint8_t {
+        None,
+        Octave,
+        Root,
+        Scale
+    };
 
     void renderHome(const SimpleMidiController& controller) noexcept {
         char line[32];
-        std::snprintf(line, sizeof(line), "OCT %+d M%u-%u", controller.octave(), controller.baseNote(), controller.baseNote() + 19);
+        std::snprintf(line, sizeof(line), "%s %s OCT %+d", pitchClassName(controller.rootPitchClass()),
+                      modeShortName(controller.mode()), controller.octave());
         framebuffer_.drawText(0, 0, line);
+
+        std::snprintf(line, sizeof(line), "RNG M%u-%u", controller.rootNote(), controller.highestNote());
+        framebuffer_.drawText(0, 7, line);
 
         if (controller.lastNote() >= 0) {
             const uint8_t note = static_cast<uint8_t>(controller.lastNote());
-            std::snprintf(line, sizeof(line), "LAST %s M%u", noteName(note), note);
-            framebuffer_.drawText(0, 7, line);
+            std::snprintf(line, sizeof(line), "LAST %s M%u H%u", pitchClassName(note % 12), note, controller.heldCount());
+            framebuffer_.drawText(0, 14, line);
         } else {
-            framebuffer_.drawText(0, 7, "PLAY A PAD");
+            framebuffer_.drawText(0, 14, "PLAY A PAD");
         }
 
-        std::snprintf(line, sizeof(line), "HELD %u", controller.heldCount());
-        framebuffer_.drawText(0, 14, line);
-
         for (uint8_t key = 0; key < SimpleMidiController::kKeyCount; ++key) {
-            const int x = 4 + key * 6;
-            if (controller.activeNote(key) >= 0) framebuffer_.fillRect(x, 24, 4, 7);
+            const int x = 4 + key * 10;
+            if (controller.activeNote(key) >= 0) framebuffer_.fillRect(x, 24, 6, 7);
             else {
-                framebuffer_.fillRect(x, 30, 4, 1);
+                framebuffer_.fillRect(x, 30, 6, 1);
                 framebuffer_.setPixel(x, 29);
-                framebuffer_.setPixel(x + 3, 29);
+                framebuffer_.setPixel(x + 5, 29);
             }
         }
     }
 
-    void renderOctave(const SimpleMidiController& controller) noexcept {
-        char value[8];
-        char range[24];
-        framebuffer_.drawText(0, 1, "OCTAVE");
-        std::snprintf(value, sizeof(value), "%+d", controller.octave());
-        framebuffer_.drawText(48, 8, value, 3);
-        std::snprintf(range, sizeof(range), "M%u-%u", controller.baseNote(), controller.baseNote() + 19);
-        framebuffer_.drawText(0, 26, range);
+    void renderOverlay(const SimpleMidiController& controller) noexcept {
+        if (overlay_ == Overlay::Octave) {
+            char value[8];
+            char range[24];
+            framebuffer_.drawText(0, 1, "OCTAVE");
+            std::snprintf(value, sizeof(value), "%+d", controller.octave());
+            framebuffer_.drawText(48, 8, value, 3);
+            std::snprintf(range, sizeof(range), "M%u-%u", controller.rootNote(), controller.highestNote());
+            framebuffer_.drawText(0, 26, range);
+            return;
+        }
+
+        const bool rootPage = overlay_ == Overlay::Root;
+        framebuffer_.drawText(0, 1, rootPage ? "ROOT" : "SCALE");
+        if (rootPage) framebuffer_.drawText(48, 9, pitchClassName(controller.rootPitchClass()), 3);
+        else {
+            framebuffer_.drawText(0, 8, modeName(controller.mode()), 2);
+            framebuffer_.drawText(0, 21, modeDescription(controller.mode()));
+        }
+        drawPageDots(rootPage ? E2Page::Root : E2Page::Scale);
+    }
+
+    void drawPageDots(E2Page page) noexcept {
+        for (uint8_t index = 0; index < 2; ++index) {
+            const int x = 112 + index * 9;
+            const bool active = index == static_cast<uint8_t>(page);
+            if (active) framebuffer_.fillRect(x, 26, 5, 5);
+            else {
+                framebuffer_.fillRect(x, 26, 5, 1);
+                framebuffer_.fillRect(x, 30, 5, 1);
+                framebuffer_.fillRect(x, 27, 1, 3);
+                framebuffer_.fillRect(x + 4, 27, 1, 3);
+            }
+        }
     }
 
     MonoFramebuffer framebuffer_{};
-    uint32_t octaveChangedAt_{};
-    bool octaveOverlay_{};
+    uint32_t overlayChangedAt_{};
+    Overlay overlay_{Overlay::None};
 };
 
 }

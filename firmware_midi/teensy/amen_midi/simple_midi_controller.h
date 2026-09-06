@@ -1,5 +1,7 @@
 #pragma once
 
+#include "diatonic_scales.h"
+
 #include <array>
 #include <cstdint>
 
@@ -19,7 +21,7 @@ struct MidiCommand {
 
 class SimpleMidiController {
 public:
-    static constexpr uint8_t kKeyCount = 20;
+    static constexpr uint8_t kKeyCount = 12;
     static constexpr uint8_t kChannel = 1;
     static constexpr uint8_t kVelocity = 100;
 
@@ -29,7 +31,7 @@ public:
 
     MidiCommand press(uint8_t key) noexcept {
         if (key >= kKeyCount || activeNotes_[key] >= 0) return {};
-        const uint8_t note = static_cast<uint8_t>(baseNote() + key);
+        const uint8_t note = noteForKey(key);
         activeNotes_[key] = note;
         lastNote_ = note;
         return {MidiCommandType::NoteOn, note, kVelocity};
@@ -43,17 +45,33 @@ public:
     }
 
     bool turnOctave(int delta) noexcept {
-        const int next = octave_ + delta;
-        const int clamped = next < kMinOctave ? kMinOctave : (next > kMaxOctave ? kMaxOctave : next);
+        const int64_t next = static_cast<int64_t>(octave_) + delta;
+        const int clamped = next < kMinOctave ? kMinOctave : (next > kMaxOctave ? kMaxOctave : static_cast<int>(next));
         if (clamped == octave_) return false;
         octave_ = static_cast<int8_t>(clamped);
         return true;
     }
 
-    int octave() const noexcept { return octave_; }
-    uint8_t baseNote() const noexcept {
-        return static_cast<uint8_t>(60 + octave_ * 12);
+    bool turnRoot(int delta) noexcept {
+        const uint8_t next = wrap(rootPitchClass_, delta, 12);
+        if (next == rootPitchClass_) return false;
+        rootPitchClass_ = next;
+        return true;
     }
+
+    bool turnMode(int delta) noexcept {
+        const uint8_t current = static_cast<uint8_t>(mode_);
+        const uint8_t next = wrap(current, delta, kDiatonicModeCount);
+        if (next == current) return false;
+        mode_ = static_cast<DiatonicMode>(next);
+        return true;
+    }
+
+    int octave() const noexcept { return octave_; }
+    uint8_t rootPitchClass() const noexcept { return rootPitchClass_; }
+    DiatonicMode mode() const noexcept { return mode_; }
+    uint8_t rootNote() const noexcept { return noteForKey(0); }
+    uint8_t highestNote() const noexcept { return noteForKey(kKeyCount - 1); }
     int16_t activeNote(uint8_t key) const noexcept {
         return key < kKeyCount ? activeNotes_[key] : -1;
     }
@@ -66,9 +84,22 @@ public:
 
 private:
     static constexpr int kMinOctave = -5;
-    static constexpr int kMaxOctave = 4;
+    static constexpr int kMaxOctave = 3;
+
+    static uint8_t wrap(uint8_t current, int delta, uint8_t count) noexcept {
+        const int64_t value = static_cast<int64_t>(current) + delta;
+        const int64_t wrapped = ((value % count) + count) % count;
+        return static_cast<uint8_t>(wrapped);
+    }
+
+    uint8_t noteForKey(uint8_t key) const noexcept {
+        return static_cast<uint8_t>(60 + octave_ * 12 + rootPitchClass_ + scaleDegreeOffset(mode_, key));
+    }
+
     std::array<int16_t, kKeyCount> activeNotes_{};
     int8_t octave_{};
+    uint8_t rootPitchClass_{};
+    DiatonicMode mode_{DiatonicMode::Ionian};
     int16_t lastNote_{-1};
 };
 

@@ -1,37 +1,25 @@
 # AMEN MIDI
 
-Firmware MIDI frère pour le PCB AMEN_MINI / Teensy 4.1. Le cœur C++17 est portable, statique et testable sur Linux; il n'inclut ni Arduino ni dépendance externe.
+Firmware MIDI pour le PCB AMEN_MINI et Teensy 4.1. Le firmware actif est construit progressivement dans `teensy/amen_midi/`; les anciens modules sous `src/` ne participent plus au build CMake ni au sketch.
 
-## Build et validation Linux
+## État actuel
 
-```sh
-cmake -S . -B build
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-./build/amen_midi_harness
+Les douze pads inférieurs jouent douze degrés consécutifs d’un mode diatonique. E1 règle l’octave. E2 sélectionne la fondamentale ou, après un clic, l’un des sept modes diatoniques. Les huit pads supérieurs, Shift et les autres encodeurs restent réservés aux prochaines étapes.
+
+Le cœur musical minimal et l’interface OLED sont des en-têtes C++17 portables, statiques et sans dépendance Arduino. `amen_midi.ino` contient uniquement l’intégration Teensy : scan, USB-MIDI et backend OLED I²C direct.
+
+## Tests natifs
+
+Depuis `firmware_midi/` sous PowerShell :
+
+```powershell
+cmake -S . -B "$env:TEMP\amen-midi-build" -G "MinGW Makefiles"
+cmake --build "$env:TEMP\amen-midi-build"
+ctest --test-dir "$env:TEMP\amen-midi-build" --output-on-failure
 ```
 
-Le build impose `-std=c++17 -Wall -Wextra -Wpedantic -Werror`. Le runner unique est `amen_midi_tests`.
+Le build impose C++17 et traite les avertissements comme des erreurs. `tests/test_main.cpp` valide les gammes, les limites MIDI, les NoteOff après changement d’état et les transitions de l’OLED.
 
-## Arborescence
+## Teensy 4.1
 
-- `src/music`: presets et voicings;
-- `src/midi`: événements bornés et ownership des notes;
-- `src/performance`: sources, snapshots, HOLD, Gate/Latch, Panic;
-- `src/profiles`: destinations CC externes;
-- `src/controls`: deltas relatifs;
-- `src/algorithms`: ordonnanceur FX sans allocation;
-- `src/ui`: modèle texte fixe;
-- `src/teensy`: pin map réel et interface d'adaptation sans Arduino;
-- `teensy/amen_midi`: sketch Teensy 4.1 (matrice, encodeurs, OLED, USB-MIDI);
-- `tests`: tests natifs; `apps`: démonstrateur console.
-
-## Statut de validation
-
-Validé sur hôte: compilation stricte, catalogues/voicings, ownership MIDI, interaction, contrôles, FX, HOLD, UI, pin map statique et harness. Non validé sur matériel: scan matriciel électrique, quadrature encodeurs, cadence USB MIDI, écran et latence Teensy. `src/teensy/adapter.hpp` est le contrat d'intégration; le toolchain Teensy n'est pas requis par ce projet. Les presets artistiques sont des prototypes déterministes à auditer musicalement, pas des voicings validés à l'écoute.
-
-## Contrat de drainage MIDI
-
-Les événements sont produits dans un buffer statique. Si ce buffer est saturé au moment d'un `NoteOn`, le moteur conserve une cible de synchronisation bornée, visible via `syncPending()`, sans créer d'owner fantôme. Après avoir envoyé puis vidé le buffer avec `clearEvents()`, l'hôte doit appeler `servicePending(now)` (ou laisser le prochain `tick(now)` le faire) et drainer les événements récupérés. L'adaptateur Teensy fourni applique automatiquement cette séquence. `tick()` et `servicePending()` ne font aucun I/O ni allocation dynamique. Les comparaisons de deadlines restent wrap-safe tant que deux appels de service successifs sont espacés de moins de `2^31` ms; une période sans source ne conserve pas d'ancienne deadline, car le scheduler redémarre lors du passage de zéro à une source active.
-
-`assignFx()` retourne `false` sans modifier le slot lorsque le pad, le type ou le mode est hors plage. Les appels valides retournent `true`.
+Le FQBN actif est `teensy:avr:teensy41:usb=serialmidi`. `scripts/build_teensy.sh` compile directement `teensy/amen_midi/` et écrit le HEX dans `teensy_build/`.

@@ -20,6 +20,9 @@ uint32_t changedAt[21] = {};
 volatile int32_t encoderPositions[7] = {};
 uint8_t encoderAb[7] = {};
 int8_t encoderPartial[7] = {};
+volatile bool e2Push = false;
+bool e2PushRaw = false;
+uint32_t e2PushChangedAt = 0;
 volatile uint32_t scanCount = 0;
 bool firstScan = true;
 IntervalTimer scanTimer;
@@ -27,8 +30,10 @@ IntervalTimer scanTimer;
 amen::SimpleMidiController controller;
 bool previousContacts[21] = {};
 int32_t previousEncoderPositions[7] = {};
+bool previousE2Push = false;
 bool inputReady = false;
 amen::OledUi oledUi;
+amen::E2Page e2Page = amen::E2Page::Root;
 std::array<uint8_t, amen::MonoFramebuffer::kSize> displayedFrame{};
 uint8_t oledAddress = 0;
 uint32_t lastDisplayAt = 0;
@@ -71,6 +76,7 @@ bool display(const amen::MonoFramebuffer& framebuffer) {
 void scanInputs() {
     const uint32_t now = micros();
     bool sample[21];
+    const bool e2PushSample = !digitalRead(PUSH[1]);
 
     for (uint8_t row = 0; row < 5; ++row) {
         digitalWrite(ROWS[row], LOW);
@@ -109,6 +115,15 @@ void scanInputs() {
         if (contacts[i] != raw[i] && now - changedAt[i] >= DEBOUNCE_US) contacts[i] = raw[i];
     }
 
+    if (firstScan) {
+        e2PushRaw = e2Push = e2PushSample;
+        e2PushChangedAt = now;
+    } else if (e2PushSample != e2PushRaw) {
+        e2PushRaw = e2PushSample;
+        e2PushChangedAt = now;
+    }
+    if (e2Push != e2PushRaw && now - e2PushChangedAt >= DEBOUNCE_US) e2Push = e2PushRaw;
+
     firstScan = false;
     ++scanCount;
 }
@@ -138,18 +153,20 @@ void setup() {
     oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
-    Serial.println("AMEN MIDI V0");
+    Serial.println("AMEN MIDI DIATONIC");
     if (!oledReady) Serial.println("OLED unavailable");
 }
 
 void loop() {
     bool contactSnapshot[21];
     int32_t encoderSnapshot[7];
+    bool e2PushSnapshot;
     uint32_t scans;
 
     noInterrupts();
     for (uint8_t i = 0; i < 21; ++i) contactSnapshot[i] = contacts[i];
     for (uint8_t i = 0; i < 7; ++i) encoderSnapshot[i] = encoderPositions[i];
+    e2PushSnapshot = e2Push;
     scans = scanCount;
     interrupts();
 
@@ -157,6 +174,7 @@ void loop() {
         if (scans < 20) return;
         for (uint8_t i = 0; i < 21; ++i) previousContacts[i] = contactSnapshot[i];
         for (uint8_t i = 0; i < 7; ++i) previousEncoderPositions[i] = encoderSnapshot[i];
+        previousE2Push = e2PushSnapshot;
         inputReady = true;
         return;
     }
@@ -173,10 +191,33 @@ void loop() {
     const int32_t octaveDelta = encoderSnapshot[0] - previousEncoderPositions[0];
     if (octaveDelta != 0) {
         if (controller.turnOctave(octaveDelta)) {
-            Serial.printf("Octave %+d, SW1=%u, SW20=%u\n", controller.octave(), controller.baseNote(), controller.baseNote() + 19);
+            Serial.printf("Octave %+d, SW1=%u, SW12=%u\n", controller.octave(), controller.rootNote(), controller.highestNote());
             oledUi.showOctave(millis());
         }
         previousEncoderPositions[0] = encoderSnapshot[0];
+    }
+
+    if (e2PushSnapshot != previousE2Push) {
+        if (e2PushSnapshot) {
+            e2Page = e2Page == amen::E2Page::Root ? amen::E2Page::Scale : amen::E2Page::Root;
+            oledUi.showE2(e2Page, millis());
+            Serial.printf("E2 %s\n", e2Page == amen::E2Page::Root ? "ROOT" : "SCALE");
+        }
+        previousE2Push = e2PushSnapshot;
+    }
+
+    const int32_t e2Delta = encoderSnapshot[1] - previousEncoderPositions[1];
+    if (e2Delta != 0) {
+        const bool changed = e2Page == amen::E2Page::Root
+            ? controller.turnRoot(e2Delta)
+            : controller.turnMode(e2Delta);
+        if (changed) {
+            oledUi.showE2(e2Page, millis());
+            Serial.printf("Root %s, scale %s, SW1=%u, SW12=%u\n",
+                          amen::pitchClassName(controller.rootPitchClass()), amen::modeName(controller.mode()),
+                          controller.rootNote(), controller.highestNote());
+        }
+        previousEncoderPositions[1] = encoderSnapshot[1];
     }
 
     if (sent) usbMIDI.send_now();
