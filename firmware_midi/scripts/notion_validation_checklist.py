@@ -13,7 +13,7 @@ Le cœur hôte est validé (Debug/Release/ASan/UBSan, revues conformité + quali
 
 1. USB-MIDI : appareil énuméré (fqbn teensy41 usb=SERIAL_MIDI), Serum/Pigments/Falcon reçoivent notes et accords, CC Shift+E1..E7 corrects, aucun message fantôme au boot
 2. Matrice 5x4 + COL_SHIFT : 21 touches sans rebond, aucun ghosting multi-appui, ordre PAD01..12 = SW1..12 (bas→haut, gauche→droite), FX01..08 = SW13..20, SW21 = Shift bas-gauche
-3. Encodeurs ENC1..7 : sens correct (sinon échanger A/B dans teensy_pinmap.h), un cran = un pas, clics OK, Shift+clic E7 = Panic
+3. Encodeurs ENC1..7 : sens correct (sinon échanger A/B dans amen_midi.ino), un cran = un pas, clics OK, Shift+clic E7 = Panic
 4. OLED SSD1306 (I2C 18/19, 0x3C) : 4 lignes lisibles, live update, pas de freeze après 1 h
 5. Bimanuel : note-first et FX-first, Gate au-dessus de Latch, Gate A tenu repris après Gate B, aucun stale event
 6. Hold : double-clic Shift 350 ms ON/OFF, re-appui degré tenu le retire, simple Shift ne bascule jamais

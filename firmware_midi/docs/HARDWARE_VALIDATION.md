@@ -29,7 +29,7 @@ dans cette page, sur Notion et dans un commit.
 
 ## 3. Encodeurs (ENC1..ENC7)
 
-- [ ] Sens de rotation correct pour E1..E7 (sinon échanger A/B dans `src/teensy/teensy_pinmap.h`)
+- [ ] Sens de rotation correct pour E1..E7 (sinon échanger A/B dans `amen_midi.ino`)
 - [ ] Un cran = un pas, pas de saut ni d'inversion en rotation rapide
 - [ ] Clics détectés (debounce OK), notamment Shift + clic E7 = Panic
 - [ ] E5 parcourt bien les 9 formes NOTE → THIRTEENTH

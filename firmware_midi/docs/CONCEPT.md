@@ -1,6 +1,6 @@
 # Concept
 
-Statut : conception historique du moteur d’août 2026 sous `firmware_midi/src/`, exclu du build actif. Pour le firmware jouable, voir [../README.md](../README.md) et [CONTROLS.md](CONTROLS.md) ; pour la direction future, voir [MUSICAL_REDESIGN_PLAN.md](MUSICAL_REDESIGN_PLAN.md).
+Statut : conception historique du moteur d'août 2026, supprimé du dépôt le 6 septembre 2026 (tree `firmware_midi/src/` retirée). Pour le firmware jouable, voir [../README.md](../README.md) et [CONTROLS.md](CONTROLS.md) ; pour la direction future, voir [MUSICAL_REDESIGN_PLAN.md](MUSICAL_REDESIGN_PLAN.md).
 
 AMEN MIDI transforme les 12 pads en sources musicales stables (degrés 0..11) et les 8 pads FX en transformations assignables. Une source reçoit un `SourceId + GenerationId`, capture au pad-down son preset, root, variation, range et forme E5, puis conserve ce snapshot jusqu'à sa libération. Les paramètres changés ensuite ne réécrivent jamais une source tenue.
 

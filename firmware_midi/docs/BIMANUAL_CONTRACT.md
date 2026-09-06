@@ -1,6 +1,6 @@
 # Contrat bimanuel
 
-Statut : contrat historique du moteur d’août 2026 sous `firmware_midi/src/`, exclu du build actif. Les tokens, FX, Gate/Latch et autres comportements ci-dessous ne décrivent pas le sketch actuel ; voir [CONTROLS.md](CONTROLS.md).
+Statut : contrat historique du moteur d'août 2026, supprimé du dépôt le 6 septembre 2026 (tree `firmware_midi/src/` retirée). Les tokens, FX, Gate/Latch et autres comportements ci-dessous ne décrivent pas le sketch actuel ; voir [CONTROLS.md](CONTROLS.md).
 
 ## Sources et tokens
 
