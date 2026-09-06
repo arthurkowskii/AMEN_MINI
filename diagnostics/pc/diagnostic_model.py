@@ -31,6 +31,24 @@ PATTERN_LABELS = {
 COUNTERS = ("edges", "changes", "invalid", "positive", "negative", "a_edges", "b_edges")
 
 
+def diagnostic_steps(profile: dict) -> list[dict]:
+    steps = [{"id": "idle", "kind": "idle"}]
+    steps.extend({"id": item["id"], "kind": "contact", "contacts": [i]}
+                 for i, item in enumerate(profile["contacts"]))
+    steps.extend({"id": f"rotation_{item['id']}", "kind": "encoder", "encoder": i}
+                 for i, item in enumerate(profile["encoders"]))
+    for i, group in enumerate(profile.get("combinations", [])):
+        if (not isinstance(group, list) or len(group) < 2 or len(set(group)) != len(group)
+                or any(type(x) is not int or not 0 <= x < 28 for x in group)):
+            raise ValueError("Combinaison de matrice invalide.")
+        steps.append({"id": f"matrix_{i + 1}", "kind": "contact", "contacts": group})
+    steps.extend({"id": f"oled_{pattern}", "kind": "oled", "pattern": pattern}
+                 for pattern in PATTERNS)
+    if len({step["id"] for step in steps}) != len(steps):
+        raise ValueError("Identifiants de contrôles dupliqués.")
+    return steps
+
+
 def validate_state(state: dict) -> None:
     if not isinstance(state, dict) or state.get("type") != "state":
         raise ValueError("Trame d’état attendue.")
@@ -59,7 +77,7 @@ def validate_state(state: dict) -> None:
 
 
 class DiagnosticRun:
-    def __init__(self, profile: dict, metadata: dict, hello: dict):
+    def __init__(self, profile: dict, metadata: dict, hello: dict, start_index: int = 0):
         if len(profile.get("contacts", [])) != 28 or len(profile.get("encoders", [])) != 7:
             raise ValueError("Le profil doit décrire 28 contacts et 7 encodeurs.")
         if hello.get("protocol") != 1 or hello.get("profile") != profile.get("id"):
@@ -70,9 +88,12 @@ class DiagnosticRun:
         self.session_id = str(uuid4())
         self.created_at = datetime.now(timezone.utc).isoformat()
         self.ended_at = None
-        self.steps = self._make_steps()
+        self.steps = diagnostic_steps(self.profile)
+        if type(start_index) is not int or not 0 <= start_index < len(self.steps):
+            raise ValueError("Checkpoint de départ invalide.")
         self.results = {step["id"]: {"status": "not_tested"} for step in self.steps}
-        self.index = 0
+        self.start_index = start_index
+        self.index = start_index
         self.phase = "waiting_state"
         self.finished = False
         self.failed = False
@@ -90,23 +111,35 @@ class DiagnosticRun:
         self.first_sign = 0
         self.pattern_acknowledged = False
         self.pattern_seen = False
+        self.attempts = []
 
-    def _make_steps(self) -> list[dict]:
-        steps = [{"id": "idle", "kind": "idle"}]
-        steps.extend({"id": item["id"], "kind": "contact", "contacts": [i]}
-                     for i, item in enumerate(self.profile["contacts"]))
-        steps.extend({"id": f"rotation_{item['id']}", "kind": "encoder", "encoder": i}
-                     for i, item in enumerate(self.profile["encoders"]))
-        for i, group in enumerate(self.profile.get("combinations", [])):
-            if (not isinstance(group, list) or len(group) < 2 or len(set(group)) != len(group)
-                    or any(type(x) is not int or not 0 <= x < 28 for x in group)):
-                raise ValueError("Combinaison de matrice invalide.")
-            steps.append({"id": f"matrix_{i + 1}", "kind": "contact", "contacts": group})
-        steps.extend({"id": f"oled_{pattern}", "kind": "oled", "pattern": pattern}
-                     for pattern in PATTERNS)
-        if len({step["id"] for step in steps}) != len(steps):
-            raise ValueError("Identifiants de contrôles dupliqués.")
-        return steps
+    def retry_current(self) -> None:
+        if self.finished and not self.failed:
+            raise ValueError("Ce parcours terminé ne peut pas être repris.")
+        step_id = self.step["id"]
+        self.attempts.append({"step": step_id, "result": deepcopy(self.results[step_id]),
+                              "reason": self.reason or "Reprise demandée par l’opérateur",
+                              "ended_at": self.ended_at})
+        self.results[step_id] = {"status": "not_tested"}
+        self.trace.append({"step": step_id, "phase": "retry",
+                           "reason": self.reason or "Reprise demandée par l’opérateur"})
+        self.ended_at = None
+        self.phase = "waiting_state"
+        self.finished = False
+        self.failed = False
+        self.interrupted = False
+        self.reason = ""
+        self.elapsed = 0
+        self.phase_start = 0
+        self.last_state = None
+        self.baseline = None
+        self.step_start = None
+        self.cycle = 0
+        self.action_index = 0
+        self.rotation = 0
+        self.first_sign = 0
+        self.pattern_acknowledged = False
+        self.pattern_seen = False
 
     @property
     def step(self) -> dict:
@@ -384,15 +417,10 @@ class DiagnosticRun:
             self.fail("OLED : défaut visuel déclaré par l’opérateur")
 
     def report(self) -> dict:
-        checks = ("inspection_passed", "electrical_passed", "profile_confirmed")
-        fields = ("unit", "operator", "pcb_revision", "measurements", "power_notes")
-        preflight = (all(self.metadata.get(key) is True for key in checks)
-                     and all(isinstance(self.metadata.get(key), str)
-                             and self.metadata[key].strip() for key in fields))
         complete = all(value["status"] == "passed" for value in self.results.values())
         if self.failed:
             verdict = "non_conforme"
-        elif self.interrupted or not complete or not preflight:
+        elif self.interrupted or not complete:
             verdict = "incomplet"
         elif not TEST_PROFILE["qualified_on_hardware"]:
             verdict = "controles_reussis_profil_a_qualifier"
@@ -401,9 +429,9 @@ class DiagnosticRun:
         return deepcopy({
             "session_id": self.session_id, "created_at": self.created_at, "ended_at": self.ended_at,
             "application": APP_VERSION, "device": self.hello, "hardware_profile": self.profile,
-            "test_profile": TEST_PROFILE, "metadata": self.metadata, "preflight_complete": preflight,
+            "test_profile": TEST_PROFILE, "metadata": self.metadata,
             "verdict": verdict, "scope": "Connexions physiques et inspection visuelle OLED uniquement",
             "qualification": "Seuils de mise au point non encore qualifiés sur un assemblage réel.",
-            "results": self.results, "reason": self.reason, "trace": self.trace,
+            "results": self.results, "attempts": self.attempts, "reason": self.reason, "trace": self.trace,
             "last_state": self.last_state,
         })

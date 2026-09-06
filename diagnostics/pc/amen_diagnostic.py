@@ -14,7 +14,7 @@ import webbrowser
 import serial
 from serial.tools import list_ports
 
-from diagnostic_model import APP_VERSION, DiagnosticRun, TEST_PROFILE, validate_state
+from diagnostic_model import APP_VERSION, DiagnosticRun, TEST_PROFILE, diagnostic_steps, validate_state
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +34,9 @@ PATTERN_NAMES = {
 
 
 def find_loader():
+    repository_loader = ROOT / 'teensy.exe'
+    if repository_loader.is_file():
+        return str(repository_loader)
     roots = [Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'Arduino15',
              Path(tempfile.gettempdir()) / 'opencode' / 'amen-arduino-data']
     for root in roots:
@@ -41,6 +44,25 @@ def find_loader():
         if candidate.is_file():
             return str(candidate)
     return ''
+
+
+def make_step_labels(profile):
+    labels = []
+    for number, step in enumerate(diagnostic_steps(profile), 1):
+        if step['kind'] == 'idle':
+            name = 'Repos initial'
+        elif step['kind'] == 'encoder':
+            name = f'Rotation {profile["encoders"][step["encoder"]]["label"]}'
+        elif step['kind'] == 'oled':
+            name = f'OLED — {PATTERN_NAMES[step["pattern"]]}'
+        elif len(step['contacts']) == 1:
+            name = f'Contact {profile["contacts"][step["contacts"][0]]["label"]}'
+        else:
+            matrix_index = int(step['id'].split('_')[1]) - 1
+            descriptions = profile.get('combination_labels', [])
+            name = f'Matrice — {descriptions[matrix_index]}' if matrix_index < len(descriptions) else f'Combinaison matrice {matrix_index + 1}'
+        labels.append(f'{number:02d} — {name}')
+    return labels
 
 
 class DiagnosticApp:
@@ -67,6 +89,9 @@ class DiagnosticApp:
         self.free = False
         self.saved = False
         self.closed = False
+        self.retrying = False
+        self.start_index = 0
+        self.step_labels = make_step_labels(profile)
         self.root.title(f'AMEN MINI — Diagnostic d’assemblage {APP_VERSION}')
         self.root.geometry('1180x900')
         self.root.minsize(900, 680)
@@ -74,7 +99,6 @@ class DiagnosticApp:
         self.status = tk.StringVar(value='Déconnecté — aucun diagnostic matériel effectué')
         self.instruction = tk.StringVar(value='Préparer la première alimentation, puis choisir le port du diagnostic.')
         self.report_status = tk.StringVar(value='Aucun rapport enregistré')
-        self.fields = {}
         self.build_ui()
         self.refresh_ports()
         self.root.after(30, self.tick)
@@ -84,7 +108,7 @@ class DiagnosticApp:
         shell.pack(fill='both', expand=True)
         ttk.Label(shell, textvariable=self.status).pack(anchor='w')
         self.preparation_visible = tk.BooleanVar(value=True)
-        ttk.Checkbutton(shell, text='Afficher la préparation et l’installation (à compléter avant le parcours)', variable=self.preparation_visible, command=self.toggle_preparation).pack(anchor='w')
+        ttk.Checkbutton(shell, text='Afficher l’aide de démarrage', variable=self.preparation_visible, command=self.toggle_preparation).pack(anchor='w')
         self.preparation_panel = ttk.Frame(shell)
         self.preparation_panel.pack(fill='x', pady=4)
         setup_canvas = tk.Canvas(self.preparation_panel, height=300, highlightthickness=0)
@@ -98,7 +122,7 @@ class DiagnosticApp:
         setup_canvas.bind('<Configure>', lambda event: setup_canvas.itemconfigure(setup_window, width=event.width))
         preparation = ttk.Frame(tabs, padding=8)
         installation = ttk.Frame(tabs, padding=8)
-        tabs.add(preparation, text='Préparation / contrôles manuels')
+        tabs.add(preparation, text='Avant de brancher')
         tabs.add(installation, text='Installer le diagnostic sur une Teensy vierge')
         self.build_preflight(preparation)
         self.build_install(installation)
@@ -114,6 +138,12 @@ class DiagnosticApp:
         actions = ttk.Frame(shell)
         actions.pack(fill='x')
         ttk.Button(actions, text='Nouveau parcours / réessayer', command=self.new_run).pack(side='left')
+        ttk.Label(actions, text='Commencer à :').pack(side='left', padx=(10, 3))
+        self.start_step = tk.StringVar(value=self.step_labels[0])
+        self.start_picker = ttk.Combobox(actions, textvariable=self.start_step, values=self.step_labels, width=43, state='readonly')
+        self.start_picker.pack(side='left')
+        self.retry_button = ttk.Button(actions, text='Erreur de manipulation — reprendre ce test', command=self.retry_current, state='disabled')
+        self.retry_button.pack(side='left', padx=(6, 0))
         ttk.Button(actions, text='Vue libre', command=self.free_view).pack(side='left')
         ttk.Button(actions, text='Exporter JSON', command=self.export).pack(side='right')
         instruction_label = ttk.Label(shell, textvariable=self.instruction, font=('Segoe UI', 13, 'bold'), wraplength=850)
@@ -163,25 +193,11 @@ class DiagnosticApp:
             self.canvas.pack(fill='both', expand=True, pady=6, before=self.board_legend)
 
     def build_preflight(self, frame):
-        labels = [('unit', 'Unité'), ('operator', 'Opérateur'), ('pcb_revision', 'Révision PCB'),
-                  ('3V3/GND', 'Hors tension : 3V3 / GND'), ('VIN/GND', 'Hors tension : VIN / GND'),
-                  ('3V3/VIN', 'Hors tension : 3V3 / VIN')]
-        for index, (key, label) in enumerate(labels):
-            row, col = divmod(index, 3)
-            ttk.Label(frame, text=label).grid(row=row * 2, column=col, sticky='w', padx=4)
-            self.fields[key] = tk.StringVar()
-            ttk.Entry(frame, textvariable=self.fields[key], width=32).grid(row=row * 2 + 1, column=col, sticky='ew', padx=4)
-            frame.columnconfigure(col, weight=1)
-        self.fields['power_notes'] = tk.StringVar()
-        ttk.Label(frame, text='Contexte des mesures, décision et première alimentation (source, limitation de courant, modules montés) :').grid(row=4, column=0, columnspan=3, sticky='w')
-        ttk.Entry(frame, textvariable=self.fields['power_notes']).grid(row=5, column=0, columnspan=3, sticky='ew')
-        checks = [('inspection_passed', 'Inspection soudures et orientation : conforme (manuel)'),
-                  ('electrical_passed', 'Mesures hors tension interprétées et alimentation autorisée (manuel)'),
-                  ('profile_confirmed', f'PCB physique conforme au profil {self.profile["id"]}')]
-        for row, (key, label) in enumerate(checks, 6):
-            self.fields[key] = tk.BooleanVar(value=False)
-            ttk.Checkbutton(frame, text=label, variable=self.fields[key]).grid(row=row, column=0, columnspan=3, sticky='w')
-        ttk.Label(frame, text='Saisir valeurs, unités et contexte. Aucun seuil universel en ohms ; un bip ne suffit pas. Le logiciel ne mesure ni ne protège les rails.', wraplength=800).grid(row=9, column=0, columnspan=3, sticky='w')
+        text = ('1. Carte hors tension : inspecter rapidement les soudures, les composants et l’orientation des modules.\n'
+                '2. Au multimètre : vérifier 3V3 / GND, VIN / GND et 3V3 / VIN.\n'
+                '3. Si les mesures paraissent normales, brancher la Teensy en USB.\n'
+                '4. Ne pas alimenter séparément VIN pendant que l’USB alimente la carte.')
+        ttk.Label(frame, text=text, wraplength=800, justify='left').pack(anchor='w')
 
     def build_install(self, frame):
         text = ('Une Teensy vierge peut ne présenter aucun port COM : c’est normal avant chargement du diagnostic.\n'
@@ -218,14 +234,6 @@ class DiagnosticApp:
             self.status.set('Chargeur ouvert — chargement à effectuer et vérifier dans Teensy Loader')
         except OSError as error:
             messagebox.showerror('Chargeur inaccessible', str(error))
-
-    def metadata(self):
-        values = {key: value.get() for key, value in self.fields.items()}
-        measurements = {key: values.pop(key).strip() for key in ('3V3/GND', 'VIN/GND', '3V3/VIN')}
-        values['measurements'] = '\n'.join(f'{key} : {value}' for key, value in measurements.items()) if all(measurements.values()) else ''
-        for key in ('unit', 'operator', 'pcb_revision', 'power_notes'):
-            values[key] = values[key].strip()
-        return values
 
     def refresh_ports(self):
         try:
@@ -283,6 +291,7 @@ class DiagnosticApp:
         self.pattern = None
         self.pattern_ack = False
         self.pattern_fresh = False
+        self.retrying = False
         self.draw_pattern()
         self.last_state_at = None
         self.status.set(reason)
@@ -311,16 +320,14 @@ class DiagnosticApp:
             return
         if self.pending:
             return
-        metadata = self.metadata()
-        complete = all(metadata[key] for key in ('unit', 'operator', 'pcb_revision', 'measurements', 'power_notes', 'inspection_passed', 'electrical_passed', 'profile_confirmed'))
-        if not complete:
-            self.preparation_visible.set(True)
-            self.toggle_preparation()
-            messagebox.showinfo('Préparation incomplète', 'Renseigner les mesures et tous les contrôles manuels. La vue libre reste accessible.')
-            return
         if not self.preserve_run('Nouvelle tentative demandée'):
             return
-        self.start_metadata = metadata
+        try:
+            self.start_index = self.step_labels.index(self.start_step.get())
+        except ValueError:
+            self.start_index = 0
+            self.start_step.set(self.step_labels[0])
+        self.start_metadata = {}
         self.free = False
         self.state = None
         self.last_seq = self.last_ms = None
@@ -332,6 +339,20 @@ class DiagnosticApp:
             self.disconnect(f'Début de parcours impossible : {error}')
             return
         self.instruction.set('Attente de l’accusé de début — aucune mesure antérieure ne compte.')
+
+    def retry_current(self):
+        if (not self.port or not self.hello or self.pending or not self.run
+                or (self.run.finished and not self.run.failed)):
+            return
+        try:
+            self.port.reset_input_buffer()
+            self.buffer.clear()
+            self.retrying = True
+            self.send('start')
+        except (OSError, serial.SerialException) as error:
+            self.disconnect(f'Reprise impossible : {error}')
+            return
+        self.instruction.set('Remise à zéro des mesures — reprise du test en échec…')
 
     def free_view(self):
         if self.pending:
@@ -384,9 +405,13 @@ class DiagnosticApp:
                 if not packet['ok'] and command != 'pattern':
                     raise ValueError(f'Commande {command} refusée')
                 if command == 'start':
-                    self.run = DiagnosticRun(self.profile, self.start_metadata, dict(self.hello))
-                    self.trace = deque(maxlen=2000)
-                    self.trace_truncated = 0
+                    if self.retrying:
+                        self.run.retry_current()
+                        self.retrying = False
+                    else:
+                        self.run = DiagnosticRun(self.profile, self.start_metadata, dict(self.hello), self.start_index)
+                        self.trace = deque(maxlen=2000)
+                        self.trace_truncated = 0
                     self.saved = False
                     self.last_seq = self.last_ms = None
                     self.last_state_at = time.monotonic()
@@ -478,6 +503,11 @@ class DiagnosticApp:
         free_ready = bool(self.free and not self.run and self.port and self.hello and not self.pending)
         self.free_patterns.configure(state='readonly' if free_ready else 'disabled')
         self.replay.configure(state='normal' if (enabled or (free_ready and self.pattern_ack and self.pattern)) and not self.pending else 'disabled')
+        retry_ready = bool(self.run and (not self.run.finished or self.run.failed)
+                           and self.port and self.hello and not self.pending)
+        self.retry_button.configure(state='normal' if retry_ready else 'disabled')
+        picker_ready = not self.run or self.run.finished
+        self.start_picker.configure(state='readonly' if picker_ready else 'disabled')
         self.draw_board()
 
     def confirm_visual(self, passed):

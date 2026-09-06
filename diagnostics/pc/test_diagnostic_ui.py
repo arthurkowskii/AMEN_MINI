@@ -6,6 +6,7 @@ import tkinter as tk
 import unittest
 from unittest.mock import patch
 
+import amen_diagnostic
 from amen_diagnostic import DiagnosticApp
 from test_diagnostic_model import Bench, profile, state
 
@@ -61,6 +62,13 @@ class InterfaceTests(unittest.TestCase):
         self.app.send("hello")
         self.app.receive({"type": "hello", "id": self.app.command_id,
                           "protocol": 1, "firmware": "test", "profile": "fixture", "boot": 123})
+
+    def test_repository_loader_is_selected_by_default(self):
+        with tempfile.TemporaryDirectory() as folder:
+            loader = Path(folder) / "teensy.exe"
+            loader.touch()
+            with patch.object(amen_diagnostic, "ROOT", Path(folder)):
+                self.assertEqual(amen_diagnostic.find_loader(), str(loader))
 
     def start(self):
         self.hello()
@@ -220,12 +228,32 @@ class InterfaceTests(unittest.TestCase):
         self.assertFalse(self.app.saved)
         self.assertTrue(self.app.run.failed)
 
-    def test_preflight_requires_three_actual_measurements(self):
-        self.app.fields["3V3/GND"].set("10 kohm")
-        self.app.fields["VIN/GND"].set("20 kohm")
-        self.assertEqual(self.app.metadata()["measurements"], "")
-        self.app.fields["3V3/VIN"].set("30 kohm")
-        self.assertIn("3V3/VIN : 30 kohm", self.app.metadata()["measurements"])
+    def test_new_run_starts_without_preflight_form(self):
+        self.hello()
+        self.app.new_run()
+        self.assertEqual(self.app.start_metadata, {})
+        self.assertEqual(self.port.sent[-1]["cmd"], "start")
+
+    def test_selected_start_step_is_used_without_passing_previous_steps(self):
+        self.hello()
+        self.app.start_step.set(self.app.step_labels[3])
+        self.app.new_run()
+        self.app.receive({"type": "ack", "id": self.app.command_id, "ok": True})
+        self.assertEqual(self.app.run.step["id"], "SW3")
+        self.assertEqual(self.app.run.progress[0], 0)
+
+    def test_retry_restarts_failed_step_without_losing_previous_results(self):
+        self.start()
+        self.app.receive(state())
+        self.app.run._pass_step(self.app.run.last_state)
+        self.app.run.fail("Erreur de manipulation")
+        failed_step = self.app.run.step["id"]
+        self.app.retry_current()
+        self.assertEqual(self.port.sent[-1]["cmd"], "start")
+        self.app.receive({"type": "ack", "id": self.app.command_id, "ok": True})
+        self.assertEqual(self.app.run.step["id"], failed_step)
+        self.assertEqual(self.app.run.results["idle"]["status"], "passed")
+        self.assertEqual(len(self.app.run.attempts), 1)
 
 
 if __name__ == "__main__":

@@ -24,9 +24,7 @@ def state() -> dict:
 
 class Bench:
     def __init__(self, sign: int = 1):
-        metadata = {"unit": "TEST", "operator": "test", "pcb_revision": "fixture",
-                    "inspection_passed": True, "electrical_passed": True, "profile_confirmed": True,
-                    "measurements": "simulated test measurements", "power_notes": "simulation"}
+        metadata = {"fixture": "TEST"}
         self.run = DiagnosticRun(profile(), metadata, {"protocol": 1, "profile": "fixture"})
         self.state = state()
         self.sign = sign
@@ -102,11 +100,47 @@ class DiagnosticTests(unittest.TestCase):
         bench.until(lambda: bench.run.finished)
         self.assertFalse(bench.run.failed)
 
-    def test_missing_manual_preflight_never_passes(self):
+    def test_metadata_does_not_affect_completed_verdict(self):
         bench = Bench()
-        bench.run.metadata["electrical_passed"] = False
+        bench.run.metadata = {}
+        bench.until(lambda: bench.run.finished)
+        report = bench.run.report()
+        self.assertEqual(report["verdict"], "controles_reussis_profil_a_qualifier")
+        self.assertNotIn("preflight_complete", report)
+
+    def test_starting_from_selected_step_keeps_previous_steps_untested(self):
+        run = DiagnosticRun(profile(), {}, {"protocol": 1, "profile": "fixture"}, start_index=3)
+        self.assertEqual(run.step["id"], "SW3")
+        self.assertTrue(all(run.results[step["id"]]["status"] == "not_tested"
+                            for step in run.steps[:3]))
+        bench = Bench()
+        bench.run = run
+        bench.tick()
         bench.until(lambda: bench.run.finished)
         self.assertEqual(bench.run.report()["verdict"], "incomplet")
+
+    def test_retry_current_step_preserves_successes_and_failed_attempt(self):
+        bench = Bench()
+        bench.until(lambda: bench.run.index == 1)
+        bench.run.fail("Erreur de manipulation")
+        bench.run.retry_current()
+        self.assertEqual(bench.run.results["idle"]["status"], "passed")
+        self.assertEqual(bench.run.results["SW1"]["status"], "not_tested")
+        self.assertEqual(bench.run.attempts[0]["step"], "SW1")
+        self.assertEqual(bench.run.phase, "waiting_state")
+        self.assertFalse(bench.run.finished)
+        bench.tick()
+        bench.until(lambda: bench.run.finished)
+        self.assertEqual(bench.run.report()["verdict"], "controles_reussis_profil_a_qualifier")
+        self.assertEqual(len(bench.run.report()["attempts"]), 1)
+
+    def test_active_step_can_be_restarted_by_operator(self):
+        bench = Bench()
+        step_id = bench.run.step["id"]
+        bench.run.retry_current()
+        self.assertEqual(bench.run.step["id"], step_id)
+        self.assertEqual(bench.run.phase, "waiting_state")
+        self.assertEqual(bench.run.attempts[0]["reason"], "Reprise demandée par l’opérateur")
 
     def test_no_states_or_partial_run_is_incomplete(self):
         bench = Bench()
@@ -271,8 +305,8 @@ class DiagnosticTests(unittest.TestCase):
     def test_report_is_an_independent_snapshot(self):
         bench = Bench()
         report = bench.run.report()
-        bench.run.metadata["unit"] = "CHANGED"
-        self.assertEqual(report["metadata"]["unit"], "TEST")
+        bench.run.metadata["fixture"] = "CHANGED"
+        self.assertEqual(report["metadata"]["fixture"], "TEST")
         saved = deepcopy(bench.run.report())
         bench.run.interrupt("USB déconnecté")
         self.assertNotEqual(saved["results"], bench.run.report()["results"])
