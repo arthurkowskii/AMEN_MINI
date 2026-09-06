@@ -10,7 +10,7 @@ constexpr uint8_t COLS[] = {0, 1, 2, 3, 4};
 constexpr uint8_t ENCODER_A[] = {16, 22, 25, 27, 29, 31, 33};
 constexpr uint8_t ENCODER_B[] = {17, 24, 26, 28, 30, 32, 34};
 constexpr uint8_t PUSH[] = {35, 36, 37, 38, 39, 40, 41};
-constexpr int8_t QUADRATURE[] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
+constexpr int8_t QUADRATURE[] = {0, 1, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, -1, 1, 0};
 constexpr uint32_t SCAN_US = 500;
 constexpr uint32_t DEBOUNCE_US = 5000;
 
