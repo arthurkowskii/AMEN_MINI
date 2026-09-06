@@ -1,8 +1,12 @@
 # AMEN MIDI - Plan de refondation musicale
 
-Statut : recherche et conception, aucune décision d'implémentation.
+Statut au 6 septembre 2026 : socle jouable implémenté et auditionné ; recherche conservée pour la suite.
 
-Ce document décrit la direction musicale envisagée pour remplacer la logique de performance actuelle. Il ne décrit pas le comportement déjà implémenté dans le firmware.
+Le firmware actif joue douze degrés et huit slots harmoniques momentanés globaux en LIFO. E2 alterne `ROOT` / `PRESET` : `MAJOR` (ionien), `MINOR` (éolien), `HARM MIN` (mineur harmonique), `CINEMA` (lydien ouvert), `DARK` (phrygien avec clusters). Cinq presets partagent trois palettes ; les recettes suivent les degrés de la gamme. Chaque tenue fige son contexte musical complet, puis interprète le slot global selon sa palette d’origine ; un nouveau preset concerne les nouveaux appuis, et `*` signale les anciennes tenues. L’ownership global préserve les hauteurs partagées, avec premier NoteOn / dernier NoteOff et buffer transactionnel.
+
+GCC strict / CTest et build Teensy validés ; upload réussi sans bootloader manuel. Arthur a auditionné la version : « super, c’est BEAUCOUP mieux ». La direction musicale est approuvée, sans prétendre à une validation matérielle exhaustive. Le voice leading automatique, les patterns, Shift, E3–E7 et les presets d’artistes ne sont pas implémentés. Demander à Arthur quelle micro-étape il souhaite avant de poursuivre.
+
+Les sections suivantes conservent la recherche d’origine : leurs exemples, questions ouvertes et séquences de travail ne constituent pas la liste des fonctions livrées. Le comportement actif fait référence à [CONTROLS.md](CONTROLS.md) et aux tables `teensy/amen_midi/musical_presets.h` et `harmony_recipes.h` ; le plan ci-dessous reste une direction, pas une implémentation à lancer en bloc.
 
 ## 1. Intention
 

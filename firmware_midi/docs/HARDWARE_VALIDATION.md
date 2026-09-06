@@ -1,5 +1,7 @@
 # AMEN MIDI — Validation matérielle (roadmap de bring-up)
 
+Statut : checklist historique du moteur d’août 2026, exclu du build actif. Les cases et validations ci-dessous concernent cet ancien périmètre, pas le sketch actuel. Le socle actuel a été compilé, uploadé et auditionné sur le premier PCB assemblé ; voir [../README.md](../README.md) pour le bilan daté et [CONTROLS.md](CONTROLS.md) pour les fonctions réellement disponibles.
+
 Le cœur hôte est validé (Debug/Release/ASan/UBSan, revues conformité + qualité APPROVED).
 Cette liste est la **seule partie non validée** : elle demande le PCB AMEN_MINI soudé + Teensy 4.1.
 

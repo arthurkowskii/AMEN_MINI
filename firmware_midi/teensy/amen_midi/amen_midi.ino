@@ -13,6 +13,7 @@ constexpr uint8_t PUSH[] = {35, 36, 37, 38, 39, 40, 41};
 constexpr int8_t QUADRATURE[] = {0, 1, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, -1, 1, 0};
 constexpr uint32_t SCAN_US = 500;
 constexpr uint32_t DEBOUNCE_US = 5000;
+constexpr uint8_t SCANNED_KEYS = 21;
 
 volatile bool contacts[21] = {};
 bool raw[21] = {};
@@ -153,7 +154,7 @@ void setup() {
     oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
-    Serial.println("AMEN MIDI DIATONIC");
+    Serial.println("AMEN MIDI HARMONIC");
     if (!oledReady) Serial.println("OLED unavailable");
 }
 
@@ -180,11 +181,19 @@ void loop() {
     }
 
     bool sent = false;
-    for (uint8_t key = 0; key < amen::SimpleMidiController::kKeyCount; ++key) {
+    amen::MidiCommand commands[amen::SimpleMidiController::kMaxEventsPerAction];
+    for (uint8_t key = 0; key < SCANNED_KEYS; ++key) {
         if (contactSnapshot[key] == previousContacts[key]) continue;
-        const auto command = contactSnapshot[key] ? controller.press(key) : controller.release(key);
-        sendMidi(command);
-        sent = sent || command.type != amen::MidiCommandType::None;
+        const uint8_t count = contactSnapshot[key]
+            ? controller.press(key, commands, amen::SimpleMidiController::kMaxEventsPerAction)
+            : controller.release(key, commands, amen::SimpleMidiController::kMaxEventsPerAction);
+        for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
+        sent = sent || count > 0;
+        if (contactSnapshot[key] && key >= amen::SimpleMidiController::kHarmonyStartKey &&
+            key < amen::SimpleMidiController::kShiftKey) {
+            oledUi.showHarmony(millis());
+            Serial.printf("PRESET %s, Harmony %s\n", controller.presetName(), controller.harmonyName());
+        }
         previousContacts[key] = contactSnapshot[key];
     }
 
@@ -199,9 +208,9 @@ void loop() {
 
     if (e2PushSnapshot != previousE2Push) {
         if (e2PushSnapshot) {
-            e2Page = e2Page == amen::E2Page::Root ? amen::E2Page::Scale : amen::E2Page::Root;
+            e2Page = e2Page == amen::E2Page::Root ? amen::E2Page::Preset : amen::E2Page::Root;
             oledUi.showE2(e2Page, millis());
-            Serial.printf("E2 %s\n", e2Page == amen::E2Page::Root ? "ROOT" : "SCALE");
+            Serial.printf("E2 %s\n", e2Page == amen::E2Page::Root ? "ROOT" : "PRESET");
         }
         previousE2Push = e2PushSnapshot;
     }
@@ -210,11 +219,11 @@ void loop() {
     if (e2Delta != 0) {
         const bool changed = e2Page == amen::E2Page::Root
             ? controller.turnRoot(e2Delta)
-            : controller.turnMode(e2Delta);
+            : controller.turnPreset(e2Delta);
         if (changed) {
             oledUi.showE2(e2Page, millis());
-            Serial.printf("Root %s, scale %s, SW1=%u, SW12=%u\n",
-                          amen::pitchClassName(controller.rootPitchClass()), amen::modeName(controller.mode()),
+            Serial.printf("Root %s, PRESET %s, Harmony %s, SW1=%u, SW12=%u\n",
+                          amen::pitchClassName(controller.rootPitchClass()), controller.presetName(), controller.harmonyName(),
                           controller.rootNote(), controller.highestNote());
         }
         previousEncoderPositions[1] = encoderSnapshot[1];

@@ -1,5 +1,7 @@
 # Presets harmoniques
 
+Statut : archive du moteur d’août 2026 sous `firmware_midi/src/`, exclu du build actif. Le catalogue ci-dessous est historique. Les cinq presets actuels (`MAJOR`, `MINOR`, `HARM MIN`, `CINEMA`, `DARK`) et leurs trois palettes sont définis dans `../teensy/amen_midi/musical_presets.h` et `harmony_recipes.h`, et décrits dans [CONTROLS.md](CONTROLS.md). Aucun preset d’artiste n’est disponible dans le firmware actif.
+
 Le catalogue statique contient **Major Basic**, **Minor Basic**, **Chromatic**, **Cinematic**, **Dark**, **Debussy / Impressionist** et **Ambient**.
 
 Chaque preset possède:

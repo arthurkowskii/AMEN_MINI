@@ -11,7 +11,7 @@ namespace amen {
 
 enum class E2Page : uint8_t {
     Root,
-    Scale
+    Preset
 };
 
 class MonoFramebuffer {
@@ -48,7 +48,9 @@ private:
             case ')': return {4, 2, 2, 2, 4};
             case '#': return {5, 7, 5, 7, 5};
             case '+': return {0, 2, 7, 2, 0};
+            case '*': return {0, 5, 2, 5, 0};
             case '-': return {0, 0, 7, 0, 0};
+            case '/': return {4, 4, 2, 2, 1};
             case '0': return {7, 5, 5, 5, 7};
             case '1': return {2, 6, 2, 2, 7};
             case '2': return {7, 1, 7, 4, 7};
@@ -111,7 +113,12 @@ public:
     }
 
     void showE2(E2Page page, uint32_t now) noexcept {
-        overlay_ = page == E2Page::Root ? Overlay::Root : Overlay::Scale;
+        overlay_ = page == E2Page::Root ? Overlay::Root : Overlay::Preset;
+        overlayChangedAt_ = now;
+    }
+
+    void showHarmony(uint32_t now) noexcept {
+        overlay_ = Overlay::Harmony;
         overlayChangedAt_ = now;
     }
 
@@ -132,17 +139,22 @@ private:
         None,
         Octave,
         Root,
-        Scale
+        Preset,
+        Harmony
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
-        char line[32];
-        std::snprintf(line, sizeof(line), "O%u %s %s", controller.octaveNumber(),
-                      pitchClassName(controller.rootPitchClass()), modeName(controller.mode()));
+        char line[36];
+        std::snprintf(line, sizeof(line), "O%u %s %s%s", controller.octaveNumber(),
+                      pitchClassName(controller.rootPitchClass()), controller.presetName(),
+                      controller.hasHeldPresetMismatch() ? "*" : "");
         framebuffer_.drawText(0, 0, line, 2);
         const char* currentNote = controller.currentNoteName();
-        if (currentNote[0] != '\0') drawCenteredText(12, currentNote, 4);
-        else drawCenteredText(18, modeDescription(controller.mode()), 2);
+        if (controller.harmonyActive()) {
+            std::snprintf(line, sizeof(line), "%s %s", currentNote, controller.harmonyName());
+            drawCenteredText(18, line, 2);
+        } else if (currentNote[0] != '\0') drawCenteredText(12, currentNote, 4);
+        else drawCenteredText(18, modeDescription(controller.scale()), 2);
     }
 
     void renderOverlay(const SimpleMidiController& controller) noexcept {
@@ -155,10 +167,18 @@ private:
         }
 
         const bool rootPage = overlay_ == Overlay::Root;
-        framebuffer_.drawText(0, 0, rootPage ? "ROOT" : "SCALE", 2);
+        if (overlay_ == Overlay::Harmony) {
+            framebuffer_.drawText(0, 0, "HARMONY", 2);
+            const char* name = controller.harmonyName();
+            int length = 0;
+            while (name[length] != '\0') ++length;
+            drawCenteredText(12, name, length * 16 - 4 <= MonoFramebuffer::kWidth ? 4 : 2);
+            return;
+        }
+        framebuffer_.drawText(0, 0, rootPage ? "ROOT" : "PRESET", 2);
         if (rootPage) drawCenteredText(12, pitchClassName(controller.rootPitchClass()), 4);
-        else drawCenteredText(14, modeName(controller.mode()), 2);
-        drawPageDots(rootPage ? E2Page::Root : E2Page::Scale);
+        else drawCenteredText(14, controller.presetName(), 2);
+        drawPageDots(rootPage ? E2Page::Root : E2Page::Preset);
     }
 
     void drawCenteredText(int y, const char* text, int scale) noexcept {

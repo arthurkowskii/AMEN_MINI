@@ -2,6 +2,8 @@
 
 AMEN_MINI is a standalone break machine: drop a break on the SD card, slice it, and play it live on 12 pads.
 
+Le même PCB accueille désormais aussi **AMEN MIDI**, le firmware actuellement développé et joué sur le premier exemplaire assemblé : douze degrés, huit pads harmoniques et cinq presets musicaux. Voir [`firmware_midi/README.md`](firmware_midi/README.md) pour l’état validé et [`firmware_midi/docs/CONTROLS.md`](firmware_midi/docs/CONTROLS.md) pour les contrôles ; les sections audio ci-dessous décrivent le projet break machine.
+
 ## The PCB
 
 ### Blueprints (KiCad)
@@ -38,7 +40,7 @@ The board is a 2-layer, 1.6 mm PCB hosting a socketed Teensy 4.1, with the PJRC 
 ## Status
 
 - **Hardware**: PCB fabricated and photographed (above). The Teensy 4.1 + Audio Adapter build is the current target.
-- **Firmware**: active development on the `dev` branch (never `main`). The engine and the PC harness are shipped; the Teensy integration layer (J12/J13) is in progress. See `firmware/docs/ROADMAP.md` for milestones and verification criteria.
+- **Firmware**: active development on the `dev` branch (never `main`). AMEN MIDI in `firmware_midi/` is built, uploaded and auditioned on Teensy 4.1. For the audio firmware in `firmware/`, the engine and PC harness are shipped and the Teensy integration layer (J12/J13) is in progress; see `firmware/docs/ROADMAP.md` for its milestones.
 
 ## License
 

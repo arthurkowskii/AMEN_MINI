@@ -12,10 +12,11 @@ enum class DiatonicMode : uint8_t {
     Lydian,
     Mixolydian,
     Aeolian,
-    Locrian
+    Locrian,
+    HarmonicMinor
 };
 
-static constexpr uint8_t kDiatonicModeCount = 7;
+static constexpr uint8_t kDiatonicModeCount = 8;
 
 struct NoteSpelling {
     std::array<char, 4> text{};
@@ -29,6 +30,7 @@ static constexpr std::array<std::array<uint8_t, 7>, kDiatonicModeCount> kDiatoni
     {{0, 2, 4, 5, 7, 9, 10}},
     {{0, 2, 3, 5, 7, 8, 10}},
     {{0, 1, 3, 5, 6, 8, 10}},
+    {{0, 2, 3, 5, 7, 8, 11}},
 }};
 
 constexpr uint8_t scaleDegreeOffset(DiatonicMode mode, uint8_t degree) noexcept {
@@ -46,6 +48,7 @@ constexpr const char* modeName(DiatonicMode mode) noexcept {
         case DiatonicMode::Mixolydian: return "MIXOLYDIAN";
         case DiatonicMode::Aeolian: return "AEOLIAN";
         case DiatonicMode::Locrian: return "LOCRIAN";
+        case DiatonicMode::HarmonicMinor: return "HARM MIN";
     }
     return "";
 }
@@ -59,6 +62,7 @@ constexpr const char* modeShortName(DiatonicMode mode) noexcept {
         case DiatonicMode::Mixolydian: return "MIX";
         case DiatonicMode::Aeolian: return "AEO";
         case DiatonicMode::Locrian: return "LOC";
+        case DiatonicMode::HarmonicMinor: return "HMIN";
     }
     return "";
 }
@@ -72,6 +76,7 @@ constexpr const char* modeDescription(DiatonicMode mode) noexcept {
         case DiatonicMode::Mixolydian: return "(MAJOR b7)";
         case DiatonicMode::Aeolian: return "(NAT MINOR)";
         case DiatonicMode::Locrian: return "(MINOR b2 b5)";
+        case DiatonicMode::HarmonicMinor: return "(MINOR #7)";
     }
     return "";
 }
