@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <IntervalTimer.h>
+#include <Wire.h>
 
+#include "oled_ui.h"
 #include "simple_midi_controller.h"
 
 constexpr uint8_t ROWS[] = {5, 6, 9, 14, 15};
@@ -26,6 +28,45 @@ amen::SimpleMidiController controller;
 bool previousContacts[21] = {};
 int32_t previousEncoderPositions[7] = {};
 bool inputReady = false;
+amen::OledUi oledUi;
+std::array<uint8_t, amen::MonoFramebuffer::kSize> displayedFrame{};
+uint8_t oledAddress = 0;
+uint32_t lastDisplayAt = 0;
+bool oledReady = false;
+
+bool oledWrite(uint8_t control, const uint8_t* data, size_t count) {
+    Wire.beginTransmission(oledAddress);
+    Wire.write(control);
+    const bool complete = Wire.write(data, count) == count;
+    return complete && Wire.endTransmission() == 0;
+}
+
+bool beginOled() {
+    Wire.begin();
+    Wire.setClock(400000);
+    for (uint8_t address = 0x3C; address <= 0x3D; ++address) {
+        Wire.beginTransmission(address);
+        if (Wire.endTransmission() == 0) {
+            oledAddress = address;
+            break;
+        }
+    }
+    if (oledAddress == 0) return false;
+    const uint8_t init[] = {0xAE, 0xD5, 0x80, 0xA8, 0x1F, 0xD3, 0x00, 0x40,
+                            0x8D, 0x14, 0x20, 0x00, 0xA1, 0xC8, 0xDA, 0x02,
+                            0x81, 0x8F, 0xD9, 0xF1, 0xDB, 0x40, 0xA4, 0xA6, 0xAF};
+    return oledWrite(0x00, init, sizeof(init));
+}
+
+bool display(const amen::MonoFramebuffer& framebuffer) {
+    const uint8_t window[] = {0x21, 0, 127, 0x22, 0, 3};
+    if (!oledWrite(0x00, window, sizeof(window))) return false;
+    const auto& pixels = framebuffer.pixels();
+    for (size_t offset = 0; offset < pixels.size(); offset += 16)
+        if (!oledWrite(0x40, pixels.data() + offset, 16)) return false;
+    displayedFrame = pixels;
+    return true;
+}
 
 void scanInputs() {
     const uint32_t now = micros();
@@ -94,9 +135,11 @@ void setup() {
         encoderAb[i] = (digitalRead(ENCODER_A[i]) << 1) | digitalRead(ENCODER_B[i]);
     }
     delayMicroseconds(20);
+    oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
     Serial.println("AMEN MIDI V0");
+    if (!oledReady) Serial.println("OLED unavailable");
 }
 
 void loop() {
@@ -131,10 +174,21 @@ void loop() {
     if (octaveDelta != 0) {
         if (controller.turnOctave(octaveDelta)) {
             Serial.printf("Octave %+d, SW1=%u, SW20=%u\n", controller.octave(), controller.baseNote(), controller.baseNote() + 19);
+            oledUi.showOctave(millis());
         }
         previousEncoderPositions[0] = encoderSnapshot[0];
     }
 
     if (sent) usbMIDI.send_now();
     while (usbMIDI.read()) {}
+
+    const uint32_t now = millis();
+    if (oledReady && now - lastDisplayAt >= 33U) {
+        lastDisplayAt = now;
+        const auto& framebuffer = oledUi.render(controller, now);
+        if (framebuffer.pixels() != displayedFrame && !display(framebuffer)) {
+            oledReady = false;
+            Serial.println("OLED write failed");
+        }
+    }
 }

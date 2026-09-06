@@ -1,5 +1,9 @@
 #include "simple_midi_controller.h"
+#include "oled_ui.h"
 
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 #include <iostream>
 
@@ -35,6 +39,26 @@ int main() {
     assert(controller.press(0).note == 0);
     assert(controller.release(0).note == 0);
     assert(controller.press(20).type == amen::MidiCommandType::None);
+
+    amen::MonoFramebuffer framebuffer;
+    framebuffer.setPixel(-1, -1);
+    framebuffer.setPixel(128, 32);
+    for (const uint8_t value : framebuffer.pixels()) assert(value == 0);
+    framebuffer.setPixel(127, 31);
+    assert(framebuffer.pixels().back() == 0x80);
+
+    amen::SimpleMidiController uiController;
+    amen::OledUi ui;
+    const auto idle = ui.render(uiController, 0).pixels();
+    assert(uiController.press(0).note == 60);
+    const auto playing = ui.render(uiController, 10).pixels();
+    assert(playing != idle);
+    uiController.turnOctave(1);
+    ui.showOctave(20);
+    const auto overlay = ui.render(uiController, 20).pixels();
+    assert(ui.overlayVisible() && overlay != playing);
+    const auto home = ui.render(uiController, 820).pixels();
+    assert(!ui.overlayVisible() && home != overlay);
 
     std::cout << "AMEN MIDI V0 tests: PASS\n";
 }

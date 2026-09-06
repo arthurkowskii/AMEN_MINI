@@ -31,6 +31,7 @@ public:
         if (key >= kKeyCount || activeNotes_[key] >= 0) return {};
         const uint8_t note = static_cast<uint8_t>(baseNote() + key);
         activeNotes_[key] = note;
+        lastNote_ = note;
         return {MidiCommandType::NoteOn, note, kVelocity};
     }
 
@@ -53,12 +54,22 @@ public:
     uint8_t baseNote() const noexcept {
         return static_cast<uint8_t>(60 + octave_ * 12);
     }
+    int16_t activeNote(uint8_t key) const noexcept {
+        return key < kKeyCount ? activeNotes_[key] : -1;
+    }
+    uint8_t heldCount() const noexcept {
+        uint8_t count = 0;
+        for (const int16_t note : activeNotes_) if (note >= 0) ++count;
+        return count;
+    }
+    int16_t lastNote() const noexcept { return lastNote_; }
 
 private:
     static constexpr int kMinOctave = -5;
     static constexpr int kMaxOctave = 4;
     std::array<int16_t, kKeyCount> activeNotes_{};
     int8_t octave_{};
+    int16_t lastNote_{-1};
 };
 
 }
