@@ -191,7 +191,7 @@ void loop() {
     const int32_t octaveDelta = encoderSnapshot[0] - previousEncoderPositions[0];
     if (octaveDelta != 0) {
         if (controller.turnOctave(octaveDelta)) {
-            Serial.printf("Octave %+d, SW1=%u, SW12=%u\n", controller.octave(), controller.rootNote(), controller.highestNote());
+            Serial.printf("Octave O%u, SW1=%u, SW12=%u\n", controller.octaveNumber(), controller.rootNote(), controller.highestNote());
             oledUi.showOctave(millis());
         }
         previousEncoderPositions[0] = encoderSnapshot[0];
@@ -226,7 +226,7 @@ void loop() {
     const uint32_t now = millis();
     if (oledReady && now - lastDisplayAt >= 33U) {
         lastDisplayAt = now;
-        const auto& framebuffer = oledUi.render(controller, now);
+        const auto& framebuffer = oledUi.render(controller, e2Page, now);
         if (framebuffer.pixels() != displayedFrame && !display(framebuffer)) {
             oledReady = false;
             Serial.println("OLED write failed");

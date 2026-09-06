@@ -9,15 +9,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
-
-namespace {
-
-bool pixelSet(const amen::MonoFramebuffer& framebuffer, int x, int y) {
-    const auto index = static_cast<std::size_t>(y / 8) * amen::MonoFramebuffer::kWidth + x;
-    return (framebuffer.pixels()[index] & static_cast<uint8_t>(1U << (y % 8))) != 0;
-}
-
-}
+#include <string>
 
 int main() {
     constexpr std::array<std::array<uint8_t, 7>, 7> expectedIntervals{{
@@ -41,10 +33,21 @@ int main() {
         assert(amen::scaleDegreeOffset(selected, 11) == 12 + expectedIntervals[mode][4]);
     }
 
+    assert(amen::pitchClassName(1) == std::string("Db"));
+    constexpr std::array<char, 4> eb{{'E', 'b', '\0', '\0'}};
+    constexpr std::array<char, 4> ab{{'A', 'b', '\0', '\0'}};
+    constexpr std::array<char, 4> b{{'B', '\0', '\0', '\0'}};
+    constexpr std::array<char, 4> ebb{{'E', 'b', 'b', '\0'}};
+    assert(amen::spellScaleDegree(3, amen::DiatonicMode::Ionian, 0).text == eb);
+    assert(amen::spellScaleDegree(3, amen::DiatonicMode::Ionian, 3).text == ab);
+    assert(amen::spellScaleDegree(5, amen::DiatonicMode::Lydian, 3).text == b);
+    assert(amen::spellScaleDegree(1, amen::DiatonicMode::Locrian, 1).text == ebb);
+
     amen::SimpleMidiController controller;
     constexpr std::array<uint8_t, 12> cIonian{{60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79}};
     assert(controller.rootPitchClass() == 0);
     assert(controller.mode() == amen::DiatonicMode::Ionian);
+    assert(controller.octaveNumber() == 5);
     assert(controller.rootNote() == 60);
     assert(controller.highestNote() == 79);
     for (uint8_t key = 0; key < controller.kKeyCount; ++key) {
@@ -55,6 +58,16 @@ int main() {
     }
     assert(controller.press(12).type == amen::MidiCommandType::None);
     assert(controller.press(19).type == amen::MidiCommandType::None);
+    assert(controller.currentNoteName()[0] == '\0');
+
+    assert(controller.press(0).note == 60);
+    assert(std::string(controller.currentNoteName()) == "C");
+    assert(controller.press(2).note == 64);
+    assert(std::string(controller.currentNoteName()) == "E");
+    assert(controller.release(2).note == 64);
+    assert(std::string(controller.currentNoteName()) == "C");
+    assert(controller.release(0).note == 60);
+    assert(controller.currentNoteName()[0] == '\0');
 
     assert(controller.turnRoot(-1));
     assert(controller.rootPitchClass() == 11);
@@ -69,6 +82,7 @@ int main() {
 
     const auto held = controller.press(0);
     assert(held.note == 60);
+    assert(std::string(controller.currentNoteName()) == "C");
     assert(controller.press(0).type == amen::MidiCommandType::None);
     controller.turnRoot(2);
     controller.turnMode(1);
@@ -76,6 +90,16 @@ int main() {
     const auto heldRelease = controller.release(0);
     assert(heldRelease.type == amen::MidiCommandType::NoteOff);
     assert(heldRelease.note == 60);
+    assert(controller.currentNoteName()[0] == '\0');
+
+    amen::SimpleMidiController spellingController;
+    spellingController.turnRoot(3);
+    assert(spellingController.press(0).note == 63);
+    assert(std::string(spellingController.currentNoteName()) == "Eb");
+    spellingController.turnRoot(4);
+    spellingController.turnMode(3);
+    assert(std::string(spellingController.currentNoteName()) == "Eb");
+    spellingController.release(0);
 
     for (uint8_t mode = 0; mode < amen::kDiatonicModeCount; ++mode) {
         amen::SimpleMidiController rangeController;
@@ -100,11 +124,13 @@ int main() {
     amen::SimpleMidiController limitController;
     assert(limitController.turnOctave(-100));
     assert(limitController.octave() == -5 && limitController.rootNote() == 0);
+    assert(limitController.octaveNumber() == 0);
     assert(!limitController.turnOctave(-1));
     limitController.turnRoot(-1);
     limitController.turnMode(-1);
     assert(limitController.turnOctave(100));
     assert(limitController.octave() == 3);
+    assert(limitController.octaveNumber() == 8);
     assert(limitController.highestNote() <= 127);
     assert(!limitController.turnOctave(1));
 
@@ -117,34 +143,37 @@ int main() {
 
     amen::SimpleMidiController uiController;
     amen::OledUi ui;
-    const auto idle = ui.render(uiController, 0).pixels();
-    for (uint8_t key = 0; key < uiController.kKeyCount; ++key)
-        assert(pixelSet(ui.render(uiController, 0), 4 + key * 10, 30));
+    const auto idle = ui.render(uiController, amen::E2Page::Root, 0).pixels();
     assert(uiController.press(0).note == 60);
-    const auto playing = ui.render(uiController, 10).pixels();
+    const auto playing = ui.render(uiController, amen::E2Page::Root, 1).pixels();
     assert(playing != idle);
+    uiController.release(0);
+    assert(ui.render(uiController, amen::E2Page::Root, 2).pixels() == idle);
 
+    const auto beforeOctave = ui.render(uiController, amen::E2Page::Root, 3).pixels();
     uiController.turnOctave(1);
-    ui.showOctave(20);
-    const auto octaveOverlay = ui.render(uiController, 20).pixels();
-    assert(ui.overlayVisible() && octaveOverlay != playing);
+    const auto changedOctave = ui.render(uiController, amen::E2Page::Root, 4).pixels();
+    assert(changedOctave != beforeOctave);
 
-    ui.showE2(amen::E2Page::Root, 30);
-    const auto rootOverlay = ui.render(uiController, 30).pixels();
-    ui.showE2(amen::E2Page::Scale, 40);
-    const auto scaleOverlay = ui.render(uiController, 40).pixels();
-    assert(rootOverlay != scaleOverlay);
-    assert(ui.overlayVisible());
+    ui.showOctave(10);
+    const auto octaveOverlay = ui.render(uiController, amen::E2Page::Root, 10).pixels();
+    assert(ui.overlayVisible() && octaveOverlay != changedOctave);
+    assert(ui.render(uiController, amen::E2Page::Root, 810).pixels() == changedOctave);
+    assert(!ui.overlayVisible());
+
+    ui.showE2(amen::E2Page::Root, 820);
+    const auto rootOverlay = ui.render(uiController, amen::E2Page::Root, 820).pixels();
+    ui.showE2(amen::E2Page::Scale, 830);
+    const auto scaleOverlay = ui.render(uiController, amen::E2Page::Scale, 830).pixels();
+    assert(rootOverlay != scaleOverlay && ui.overlayVisible());
+
+    auto previousMode = ui.render(uiController, amen::E2Page::Scale, 1630).pixels();
     for (uint8_t mode = 1; mode < amen::kDiatonicModeCount; ++mode) {
         uiController.turnMode(1);
-        ui.showE2(amen::E2Page::Scale, 40 + mode);
-        assert(ui.render(uiController, 40 + mode).pixels() != scaleOverlay);
+        const auto currentMode = ui.render(uiController, amen::E2Page::Scale, 1630 + mode).pixels();
+        assert(currentMode != previousMode);
+        previousMode = currentMode;
     }
-
-    uiController.turnRoot(1);
-    uiController.turnMode(1);
-    const auto changedHome = ui.render(uiController, 900).pixels();
-    assert(!ui.overlayVisible() && changedHome != idle);
 
     std::cout << "AMEN MIDI diatonic scale tests: PASS\n";
 }

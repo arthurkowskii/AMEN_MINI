@@ -33,7 +33,8 @@ public:
         if (key >= kKeyCount || activeNotes_[key] >= 0) return {};
         const uint8_t note = noteForKey(key);
         activeNotes_[key] = note;
-        lastNote_ = note;
+        activeSpellings_[key] = spellScaleDegree(rootPitchClass_, mode_, key);
+        heldOrder_[heldCount_++] = key;
         return {MidiCommandType::NoteOn, note, kVelocity};
     }
 
@@ -41,6 +42,7 @@ public:
         if (key >= kKeyCount || activeNotes_[key] < 0) return {};
         const uint8_t note = static_cast<uint8_t>(activeNotes_[key]);
         activeNotes_[key] = -1;
+        removeHeldKey(key);
         return {MidiCommandType::NoteOff, note, 0};
     }
 
@@ -68,6 +70,7 @@ public:
     }
 
     int octave() const noexcept { return octave_; }
+    uint8_t octaveNumber() const noexcept { return static_cast<uint8_t>(octave_ - kMinOctave); }
     uint8_t rootPitchClass() const noexcept { return rootPitchClass_; }
     DiatonicMode mode() const noexcept { return mode_; }
     uint8_t rootNote() const noexcept { return noteForKey(0); }
@@ -75,12 +78,11 @@ public:
     int16_t activeNote(uint8_t key) const noexcept {
         return key < kKeyCount ? activeNotes_[key] : -1;
     }
-    uint8_t heldCount() const noexcept {
-        uint8_t count = 0;
-        for (const int16_t note : activeNotes_) if (note >= 0) ++count;
-        return count;
+    uint8_t heldCount() const noexcept { return heldCount_; }
+    const char* currentNoteName() const noexcept {
+        if (heldCount_ == 0) return "";
+        return activeSpellings_[heldOrder_[heldCount_ - 1]].text.data();
     }
-    int16_t lastNote() const noexcept { return lastNote_; }
 
 private:
     static constexpr int kMinOctave = -5;
@@ -96,11 +98,21 @@ private:
         return static_cast<uint8_t>(60 + octave_ * 12 + rootPitchClass_ + scaleDegreeOffset(mode_, key));
     }
 
+    void removeHeldKey(uint8_t key) noexcept {
+        uint8_t index = 0;
+        while (index < heldCount_ && heldOrder_[index] != key) ++index;
+        if (index == heldCount_) return;
+        for (; index + 1 < heldCount_; ++index) heldOrder_[index] = heldOrder_[index + 1];
+        --heldCount_;
+    }
+
     std::array<int16_t, kKeyCount> activeNotes_{};
+    std::array<NoteSpelling, kKeyCount> activeSpellings_{};
+    std::array<uint8_t, kKeyCount> heldOrder_{};
     int8_t octave_{};
     uint8_t rootPitchClass_{};
+    uint8_t heldCount_{};
     DiatonicMode mode_{DiatonicMode::Ionian};
-    int16_t lastNote_{-1};
 };
 
 }

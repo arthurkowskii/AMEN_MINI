@@ -17,6 +17,10 @@ enum class DiatonicMode : uint8_t {
 
 static constexpr uint8_t kDiatonicModeCount = 7;
 
+struct NoteSpelling {
+    std::array<char, 4> text{};
+};
+
 static constexpr std::array<std::array<uint8_t, 7>, kDiatonicModeCount> kDiatonicIntervals{{
     {{0, 2, 4, 5, 7, 9, 11}},
     {{0, 2, 3, 5, 7, 9, 10}},
@@ -73,8 +77,29 @@ constexpr const char* modeDescription(DiatonicMode mode) noexcept {
 }
 
 constexpr const char* pitchClassName(uint8_t pitchClass) noexcept {
-    constexpr const char* names[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    constexpr const char* names[] = {"C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
     return names[pitchClass % 12];
+}
+
+constexpr NoteSpelling spellScaleDegree(uint8_t rootPitchClass, DiatonicMode mode, uint8_t degree) noexcept {
+    constexpr std::array<char, 7> letters{{'C', 'D', 'E', 'F', 'G', 'A', 'B'}};
+    constexpr std::array<uint8_t, 7> naturalPitchClasses{{0, 2, 4, 5, 7, 9, 11}};
+    constexpr std::array<uint8_t, 12> rootLetters{{0, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6}};
+
+    const uint8_t root = rootPitchClass % 12;
+    const uint8_t letter = static_cast<uint8_t>((rootLetters[root] + degree % 7) % 7);
+    const int target = (root + scaleDegreeOffset(mode, degree)) % 12;
+    int accidental = target - naturalPitchClasses[letter];
+    while (accidental > 6) accidental -= 12;
+    while (accidental < -6) accidental += 12;
+
+    NoteSpelling spelling{};
+    spelling.text[0] = letters[letter];
+    const char accidentalCharacter = accidental < 0 ? 'b' : '#';
+    const int accidentalCount = accidental < 0 ? -accidental : accidental;
+    for (int index = 0; index < accidentalCount && index < 2; ++index)
+        spelling.text[static_cast<std::size_t>(index + 1)] = accidentalCharacter;
+    return spelling;
 }
 
 }

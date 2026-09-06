@@ -5,11 +5,17 @@
 - SW1–SW12 jouent douze degrés consécutifs de la gamme sélectionnée.
 - SW13–SW20 sont réservés aux futurs pads harmoniques et restent inactifs.
 - SW21 reste réservé à Shift.
-- E1 transpose les douze degrés par octaves, de -5 à +3.
+- E1 transpose les douze degrés sur neuf octaves affichées `O0` à `O8`.
 - E2 contrôle la fondamentale au démarrage. Un clic alterne entre `ROOT` et `SCALE`; tourner sélectionne la fondamentale chromatique ou l’un des sept modes diatoniques.
 - E3–E7 et les autres poussoirs restent inactifs.
 
 Les modes disponibles sont ionien (majeur), dorien (mineur avec sixte majeure), phrygien (mineur avec seconde mineure), lydien (majeur avec quarte augmentée), mixolydien (majeur avec septième mineure), éolien (mineur naturel) et locrien (mineur avec seconde mineure et quinte diminuée). Aucun de ces sept modes n’est la gamme mineure harmonique. Les changements de fondamentale, de mode et d’octave n’affectent pas le NoteOff des notes déjà tenues.
+
+## Écran
+
+L’accueil affiche l’octave de `O0` à `O8`, la fondamentale et le nom complet du mode en caractères doubles. Sans note tenue, la ligne inférieure décrit le mode; pendant le jeu, elle est remplacée par la dernière note encore tenue en caractères quadruples. L’orthographe suit les degrés de la gamme, y compris les bémols, dièses et doubles altérations.
+
+Tourner E1 ouvre temporairement un écran `OCTAVE`. Cliquer ou tourner E2 ouvre temporairement un écran explicite `ROOT` ou `SCALE`; les deux points de pagination n’apparaissent que sur ces écrans E2.
 
 ## Teensy 4.1 — mapping issu du netlist réel
 
