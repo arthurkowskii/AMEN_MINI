@@ -168,7 +168,7 @@ void setup() {
     oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
-    Serial.println("AMEN MIDI HARMONY / PATTERN, E3 CLICK page, E3 TURN assign, E4 STEP 30-200 MS (+5)");
+    Serial.println("AMEN MIDI HARMONY / PATTERN / NONE, E3 CLICK page, E3 TURN assign, E4 STEP 30-200 MS (+5)");
     if (!oledReady) Serial.println("OLED unavailable");
 }
 

@@ -535,8 +535,10 @@ void testPatterns() {
         press(controller, 12, 0);
         assertEvents(tick(controller, 80), {off(60), on(62)});
         assertEvents(togglePage(controller), {off(62), on(60)});
-        assert(controller.page() == amen::PerformancePage::Harmony && !controller.runActive());
+        assert(controller.page() == amen::PerformancePage::None && !controller.runActive());
         assert(controller.runSourceKey() == amen::SimpleMidiController::kNoRunSource);
+        assertEvents(togglePage(controller), {});
+        assert(controller.page() == amen::PerformancePage::Harmony && !controller.runActive());
         assertEvents(press(controller, 1), {on(62)});
         assert(!controller.runActive());
         release(controller, 0);
@@ -637,6 +639,79 @@ void testPatterns() {
         walkRun(controller, {60, 57, 55, 53}, 80, 0, 60);
         release(controller, 0);
         release(controller, 19);
+    }
+
+    {
+        g_block = "page-cycle";
+        SimpleMidiController controller;
+        assert(controller.page() == amen::PerformancePage::Harmony);
+        assertEvents(togglePage(controller), {});
+        assert(controller.page() == amen::PerformancePage::Pattern);
+        assertEvents(togglePage(controller), {});
+        assert(controller.page() == amen::PerformancePage::None);
+        assertEvents(togglePage(controller), {});
+        assert(controller.page() == amen::PerformancePage::Harmony);
+    }
+
+    {
+        g_block = "none-page-notes";
+        SimpleMidiController controller;
+        togglePage(controller);
+        togglePage(controller);
+        assert(controller.page() == amen::PerformancePage::None);
+        assert(!controller.harmonyActive() && !controller.patternHeld());
+        for (uint8_t key = amen::SimpleMidiController::kHarmonyStartKey;
+             key < controller.kNoteKeyCount; ++key) {
+            const uint8_t note = static_cast<uint8_t>(60 + amen::scaleDegreeOffset(controller.scale(), key));
+            assertEvents(press(controller, key), {on(note)});
+            assertEvents(release(controller, key), {off(note)});
+        }
+        togglePage(controller);
+        assertEvents(press(controller, 12), {});
+        SimpleMidiController withSlot = controller;
+        togglePage(withSlot);
+        togglePage(withSlot);
+        assert(withSlot.page() == amen::PerformancePage::None && withSlot.harmonyActive());
+        assertEvents(press(withSlot, 0), {on(60)});
+        assertEvents(press(withSlot, 13), {on(83)});
+        assertEvents(release(withSlot, 0), {off(60)});
+        assertEvents(release(withSlot, 13), {off(83)});
+        assertEvents(release(withSlot, 12), {});
+        release(controller, 12);
+    }
+
+    {
+        g_block = "none-cancels-run";
+        SimpleMidiController controller;
+        togglePage(controller);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        press(controller, 12, 0);
+        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(togglePage(controller), {off(62), on(60)});
+        assert(controller.page() == amen::PerformancePage::None && !controller.runActive());
+        assertEvents(release(controller, 12), {});
+        release(controller, 0);
+    }
+
+    {
+        g_block = "none-page-exact-ui";
+        amen::SimpleMidiController controller;
+        amen::OledUi ui;
+        togglePage(controller);
+        togglePage(controller);
+        assert(controller.page() == amen::PerformancePage::None);
+        amen::MonoFramebuffer expected;
+        expected.drawText(0, 0, "O5 C", 2);
+        expected.drawText(96, 0, "NONE", 2);
+        expected.drawText(0, 11, "MAJOR ", 2);
+        expected.drawText(37, 22, "(MAJOR)", 2);
+        assert(ui.render(controller, amen::E2Page::Root, 0).pixels() == expected.pixels());
+        ui.showPage(10);
+        expected.clear();
+        expected.drawText(0, 0, "PAGE", 2);
+        expected.drawText(96, 0, "NONE", 2);
+        expected.drawText(49, 18, "NONE", 2);
+        assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
     }
 }
 }  // namespace

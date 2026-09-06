@@ -23,7 +23,8 @@ struct MidiCommand {
 
 enum class PerformancePage : uint8_t {
     Harmony,
-    Pattern
+    Pattern,
+    None
 };
 
 class SimpleMidiController {
@@ -31,6 +32,7 @@ public:
     static constexpr uint8_t kKeyCount = 12;
     static constexpr uint8_t kHarmonyStartKey = 12;
     static constexpr uint8_t kHarmonyKeyCount = kHarmonySlotCount;
+    static constexpr uint8_t kNoteKeyCount = kKeyCount + kHarmonyKeyCount;
     static constexpr uint8_t kShiftKey = kHarmonyStartKey + kHarmonyKeyCount;
     static constexpr uint8_t kChannel = 1;
     static constexpr uint8_t kVelocity = 100;
@@ -68,8 +70,9 @@ public:
     uint8_t togglePage(MidiCommand* out, uint8_t capacity) noexcept {
         SimpleMidiController candidate = *this;
         if (candidate.page_ == PerformancePage::Harmony) candidate.page_ = PerformancePage::Pattern;
-        else {
-            candidate.page_ = PerformancePage::Harmony;
+        else if (candidate.page_ == PerformancePage::Pattern) candidate.page_ = PerformancePage::None;
+        else candidate.page_ = PerformancePage::Harmony;
+        if (candidate.page_ != PerformancePage::Pattern) {
             candidate.run_.cancel();
             candidate.runSourceKey_ = kNoRunSource;
         }
@@ -326,11 +329,14 @@ private:
                 if (page_ == PerformancePage::Harmony) {
                     role = PadRole::HarmonySlot;
                     candidate.pressHarmony(key);
-                } else {
+                } else if (page_ == PerformancePage::Pattern) {
                     role = PadRole::PatternSlot;
                     candidate.pressPattern(key);
                     const uint8_t lower = candidate.lowerHeldKey();
                     if (lower != kNoRunSource) candidate.startRun(lower, candidate.currentPattern(), now);
+                } else {
+                    role = PadRole::ManualDegree;
+                    candidate.pressDegree(key);
                 }
             }
         } else {
@@ -373,8 +379,8 @@ private:
         --heldCount_;
     }
 
-    std::array<DegreeState, kKeyCount> degrees_{};
-    std::array<uint8_t, kKeyCount> heldOrder_{};
+    std::array<DegreeState, kNoteKeyCount> degrees_{};
+    std::array<uint8_t, kNoteKeyCount> heldOrder_{};
     std::array<uint8_t, kHarmonyKeyCount> harmonyStack_{};
     uint8_t harmonyCount_{};
     std::array<uint8_t, kHarmonyKeyCount> patternStack_{};

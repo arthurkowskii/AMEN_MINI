@@ -149,7 +149,9 @@ public:
             overlay_ = Overlay::None;
             renderHome(controller, page);
         }
-        framebuffer_.drawText(96, 0, controller.page() == PerformancePage::Harmony ? "HARM" : "PATT", 2);
+        framebuffer_.drawText(96, 0,
+            controller.page() == PerformancePage::Harmony ? "HARM"
+            : controller.page() == PerformancePage::Pattern ? "PATT" : "NONE", 2);
         return framebuffer_;
     }
 
@@ -197,7 +199,9 @@ private:
                 std::snprintf(value, sizeof(value), "%u", controller.stepMs());
                 drawCenteredText(12, value, 4);
             } else if (overlay_ == Overlay::Page) {
-                drawCenteredText(18, controller.page() == PerformancePage::Harmony ? "HARMONY" : "PATTERN", 2);
+                drawCenteredText(18,
+                    controller.page() == PerformancePage::Harmony ? "HARMONY"
+                    : controller.page() == PerformancePage::Pattern ? "PATTERN" : "NONE", 2);
             } else if (overlay_ == Overlay::PatternEdit) {
                 std::snprintf(value, sizeof(value), "%u %s", controller.patternSlot(),
                               controller.runShapeName());

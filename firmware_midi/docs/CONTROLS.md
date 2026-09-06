@@ -7,7 +7,7 @@
 - SW21 reste réservé à Shift.
 - E1 transpose les douze degrés sur neuf octaves affichées `O0` à `O8`.
 - E2 contrôle la fondamentale au démarrage. Un clic alterne entre `ROOT` et `PRESET`; tourner sélectionne la fondamentale chromatique ou l’un des six presets, avec bouclage en fin de liste.
-- Le clic E3 alterne entre les pages persistantes `HARMONY` et `PATTERN`. Le démarrage se fait en `HARMONY`.
+- Le clic E3 fait défiler les pages persistantes `HARMONY` → `PATTERN` → `NONE` → `HARMONY`. Le démarrage se fait en `HARMONY`.
 - En page `PATTERN`, la rotation E3 réassigne le slot pattern du pad supérieur tenu le plus récent ; en `HARMONY` elle est sans effet.
 - E4 règle l'espacement du prochain run : 80 ms au démarrage, de 30 à 200 ms par pas de 5 ms.
 
@@ -32,11 +32,15 @@ Le pattern remplace temporairement la voix manuelle du pad source (l’accord en
 
 Chaque contour part de la note choisie : les runs de gamme montent ou descendent de huit notes (une octave, extrémités comprises), les ping-pong `UP DOWN` / `DOWN UP` font quinze notes sans redoubler les sommets, les tierces montantes jouent les paires explicites 0,2 · 1,3 · 2,4 · 3,5 · 4,6 · 5,7 et les descendantes leur miroir 0,−2 · −1,−3 · −2,−4 · −3,−5 · −4,−6 · −5,−7, et les arpèges déploient la triade aux degrés 0,2,4,7 en montant et 0,−3,−5,−7 en descendant. Le run s’arrête avant de sortir de MIDI 0–127, sans repli ni repliage. La gamme, le départ et l’espacement sont figés au déclenchement ; la rotation E3 pendant le run modifie l’assignation future sans altérer le run actif.
 
-Revenir en `HARMONY` avec E3 annule le run et restaure la source tenue. Chaque pad conserve son rôle jusqu’au relâchement, même à travers les changements de page. Un pad supérieur tenu comme pattern en page `HARMONY` ne déclenche rien. Chaque note dure un pas, dernière note comprise. L'horloge est interne et libre, sans synchronisation MIDI. Si la boucle prend du retard, les pas expirés sont sautés plutôt que rejoués en rafale. Pour des appuis reçus dans le même snapshot, E3 est traité d'abord, puis les pads supérieurs, puis les inférieurs.
+## Page NONE
+
+En page `NONE`, les huit pads supérieurs deviennent des notes : les vingt pads jouent vingt degrés consécutifs de la gamme sélectionnée, SW13–SW20 poursuivant l’échelle là où SW1–SW12 s’arrêtent (en Do majeur, SW13 = A5, SW14 = B5, SW15 = C6… ; en `CHROMATIC`, une octave et huit demi-tons). Chaque pad fige son contexte comme les autres degrés et son orthographe apparaît sur l’OLED. Les nouveaux appuis y sont toujours des notes seules, même si un slot harmonique reste tenu depuis `HARMONY` ; les tenues antérieures gardent leur rôle jusqu’au relâchement, conformément au contrat général. Aucun pattern ne se déclenche en `NONE` ; entrer dans `NONE` depuis `PATTERN` annule le run actif et restaure la source tenue.
+
+Revenir en `HARMONY` ou passer en `NONE` avec E3 annule le run et restaure la source tenue. Chaque pad conserve son rôle jusqu’au relâchement, même à travers les changements de page. Un pad supérieur tenu comme pattern en page `HARMONY` ou `NONE` ne déclenche rien. Chaque note dure un pas, dernière note comprise. L'horloge est interne et libre, sans synchronisation MIDI. Si la boucle prend du retard, les pas expirés sont sautés plutôt que rejoués en rafale. Pour des appuis reçus dans le même snapshot, E3 est traité d'abord, puis les pads supérieurs, puis les inférieurs.
 
 ## Écran
 
-L'accueil utilise trois lignes en caractères doubles : octave et fondamentale, preset et dernière note tenue, puis harmonie/description de gamme ou état du pattern courant suivi de `IDLE`, `READY` ou `PLAY`. `HARM` ou `PATT` reste visible en haut à droite, y compris pendant les overlays. Un `*` après le preset indique une ancienne tenue appartenant à un autre preset ; le nom harmonique affiché concerne le preset sélectionné. L'orthographe des notes tenues reste mémorisée.
+L'accueil utilise trois lignes en caractères doubles : octave et fondamentale, preset et dernière note tenue, puis harmonie/description de gamme ou état du pattern courant suivi de `IDLE`, `READY` ou `PLAY`. `HARM`, `PATT` ou `NONE` reste visible en haut à droite, y compris pendant les overlays. Un `*` après le preset indique une ancienne tenue appartenant à un autre preset ; le nom harmonique affiché concerne le preset sélectionné. L'orthographe des notes tenues reste mémorisée.
 
 Tourner E1 ouvre temporairement un écran `OCTAVE`. Cliquer ou tourner E2 ouvre temporairement un écran explicite `ROOT` ou `PRESET`; les deux points de pagination n’apparaissent que sur ces écrans E2. Appuyer sur SW13–SW20 ouvre temporairement un écran `HARMONY` : le nom de la recette est en caractères quadruples s’il tient, sinon doubles. Ces overlays durent 800 ms.
 
