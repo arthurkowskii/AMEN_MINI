@@ -122,6 +122,26 @@ public:
         overlayChangedAt_ = now;
     }
 
+    void showPage(uint32_t now) noexcept {
+        overlay_ = Overlay::Page;
+        overlayChangedAt_ = now;
+    }
+
+    void showPattern(uint32_t now) noexcept {
+        overlay_ = Overlay::Pattern;
+        overlayChangedAt_ = now;
+    }
+
+    void showPatternEdit(uint32_t now) noexcept {
+        overlay_ = Overlay::PatternEdit;
+        overlayChangedAt_ = now;
+    }
+
+    void showStep(uint32_t now) noexcept {
+        overlay_ = Overlay::Step;
+        overlayChangedAt_ = now;
+    }
+
     const MonoFramebuffer& render(const SimpleMidiController& controller, E2Page page, uint32_t now) noexcept {
         framebuffer_.clear();
         if (overlay_ != Overlay::None && now - overlayChangedAt_ < 800U) renderOverlay(controller);
@@ -129,6 +149,7 @@ public:
             overlay_ = Overlay::None;
             renderHome(controller, page);
         }
+        framebuffer_.drawText(96, 0, controller.page() == PerformancePage::Harmony ? "HARM" : "PATT", 2);
         return framebuffer_;
     }
 
@@ -140,25 +161,54 @@ private:
         Octave,
         Root,
         Preset,
-        Harmony
+        Harmony,
+        Page,
+        Pattern,
+        PatternEdit,
+        Step
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
         char line[36];
-        std::snprintf(line, sizeof(line), "O%u %s %s%s", controller.octaveNumber(),
-                      pitchClassName(controller.rootPitchClass()), controller.presetName(),
-                      controller.hasHeldPresetMismatch() ? "*" : "");
+        std::snprintf(line, sizeof(line), "O%u %s", controller.octaveNumber(),
+                      pitchClassName(controller.rootPitchClass()));
         framebuffer_.drawText(0, 0, line, 2);
         const char* currentNote = controller.currentNoteName();
-        if (controller.harmonyActive()) {
-            std::snprintf(line, sizeof(line), "%s %s", currentNote, controller.harmonyName());
-            drawCenteredText(18, line, 2);
-        } else if (currentNote[0] != '\0') drawCenteredText(12, currentNote, 4);
-        else drawCenteredText(18, modeDescription(controller.scale()), 2);
+        std::snprintf(line, sizeof(line), "%s%s %s", controller.presetName(),
+                      controller.hasHeldPresetMismatch() ? "*" : "", currentNote);
+        framebuffer_.drawText(0, 11, line, 2);
+        if (controller.page() == PerformancePage::Pattern) {
+            char state[24];
+            std::snprintf(state, sizeof(state), "%s %s", controller.runShapeName(),
+                          controller.runActive() ? "PLAY" : (controller.patternHeld() ? "READY" : "IDLE"));
+            drawCenteredText(22, state, 2);
+        } else if (controller.harmonyActive()) drawCenteredText(22, controller.harmonyName(), 2);
+        else drawCenteredText(22, modeDescription(controller.scale()), 2);
     }
 
     void renderOverlay(const SimpleMidiController& controller) noexcept {
-        char value[8];
+        char value[36];
+        if (overlay_ == Overlay::Page || overlay_ == Overlay::Pattern || overlay_ == Overlay::PatternEdit || overlay_ == Overlay::Step) {
+            const char* label = overlay_ == Overlay::Step ? "STEP MS"
+                : (overlay_ == Overlay::Page ? "PAGE"
+                : (overlay_ == Overlay::PatternEdit ? "SLOT" : "PATTERN"));
+            framebuffer_.drawText(0, 0, label, 2);
+            if (overlay_ == Overlay::Step) {
+                std::snprintf(value, sizeof(value), "%u", controller.stepMs());
+                drawCenteredText(12, value, 4);
+            } else if (overlay_ == Overlay::Page) {
+                drawCenteredText(18, controller.page() == PerformancePage::Harmony ? "HARMONY" : "PATTERN", 2);
+            } else if (overlay_ == Overlay::PatternEdit) {
+                std::snprintf(value, sizeof(value), "%u %s", controller.patternSlot(),
+                              controller.runShapeName());
+                drawCenteredText(18, value, 2);
+            } else {
+                std::snprintf(value, sizeof(value), "%s %s", controller.runShapeName(),
+                              controller.runActive() ? "PLAY" : (controller.patternHeld() ? "READY" : "IDLE"));
+                drawCenteredText(18, value, 2);
+            }
+            return;
+        }
         if (overlay_ == Overlay::Octave) {
             framebuffer_.drawText(0, 0, "OCTAVE", 2);
             std::snprintf(value, sizeof(value), "O%u", controller.octaveNumber());
@@ -192,12 +242,12 @@ private:
         for (uint8_t index = 0; index < 2; ++index) {
             const int x = 112 + index * 9;
             const bool active = index == static_cast<uint8_t>(page);
-            if (active) framebuffer_.fillRect(x, 2, 5, 5);
+            if (active) framebuffer_.fillRect(x, 27, 5, 5);
             else {
-                framebuffer_.fillRect(x, 2, 5, 1);
-                framebuffer_.fillRect(x, 6, 5, 1);
-                framebuffer_.fillRect(x, 3, 1, 3);
-                framebuffer_.fillRect(x + 4, 3, 1, 3);
+                framebuffer_.fillRect(x, 27, 5, 1);
+                framebuffer_.fillRect(x, 31, 5, 1);
+                framebuffer_.fillRect(x, 28, 1, 3);
+                framebuffer_.fillRect(x + 4, 28, 1, 3);
             }
         }
     }

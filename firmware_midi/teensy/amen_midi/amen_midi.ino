@@ -24,6 +24,9 @@ int8_t encoderPartial[7] = {};
 volatile bool e2Push = false;
 bool e2PushRaw = false;
 uint32_t e2PushChangedAt = 0;
+volatile bool e3Push = false;
+bool e3PushRaw = false;
+uint32_t e3PushChangedAt = 0;
 volatile uint32_t scanCount = 0;
 bool firstScan = true;
 IntervalTimer scanTimer;
@@ -32,6 +35,7 @@ amen::SimpleMidiController controller;
 bool previousContacts[21] = {};
 int32_t previousEncoderPositions[7] = {};
 bool previousE2Push = false;
+bool previousE3Push = false;
 bool inputReady = false;
 amen::OledUi oledUi;
 amen::E2Page e2Page = amen::E2Page::Root;
@@ -78,6 +82,7 @@ void scanInputs() {
     const uint32_t now = micros();
     bool sample[21];
     const bool e2PushSample = !digitalRead(PUSH[1]);
+    const bool e3PushSample = !digitalRead(PUSH[2]);
 
     for (uint8_t row = 0; row < 5; ++row) {
         digitalWrite(ROWS[row], LOW);
@@ -125,6 +130,15 @@ void scanInputs() {
     }
     if (e2Push != e2PushRaw && now - e2PushChangedAt >= DEBOUNCE_US) e2Push = e2PushRaw;
 
+    if (firstScan) {
+        e3PushRaw = e3Push = e3PushSample;
+        e3PushChangedAt = now;
+    } else if (e3PushSample != e3PushRaw) {
+        e3PushRaw = e3PushSample;
+        e3PushChangedAt = now;
+    }
+    if (e3Push != e3PushRaw && now - e3PushChangedAt >= DEBOUNCE_US) e3Push = e3PushRaw;
+
     firstScan = false;
     ++scanCount;
 }
@@ -154,7 +168,7 @@ void setup() {
     oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
-    Serial.println("AMEN MIDI HARMONIC");
+    Serial.println("AMEN MIDI HARMONY / PATTERN, E3 CLICK page, E3 TURN assign, E4 STEP 30-200 MS (+5)");
     if (!oledReady) Serial.println("OLED unavailable");
 }
 
@@ -162,12 +176,14 @@ void loop() {
     bool contactSnapshot[21];
     int32_t encoderSnapshot[7];
     bool e2PushSnapshot;
+    bool e3PushSnapshot;
     uint32_t scans;
 
     noInterrupts();
     for (uint8_t i = 0; i < 21; ++i) contactSnapshot[i] = contacts[i];
     for (uint8_t i = 0; i < 7; ++i) encoderSnapshot[i] = encoderPositions[i];
     e2PushSnapshot = e2Push;
+    e3PushSnapshot = e3Push;
     scans = scanCount;
     interrupts();
 
@@ -176,23 +192,35 @@ void loop() {
         for (uint8_t i = 0; i < 21; ++i) previousContacts[i] = contactSnapshot[i];
         for (uint8_t i = 0; i < 7; ++i) previousEncoderPositions[i] = encoderSnapshot[i];
         previousE2Push = e2PushSnapshot;
+        previousE3Push = e3PushSnapshot;
         inputReady = true;
         return;
     }
 
     bool sent = false;
     amen::MidiCommand commands[amen::SimpleMidiController::kMaxEventsPerAction];
-    for (uint8_t key = 0; key < SCANNED_KEYS; ++key) {
+    const uint32_t inputNow = millis();
+    if (e3PushSnapshot != previousE3Push) {
+        if (e3PushSnapshot) {
+            const uint8_t count = controller.togglePage(commands, amen::SimpleMidiController::kMaxEventsPerAction);
+            for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
+            sent = count > 0;
+            oledUi.showPage(inputNow);
+        }
+        previousE3Push = e3PushSnapshot;
+    }
+    for (uint8_t index = 0; index < SCANNED_KEYS; ++index) {
+        const uint8_t key = index < 8 ? index + 12 : (index < 20 ? index - 8 : 20);
         if (contactSnapshot[key] == previousContacts[key]) continue;
         const uint8_t count = contactSnapshot[key]
-            ? controller.press(key, commands, amen::SimpleMidiController::kMaxEventsPerAction)
+            ? controller.press(key, inputNow, commands, amen::SimpleMidiController::kMaxEventsPerAction)
             : controller.release(key, commands, amen::SimpleMidiController::kMaxEventsPerAction);
         for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
         sent = sent || count > 0;
         if (contactSnapshot[key] && key >= amen::SimpleMidiController::kHarmonyStartKey &&
             key < amen::SimpleMidiController::kShiftKey) {
-            oledUi.showHarmony(millis());
-            Serial.printf("PRESET %s, Harmony %s\n", controller.presetName(), controller.harmonyName());
+            if (controller.page() == amen::PerformancePage::Pattern) oledUi.showPattern(inputNow);
+            else oledUi.showHarmony(inputNow);
         }
         previousContacts[key] = contactSnapshot[key];
     }
@@ -229,6 +257,21 @@ void loop() {
         previousEncoderPositions[1] = encoderSnapshot[1];
     }
 
+    const int32_t e3Delta = encoderSnapshot[2] - previousEncoderPositions[2];
+    if (e3Delta != 0) {
+        if (controller.turnPattern(e3Delta)) oledUi.showPatternEdit(millis());
+        previousEncoderPositions[2] = encoderSnapshot[2];
+    }
+
+    const int32_t e4Delta = encoderSnapshot[3] - previousEncoderPositions[3];
+    if (e4Delta != 0) {
+        if (controller.turnStep(e4Delta)) oledUi.showStep(millis());
+        previousEncoderPositions[3] = encoderSnapshot[3];
+    }
+
+    const uint8_t tickCount = controller.tick(millis(), commands, amen::SimpleMidiController::kMaxEventsPerAction);
+    for (uint8_t i = 0; i < tickCount; ++i) sendMidi(commands[i]);
+    sent = sent || tickCount > 0;
     if (sent) usbMIDI.send_now();
     while (usbMIDI.read()) {}
 

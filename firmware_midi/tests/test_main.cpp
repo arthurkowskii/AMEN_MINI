@@ -44,6 +44,30 @@ EventList release(SimpleMidiController& controller, uint8_t key) {
     return list;
 }
 
+EventList press(SimpleMidiController& controller, uint8_t key, uint32_t now) {
+    EventList list;
+    list.count = controller.press(key, now, list.items, kCap);
+    return list;
+}
+
+EventList tick(SimpleMidiController& controller, uint32_t now) {
+    EventList list;
+    list.count = controller.tick(now, list.items, kCap);
+    return list;
+}
+
+EventList togglePage(SimpleMidiController& controller) {
+    EventList list;
+    list.count = controller.togglePage(list.items, kCap);
+    return list;
+}
+
+EventList cancelRun(SimpleMidiController& controller) {
+    EventList list;
+    list.count = controller.cancelRun(list.items, kCap);
+    return list;
+}
+
 void assertEvents(const EventList& list, std::initializer_list<MidiCommand> expected) {
     if (static_cast<std::size_t>(list.count) != expected.size() ||
         !std::equal(expected.begin(), expected.end(), list.items,
@@ -81,6 +105,540 @@ constexpr MidiCommand off(uint8_t note) {
     return {MidiCommandType::NoteOff, note, 0};
 }
 
+void walkRun(SimpleMidiController& controller, std::initializer_list<uint8_t> notes,
+             uint32_t stepMs, uint32_t start, int restoreNote = -1) {
+    const size_t count = notes.size();
+    for (size_t i = 1; i < count; ++i) {
+        const uint32_t t = start + static_cast<uint32_t>(i) * stepMs;
+        assertEvents(tick(controller, t - 1), {});
+        assertEvents(tick(controller, t), {off(notes.begin()[i - 1]), on(notes.begin()[i])});
+    }
+    const uint32_t end = start + static_cast<uint32_t>(count) * stepMs;
+    assertEvents(tick(controller, end - 1), {});
+    const uint8_t last = notes.begin()[count - 1];
+    if (restoreNote >= 0 && static_cast<uint8_t>(restoreNote) == last) assertEvents(tick(controller, end), {});
+    else if (restoreNote >= 0)
+        assertEvents(tick(controller, end), {off(last), on(static_cast<uint8_t>(restoreNote))});
+    else assertEvents(tick(controller, end), {off(last)});
+    assert(!controller.runActive());
+}
+
+void testPatterns() {
+    {
+        g_block = "pattern-slots-defaults";
+        static constexpr std::array<const char*, 8> names{
+            "RUN UP", "RUN DOWN", "UP DOWN", "DOWN UP", "THIRDS UP", "THIRDS DN", "ARP UP", "ARP DOWN"};
+        SimpleMidiController controller;
+        for (uint8_t slot = 0; slot < 8; ++slot)
+            assert(std::string(amen::runShapeName(controller.slotAssignment(slot))) == names[slot]);
+        assert(amen::runShapeName(static_cast<amen::RunShape>(255))[0] == '\0');
+    }
+
+    {
+        g_block = "run-contours-all-shapes";
+        for (uint8_t shape = 0; shape < amen::kRunShapeCount; ++shape) {
+            for (uint8_t mode = 0; mode < amen::kDiatonicModeCount; ++mode) {
+                amen::RunPattern run;
+                run.start(60, static_cast<amen::DiatonicMode>(mode), 0,
+                          static_cast<amen::RunShape>(shape), 80, 0);
+                const amen::RunPatternDefinition& def = amen::kRunShapes[shape];
+                for (uint8_t step = 0; step < def.degreeCount; ++step) {
+                    run.tick(step * 80U);
+                    assert(run.note() == 60 + amen::signedScaleDegreeOffset(
+                        static_cast<amen::DiatonicMode>(mode), def.degrees[step]));
+                }
+                run.tick(def.degreeCount * 80U);
+                assert(!run.active());
+            }
+        }
+    }
+
+    {
+        g_block = "run-up-timeline";
+        SimpleMidiController controller;
+        assert(controller.page() == amen::PerformancePage::Harmony && controller.stepMs() == 80);
+        assertEvents(togglePage(controller), {});
+        assert(controller.page() == amen::PerformancePage::Pattern);
+        assertEvents(press(controller, 12), {});
+        assert(controller.patternHeld());
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assert(controller.runActive() && controller.runFinalOff() == 640);
+        walkRun(controller, {60, 62, 64, 65, 67, 69, 71, 72}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "run-down-timeline";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 13);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 59, 57, 55, 53, 52, 50, 48}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 13);
+    }
+
+    {
+        g_block = "pingpong-updown";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 14);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67, 65, 64, 62, 60}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 14);
+    }
+
+    {
+        g_block = "pingpong-downup";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 15);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 59, 57, 55, 53, 52, 50, 48, 50, 52, 53, 55, 57, 59, 60}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 15);
+    }
+
+    {
+        g_block = "thirds-up";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 16);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 64, 62, 65, 64, 67, 65, 69, 67, 71, 69, 72}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 16);
+    }
+
+    {
+        g_block = "thirds-down";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 17);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 57, 59, 55, 57, 53, 55, 52, 53, 50, 52, 48}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 17);
+    }
+
+    {
+        g_block = "arp-up";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 18);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 64, 67, 72}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 18);
+    }
+
+    {
+        g_block = "arp-down";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 19);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 55, 52, 48}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 19);
+    }
+
+    {
+        g_block = "run-up-truncates-at-127";
+        SimpleMidiController controller;
+        controller.turnOctave(100);
+        controller.turnRoot(-1);
+        controller.turnPreset(1);
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 6, 0), {on(117)});
+        walkRun(controller, {117, 119, 121, 122, 124, 126, 127}, 80, 0, 117);
+        release(controller, 6);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "run-down-truncates-at-0";
+        SimpleMidiController controller;
+        controller.turnOctave(-100);
+        togglePage(controller);
+        press(controller, 13);
+        assertEvents(press(controller, 0, 0), {on(0)});
+        assert(controller.runActive() && controller.runFinalOff() == 80);
+        assertEvents(tick(controller, 80), {});
+        assert(!controller.runActive());
+        assertEvents(release(controller, 0), {off(0)});
+        release(controller, 13);
+    }
+
+    {
+        g_block = "run-down-nonnegative-all-presets";
+        for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
+            SimpleMidiController controller;
+            controller.turnPreset(preset);
+            controller.turnOctave(-100);
+            togglePage(controller);
+            press(controller, 13);
+            assertEvents(press(controller, 0, 0), {on(0)});
+            assert(controller.runFinalOff() == 80);
+            assertEvents(tick(controller, 80), {});
+            assert(!controller.runActive());
+            assertEvents(release(controller, 0), {off(0)});
+            release(controller, 13);
+        }
+    }
+
+    {
+        g_block = "order-lower-then-upper-restores-manual";
+        SimpleMidiController controller;
+        togglePage(controller);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assert(controller.heldCount() == 1 && !controller.runActive());
+        assertEvents(press(controller, 12, 0), {});
+        assert(controller.runActive() && controller.runSourceKey() == 0);
+        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(tick(controller, 160), {off(62), on(64)});
+        assertEvents(tick(controller, 240), {off(64), on(65)});
+        assertEvents(tick(controller, 320), {off(65), on(67)});
+        assertEvents(tick(controller, 400), {off(67), on(69)});
+        assertEvents(tick(controller, 480), {off(69), on(71)});
+        assertEvents(tick(controller, 560), {off(71), on(72)});
+        assertEvents(tick(controller, 640), {off(72), on(60)});
+        assert(!controller.runActive() && controller.heldCount() == 1);
+        release(controller, 0);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "order-upper-then-lower-restores-manual";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 13);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assert(controller.runSourceKey() == 0 && controller.runShape() == amen::RunShape::RunDown);
+        assertEvents(tick(controller, 80), {off(60), on(59)});
+        assertEvents(tick(controller, 160), {off(59), on(57)});
+        assertEvents(tick(controller, 240), {off(57), on(55)});
+        assertEvents(tick(controller, 320), {off(55), on(53)});
+        assertEvents(tick(controller, 400), {off(53), on(52)});
+        assertEvents(tick(controller, 480), {off(52), on(50)});
+        assertEvents(tick(controller, 560), {off(50), on(48)});
+        assertEvents(tick(controller, 640), {off(48), on(60)});
+        assert(!controller.runActive() && controller.heldCount() == 1);
+        release(controller, 0);
+        release(controller, 13);
+    }
+
+    {
+        g_block = "hold-lower-then-upper-restores-chord";
+        SimpleMidiController controller;
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60), on(64), on(67)});
+        togglePage(controller);
+        assertEvents(press(controller, 13, 0), {off(64), off(67)});
+        assert(controller.runActive());
+        assertEvents(tick(controller, 80), {off(60), on(59)});
+        assertEvents(tick(controller, 160), {off(59), on(57)});
+        assertEvents(tick(controller, 240), {off(57), on(55)});
+        assertEvents(tick(controller, 320), {off(55), on(53)});
+        assertEvents(tick(controller, 400), {off(53), on(52)});
+        assertEvents(tick(controller, 480), {off(52), on(50)});
+        assertEvents(tick(controller, 560), {off(50), on(48)});
+        assertEvents(tick(controller, 640), {off(48), on(60), on(64), on(67)});
+        release(controller, 0);
+        release(controller, 12);
+        release(controller, 13);
+    }
+
+    {
+        g_block = "cancel-restores-source";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 0, 0);
+        press(controller, 12, 0);
+        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(cancelRun(controller), {off(62), on(60)});
+        assert(!controller.runActive() && controller.runSourceKey() == amen::SimpleMidiController::kNoRunSource);
+        release(controller, 0);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "release-source-prevents-restoration";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 0, 0);
+        press(controller, 12, 0);
+        assertEvents(release(controller, 0), {});
+        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(tick(controller, 160), {off(62), on(64)});
+        assertEvents(tick(controller, 240), {off(64), on(65)});
+        assertEvents(tick(controller, 320), {off(65), on(67)});
+        assertEvents(tick(controller, 400), {off(67), on(69)});
+        assertEvents(tick(controller, 480), {off(69), on(71)});
+        assertEvents(tick(controller, 560), {off(71), on(72)});
+        assertEvents(tick(controller, 640), {off(72)});
+        assert(!controller.runActive() && controller.heldCount() == 0);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "retrigger-transfers-restoration";
+        SimpleMidiController controller;
+        togglePage(controller);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assertEvents(press(controller, 12, 0), {});
+        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(press(controller, 4, 100), {off(62), on(60), on(67)});
+        assert(controller.runSourceKey() == 4);
+        assertEvents(tick(controller, 180), {off(67), on(69)});
+        assertEvents(tick(controller, 260), {off(69), on(71)});
+        assertEvents(tick(controller, 340), {off(71), on(72)});
+        assertEvents(tick(controller, 420), {off(72), on(74)});
+        assertEvents(tick(controller, 500), {off(74), on(76)});
+        assertEvents(tick(controller, 580), {off(76), on(77)});
+        assertEvents(tick(controller, 660), {off(77), on(79)});
+        assertEvents(tick(controller, 740), {off(79), on(67)});
+        release(controller, 0);
+        release(controller, 4);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "reference-lifo-most-recent-lower";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 0, 0);
+        press(controller, 4, 0);
+        assertEvents(press(controller, 19, 0), {});
+        assert(controller.runSourceKey() == 4 && controller.runNote() == 67);
+        release(controller, 0);
+        release(controller, 4);
+        release(controller, 19);
+    }
+
+    {
+        g_block = "pattern-lifo-release-restores-previous";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 12);
+        assert(controller.patternSlot() == 0);
+        press(controller, 13);
+        assert(controller.patternSlot() == 1);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assert(controller.runShape() == amen::RunShape::RunDown);
+        release(controller, 0);
+        tick(controller, 640);
+        assert(!controller.runActive());
+        release(controller, 13);
+        assert(controller.patternSlot() == 0);
+        assertEvents(press(controller, 0, 700), {on(60)});
+        assert(controller.runShape() == amen::RunShape::RunUp);
+        release(controller, 0);
+        tick(controller, 1340);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "edit-under-held-wraps-no-mutate-active";
+        SimpleMidiController controller;
+        togglePage(controller);
+        assert(!controller.turnPattern(1));
+        press(controller, 12);
+        assert(controller.patternSlot() == 0);
+        assert(controller.slotAssignment(0) == amen::RunShape::RunUp);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assert(controller.turnPattern(1));
+        assert(controller.slotAssignment(0) == amen::RunShape::RunDown);
+        assert(controller.runShape() == amen::RunShape::RunUp);
+        assertEvents(tick(controller, 80), {off(60), on(62)});
+        for (int i = 0; i < 7; ++i) assert(controller.turnPattern(1));
+        assert(controller.slotAssignment(0) == amen::RunShape::RunUp);
+        assert(!controller.turnPattern(0));
+        tick(controller, 640);
+        release(controller, 0);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "run-shared-owner-pitch";
+        SimpleMidiController controller;
+        assertEvents(press(controller, 7), {on(72)});
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assertEvents(tick(controller, 560), {off(60)});
+        assert(controller.runNote() == 72);
+        assertEvents(tick(controller, 640), {on(60)});
+        assertEvents(release(controller, 7), {off(72)});
+        release(controller, 0);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "run-frozen-settings-step";
+        SimpleMidiController controller;
+        assert(controller.turnStep(1) && controller.stepMs() == 85);
+        assert(controller.turnStep(-1) && controller.stepMs() == 80);
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        controller.turnRoot(9);
+        controller.turnPreset(2);
+        controller.turnOctave(1);
+        controller.turnStep(4);
+        assert(controller.stepMs() == 100 && controller.runFinalOff() == 640);
+        assertEvents(tick(controller, 160), {off(60), on(64)});
+        assertEvents(tick(controller, 560), {off(64), on(72)});
+        release(controller, 0);
+        assertEvents(tick(controller, 640), {off(72)});
+        assertEvents(press(controller, 0, 700), {on(81)});
+        assert(controller.runFinalOff() == 1500);
+        assertEvents(tick(controller, 899), {off(81), on(83)});
+        assertEvents(tick(controller, 900), {off(83), on(84)});
+        release(controller, 0);
+        assertEvents(tick(controller, 1300), {off(84), on(92)});
+        assertEvents(tick(controller, 1500), {off(92)});
+        assert(controller.turnStep(std::numeric_limits<int>::max()) && controller.stepMs() == 200);
+        assert(!controller.turnStep(1));
+        assert(controller.turnStep(std::numeric_limits<int>::min()) && controller.stepMs() == 30);
+        assert(!controller.turnStep(-1) && !controller.turnStep(0));
+        release(controller, 12);
+    }
+
+    {
+        g_block = "run-wrap-and-delay-skip";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 12);
+        const uint32_t start = std::numeric_limits<uint32_t>::max() - 39;
+        assertEvents(press(controller, 0, start), {on(60)});
+        assert(controller.runFinalOff() == 600);
+        assertEvents(tick(controller, 39), {});
+        assertEvents(tick(controller, 40), {off(60), on(62)});
+        assertEvents(tick(controller, 370), {off(62), on(69)});
+        assertEvents(tick(controller, 439), {});
+        assertEvents(tick(controller, 440), {off(69), on(71)});
+        assertEvents(tick(controller, 599), {off(71), on(72)});
+        release(controller, 0);
+        assertEvents(tick(controller, 600), {off(72)});
+        release(controller, 12);
+    }
+
+    {
+        g_block = "toggle-page-cancels-restores";
+        SimpleMidiController controller;
+        togglePage(controller);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        press(controller, 12, 0);
+        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(togglePage(controller), {off(62), on(60)});
+        assert(controller.page() == amen::PerformancePage::Harmony && !controller.runActive());
+        assert(controller.runSourceKey() == amen::SimpleMidiController::kNoRunSource);
+        assertEvents(press(controller, 1), {on(62)});
+        assert(!controller.runActive());
+        release(controller, 0);
+        release(controller, 1);
+        release(controller, 12);
+    }
+
+    {
+        g_block = "pattern-transactional-actions";
+        const auto check = [](SimpleMidiController initial, const auto& action) {
+            SimpleMidiController expected = initial;
+            EventList accepted;
+            accepted.count = action(expected, accepted.items, kCap);
+            for (uint8_t capacity = 0; capacity < std::max<uint8_t>(1, accepted.count); ++capacity) {
+                SimpleMidiController actual = initial;
+                std::array<MidiCommand, kCap> buffer;
+                buffer.fill(on(127));
+                assert(action(actual, buffer.data(), capacity) == 0);
+                for (const auto& event : buffer) assert(event.type == MidiCommandType::NoteOn && event.note == 127 && event.velocity == 100);
+                assert(actual.page() == initial.page());
+                assert(actual.runActive() == initial.runActive());
+                assert(actual.runShape() == initial.runShape());
+                assert(actual.runFinalOff() == initial.runFinalOff());
+                assert(actual.patternHeld() == initial.patternHeld());
+                assert(actual.heldCount() == initial.heldCount());
+                assert(actual.harmonyStackSize() == initial.harmonyStackSize());
+                assert(actual.runSourceKey() == initial.runSourceKey());
+                assert(action(actual, buffer.data(), kCap) == accepted.count);
+                for (uint8_t i = 0; i < accepted.count; ++i) {
+                    assert(buffer[i].type == accepted.items[i].type && buffer[i].note == accepted.items[i].note);
+                }
+                for (uint8_t key = 0; key < 20; ++key) {
+                    SimpleMidiController reference = expected;
+                    SimpleMidiController released = actual;
+                    const auto a = release(released, key);
+                    const auto b = release(reference, key);
+                    assert(a.count == b.count);
+                    for (uint8_t i = 0; i < a.count; ++i) assert(a.items[i].type == b.items[i].type && a.items[i].note == b.items[i].note);
+                }
+                const auto a = tick(actual, 10000);
+                SimpleMidiController reference = expected;
+                const auto b = tick(reference, 10000);
+                assert(a.count == b.count);
+                for (uint8_t i = 0; i < a.count; ++i) assert(a.items[i].type == b.items[i].type && a.items[i].note == b.items[i].note);
+            }
+        };
+        const auto page = [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.togglePage(out, cap); };
+        const auto trigger = [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.press(0, 0, out, cap); };
+        const auto advance = [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.tick(80, out, cap); };
+        SimpleMidiController controller;
+        check(controller, page);
+        togglePage(controller);
+        check(controller, [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.press(12, 0, out, cap); });
+        press(controller, 12);
+        check(controller, trigger);
+        press(controller, 0, 0);
+        check(controller, advance);
+        check(controller, page);
+        check(controller, [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.tick(640, out, cap); });
+        check(controller, [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.release(0, out, cap); });
+        check(controller, [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.release(12, out, cap); });
+    }
+
+    {
+        g_block = "ui-pattern-label-persists";
+        amen::SimpleMidiController controller;
+        amen::OledUi ui;
+        togglePage(controller);
+        press(controller, 12);
+        ui.showPattern(10);
+        amen::MonoFramebuffer expected;
+        expected.drawText(0, 0, "PATTERN", 2);
+        expected.drawText(96, 0, "PATT", 2);
+        expected.drawText(17, 18, "RUN UP READY", 2);
+        assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
+        assert(ui.overlayVisible());
+        controller.turnPattern(1);
+        ui.showPatternEdit(20);
+        const auto edit = ui.render(controller, amen::E2Page::Root, 20).pixels();
+        assert(ui.overlayVisible() && edit != expected.pixels());
+        assert(ui.render(controller, amen::E2Page::Root, 820).pixels() ==
+               ui.render(controller, amen::E2Page::Root, 1000).pixels());
+        assert(!ui.overlayVisible());
+    }
+
+    {
+        g_block = "chromatic-run";
+        SimpleMidiController controller;
+        controller.turnPreset(5);
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 61, 62, 63, 64, 65, 66, 67}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 12);
+        press(controller, 19);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        walkRun(controller, {60, 57, 55, 53}, 80, 0, 60);
+        release(controller, 0);
+        release(controller, 19);
+    }
+}
 }  // namespace
 
 int main() {
@@ -101,11 +659,17 @@ int main() {
             assert(amen::modeName(selected)[0] != '\0');
             assert(amen::modeShortName(selected)[0] != '\0');
             assert(amen::modeDescription(selected)[0] == '(');
+        }
+        for (uint8_t mode = 0; mode < expectedIntervals.size(); ++mode) {
+            const auto selected = static_cast<amen::DiatonicMode>(mode);
             for (uint8_t degree = 0; degree < 7; ++degree)
                 assert(amen::scaleDegreeOffset(selected, degree) == expectedIntervals[mode][degree]);
             assert(amen::scaleDegreeOffset(selected, 7) == 12);
             assert(amen::scaleDegreeOffset(selected, 11) == 12 + expectedIntervals[mode][4]);
         }
+        for (uint8_t degree = 0; degree < 12; ++degree)
+            assert(amen::scaleDegreeOffset(amen::DiatonicMode::Chromatic, degree) == degree);
+        assert(amen::scaleDegreeOffset(amen::DiatonicMode::Chromatic, 12) == 12);
 
         assert(amen::pitchClassName(1) == std::string("Db"));
         constexpr std::array<char, 4> eb{{'E', 'b', '\0', '\0'}};
@@ -116,10 +680,10 @@ int main() {
         assert(amen::spellScaleDegree(3, amen::DiatonicMode::Ionian, 3).text == ab);
         assert(amen::spellScaleDegree(5, amen::DiatonicMode::Lydian, 3).text == b);
         assert(amen::spellScaleDegree(1, amen::DiatonicMode::Locrian, 1).text == ebb);
-        assert(amen::kDiatonicModeCount == expectedIntervals.size());
+        assert(amen::kDiatonicModeCount == expectedIntervals.size() + 1);
         constexpr std::array<char, 7> letters{{'C', 'D', 'E', 'F', 'G', 'A', 'B'}};
         constexpr std::array<int, 7> natural{{0, 2, 4, 5, 7, 9, 11}};
-        for (uint8_t mode = 0; mode < amen::kDiatonicModeCount; ++mode)
+        for (uint8_t mode = 0; mode < expectedIntervals.size(); ++mode)
         for (uint8_t root = 0; root < 12; ++root)
         for (uint8_t degree = 0; degree < 12; ++degree) {
             const auto spelling = amen::spellScaleDegree(root, static_cast<amen::DiatonicMode>(mode), degree).text;
@@ -134,6 +698,10 @@ int main() {
             const auto rootLetter = std::find(letters.begin(), letters.end(), amen::pitchClassName(root)[0]);
             assert(letter - letters.begin() == (rootLetter - letters.begin() + degree) % 7);
         }
+        for (uint8_t root = 0; root < 12; ++root)
+        for (uint8_t degree = 0; degree < 12; ++degree)
+            assert(std::string(amen::spellScaleDegree(root, amen::DiatonicMode::Chromatic, degree).text.data()) ==
+                   amen::pitchClassName((root + degree) % 12));
     }
 
     for (const amen::ChordRecipe& recipe : amen::kChordRecipes) {
@@ -211,10 +779,10 @@ int main() {
         assert(controller.rootPitchClass() == 0);
         assert(!controller.turnRoot(12));
         assert(controller.turnPreset(-1));
-        assert(controller.preset() == amen::MusicalPreset::Dark);
+        assert(controller.preset() == amen::MusicalPreset::Chromatic);
         assert(controller.turnPreset(1));
         assert(controller.preset() == amen::MusicalPreset::Major);
-        assert(!controller.turnPreset(5));
+        assert(!controller.turnPreset(6));
 
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 0), {});
@@ -689,6 +1257,45 @@ int main() {
     }
 
     {
+        g_block = "chromatic-scale";
+        SimpleMidiController chromatic;
+        chromatic.turnPreset(5);
+        assert(chromatic.preset() == amen::MusicalPreset::Chromatic);
+        assert(chromatic.scale() == amen::DiatonicMode::Chromatic);
+        assert(std::string(chromatic.presetName()) == "CHROMATIC");
+        assert(std::string(amen::modeDescription(chromatic.scale())) == "(12 SEMITONES)");
+        for (uint8_t key = 0; key < chromatic.kKeyCount; ++key) {
+            assertEvents(press(chromatic, key), {on(60 + key)});
+            assertEvents(release(chromatic, key), {off(60 + key)});
+        }
+        assert(chromatic.rootNote() == 60 && chromatic.highestNote() == 71);
+        assertEvents(press(chromatic, 1), {on(61)});
+        assert(std::string(chromatic.currentNoteName()) == "Db");
+        assertEvents(release(chromatic, 1), {off(61)});
+        assertEvents(press(chromatic, 6), {on(66)});
+        assert(std::string(chromatic.currentNoteName()) == "F#");
+        assertEvents(release(chromatic, 6), {off(66)});
+        chromatic.turnRoot(2);
+        assertEvents(press(chromatic, 3), {on(65)});
+        assert(std::string(chromatic.currentNoteName()) == "F");
+        assertEvents(release(chromatic, 3), {off(65)});
+        chromatic.turnOctave(-100);
+        assertEvents(press(chromatic, 0), {on(2)});
+        assertEvents(release(chromatic, 0), {off(2)});
+        chromatic.turnOctave(100);
+        assertEvents(press(chromatic, 11), {on(109)});
+        assertEvents(release(chromatic, 11), {off(109)});
+        chromatic.turnOctave(-3);
+        chromatic.turnRoot(-2);
+        press(chromatic, 12);
+        assertNoteOns(press(chromatic, 0), {60, 64, 67});
+        assertEvents(press(chromatic, 13), {on(71)});
+        assertEvents(release(chromatic, 13), {off(71)});
+        assertEvents(release(chromatic, 0), {off(60), off(64), off(67)});
+        release(chromatic, 12);
+    }
+
+    {
         g_block = "frozen-context-mixed-presets";
         SimpleMidiController controller;
         press(controller, 12);
@@ -726,7 +1333,8 @@ int main() {
 
     {
         g_block = "preset-data-and-wrapping";
-        constexpr std::array<const char*, 5> names{{"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK"}};
+        constexpr std::array<const char*, amen::kMusicalPresetCount> names{
+            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC"}};
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             SimpleMidiController controller;
             controller.turnPreset(preset);
@@ -757,7 +1365,7 @@ int main() {
         SimpleMidiController controller;
         int64_t expected = 0;
         for (int delta : {std::numeric_limits<int>::max(), std::numeric_limits<int>::min(), -1000003, 1000003, 0, 500}) {
-            const int64_t next = ((expected + delta) % 5 + 5) % 5;
+            const int64_t next = ((expected + delta) % amen::kMusicalPresetCount + amen::kMusicalPresetCount) % amen::kMusicalPresetCount;
             assert(controller.turnPreset(delta) == (next != expected));
             expected = next;
             assert(static_cast<uint8_t>(controller.preset()) == expected);
@@ -772,8 +1380,10 @@ int main() {
         press(controller, 0);
         controller.turnPreset(2);
         amen::MonoFramebuffer expected;
-        expected.drawText(0, 0, "O5 C HARM MIN*", 2);
-        expected.drawText(58, 12, "C", 4);
+        expected.drawText(0, 0, "O5 C", 2);
+        expected.drawText(96, 0, "HARM", 2);
+        expected.drawText(0, 11, "HARM MIN* C", 2);
+        expected.drawText(25, 22, "(MINOR #7)", 2);
         assert(ui.render(controller, amen::E2Page::Preset, 0).pixels() == expected.pixels());
         controller.turnPreset(-2);
         assert(!controller.hasHeldPresetMismatch());
@@ -781,12 +1391,13 @@ int main() {
         ui.showE2(amen::E2Page::Preset, 1);
         expected.clear();
         expected.drawText(0, 0, "PRESET", 2);
+        expected.drawText(96, 0, "HARM", 2);
         expected.drawText(45, 14, "MAJOR", 2);
-        expected.fillRect(112, 2, 5, 1);
-        expected.fillRect(112, 6, 5, 1);
-        expected.fillRect(112, 3, 1, 3);
-        expected.fillRect(116, 3, 1, 3);
-        expected.fillRect(121, 2, 5, 5);
+        expected.fillRect(112, 27, 5, 1);
+        expected.fillRect(112, 31, 5, 1);
+        expected.fillRect(112, 28, 1, 3);
+        expected.fillRect(116, 28, 1, 3);
+        expected.fillRect(121, 27, 5, 5);
         assert(ui.render(controller, amen::E2Page::Preset, 1).pixels() == expected.pixels());
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             for (uint8_t slot = 0; slot < amen::kHarmonySlotCount; ++slot) {
@@ -794,6 +1405,7 @@ int main() {
                 ui.showHarmony(10);
                 expected.clear();
                 expected.drawText(0, 0, "HARMONY", 2);
+                expected.drawText(96, 0, "HARM", 2);
                 const int length = static_cast<int>(std::string(controller.harmonyName()).size());
                 const int scale = length * 16 - 4 <= 128 ? 4 : 2;
                 expected.drawText((128 - (length * 4 * scale - scale)) / 2, 12, controller.harmonyName(), scale);
@@ -804,5 +1416,6 @@ int main() {
         }
     }
 
-    std::cout << "AMEN MIDI preset and ownership tests: PASS\n";
+    testPatterns();
+    std::cout << "AMEN MIDI preset, pattern and ownership tests: PASS\n";
 }
