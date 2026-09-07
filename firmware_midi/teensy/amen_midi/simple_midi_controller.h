@@ -33,6 +33,30 @@ enum class ClockMode : uint8_t {
     Frequency
 };
 
+enum class PatternBank : uint8_t {
+    Orchestral,
+    FutureArp,
+    FuturePattern,
+    Kawaii,
+    Repeat
+};
+
+enum class RateDivision : uint8_t {
+    Quarter,
+    Eighth,
+    Sixteenth,
+    ThirtySecond,
+    QuarterTriplet,
+    EighthTriplet,
+    SixteenthTriplet,
+    ThirtySecondTriplet
+};
+
+struct PatternAssignment {
+    RunShape shape;
+    RateDivision division;
+};
+
 class SimpleMidiController {
 public:
     static constexpr uint8_t kKeyCount = 12;
@@ -63,6 +87,10 @@ public:
         return applyAction(key, false, 0, out, capacity);
     }
 
+    uint8_t release(uint8_t key, uint32_t now, MidiCommand* out, uint8_t capacity) noexcept {
+        return applyAction(key, false, now, out, capacity);
+    }
+
     uint8_t tick(uint32_t now, MidiCommand* out, uint8_t capacity) noexcept {
         SimpleMidiController candidate = *this;
         candidate.run_.tick(now);
@@ -82,10 +110,14 @@ public:
     }
 
     uint8_t togglePage(MidiCommand* out, uint8_t capacity) noexcept {
+        return turnPage(1, out, capacity);
+    }
+
+    uint8_t turnPage(int delta, MidiCommand* out, uint8_t capacity) noexcept {
         SimpleMidiController candidate = *this;
-        if (candidate.page_ == PerformancePage::Harmony) candidate.page_ = PerformancePage::Pattern;
-        else if (candidate.page_ == PerformancePage::Pattern) candidate.page_ = PerformancePage::None;
-        else candidate.page_ = PerformancePage::Harmony;
+        const uint8_t current = static_cast<uint8_t>(candidate.page_);
+        candidate.page_ = static_cast<PerformancePage>(wrap(current, delta, 3));
+        if (candidate.page_ == page_) return 0;
         if (candidate.page_ != PerformancePage::Pattern) {
             candidate.run_.cancel();
             candidate.runSourceKey_ = kNoRunSource;
@@ -94,13 +126,25 @@ public:
         return commit(candidate, out, capacity);
     }
 
+    bool nextPatternBank() noexcept {
+        if (page_ != PerformancePage::Pattern) return false;
+        patternBank_ = static_cast<PatternBank>(wrap(static_cast<uint8_t>(patternBank_), 1, 5));
+        return true;
+    }
+
+    bool toggleClockMode(uint32_t now) noexcept {
+        clockMode_ = clockMode_ == ClockMode::Tempo ? ClockMode::Frequency : ClockMode::Tempo;
+        run_.setStepDuration(currentStepDurationUs(), now);
+        return true;
+    }
+
     bool turnTempo(int delta, uint32_t now) noexcept {
         const int64_t next = static_cast<int64_t>(tempo_) + delta;
         const uint16_t clamped = next < 20 ? 20 : (next > 300 ? 300 : static_cast<uint16_t>(next));
         if (clamped == tempo_ && clockMode_ == ClockMode::Tempo) return false;
         tempo_ = clamped;
         clockMode_ = ClockMode::Tempo;
-        run_.setStepDuration(stepDurationUs(), now);
+        run_.setStepDuration(currentStepDurationUs(), now);
         return true;
     }
 
@@ -111,7 +155,7 @@ public:
         if (clamped == frequencyIndex_ && clockMode_ == ClockMode::Frequency) return false;
         frequencyIndex_ = clamped;
         clockMode_ = ClockMode::Frequency;
-        run_.setStepDuration(stepDurationUs(), now);
+        run_.setStepDuration(currentStepDurationUs(), now);
         return true;
     }
 
@@ -120,10 +164,22 @@ public:
         const uint8_t key = heldPatternKey();
         if (key == kNoRunSource) return false;
         const uint8_t slot = key - kHarmonyStartKey;
-        const uint8_t current = static_cast<uint8_t>(patternAssign_[slot]);
-        const uint8_t next = wrap(current, delta, kRunShapeCount);
+        PatternAssignment& assignment = patternAssign_[static_cast<uint8_t>(patternBank_)][slot];
+        if (patternBank_ == PatternBank::Repeat) {
+            const uint8_t current = static_cast<uint8_t>(assignment.division);
+            const uint8_t next = wrap(current, delta, 8);
+            if (next == current) return false;
+            assignment.division = static_cast<RateDivision>(next);
+            return true;
+        }
+        const uint8_t first = patternBank_ == PatternBank::Orchestral ? 0
+            : (patternBank_ == PatternBank::FutureArp ? 12
+            : (patternBank_ == PatternBank::FuturePattern ? 20 : 28));
+        const uint8_t count = patternBank_ == PatternBank::Orchestral ? 12 : 8;
+        const uint8_t current = static_cast<uint8_t>(assignment.shape) - first;
+        const uint8_t next = wrap(current, delta, count);
         if (next == current) return false;
-        patternAssign_[slot] = static_cast<RunShape>(next);
+        assignment.shape = static_cast<RunShape>(first + next);
         return true;
     }
 
@@ -139,9 +195,26 @@ public:
     bool patternHeld() const noexcept { return patternCount_ > 0; }
     RunShape currentPattern() const noexcept {
         const uint8_t key = heldPatternKey();
-        return key == kNoRunSource ? patternAssign_[0] : patternAssign_[key - kHarmonyStartKey];
+        return currentAssignment(key == kNoRunSource ? 0 : key - kHarmonyStartKey).shape;
     }
-    RunShape slotAssignment(uint8_t slot) const noexcept { return patternAssign_[slot]; }
+    RunShape slotAssignment(uint8_t slot) const noexcept { return currentAssignment(slot).shape; }
+    RateDivision slotDivision(uint8_t slot) const noexcept { return currentAssignment(slot).division; }
+    PatternBank patternBank() const noexcept { return patternBank_; }
+    const char* patternBankName() const noexcept {
+        switch (patternBank_) {
+            case PatternBank::Orchestral: return "ORCH";
+            case PatternBank::FutureArp: return "FUT. ARP";
+            case PatternBank::FuturePattern: return "FUT. PATTERN";
+            case PatternBank::Kawaii: return "KAWAII";
+            case PatternBank::Repeat: return "REPEAT";
+        }
+        return "";
+    }
+    const char* currentDivisionName() const noexcept {
+        static constexpr const char* names[]{"1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T", "1/32T"};
+        const uint8_t key = heldPatternKey();
+        return names[static_cast<uint8_t>(currentAssignment(key == kNoRunSource ? 0 : key - kHarmonyStartKey).division)];
+    }
     uint8_t patternSlot() const noexcept {
         const uint8_t key = heldPatternKey();
         return key == kNoRunSource ? 0 : key - kHarmonyStartKey;
@@ -338,12 +411,32 @@ private:
         return static_cast<uint32_t>((100000000ULL + hundredths / 2U) / hundredths);
     }
 
+    static uint32_t applyDivision(uint32_t sixteenthUs, RateDivision division) noexcept {
+        static constexpr uint8_t numerators[]{4, 2, 1, 1, 8, 4, 2, 1};
+        static constexpr uint8_t denominators[]{1, 1, 1, 2, 3, 3, 3, 3};
+        const uint8_t index = static_cast<uint8_t>(division);
+        return static_cast<uint32_t>(static_cast<uint64_t>(sixteenthUs) * numerators[index] / denominators[index]);
+    }
+
+    uint32_t currentStepDurationUs() const noexcept {
+        if (run_.active()) return applyDivision(stepDurationUs(), runDivision_);
+        const uint8_t key = heldPatternKey();
+        const uint8_t slot = key == kNoRunSource ? 0 : key - kHarmonyStartKey;
+        return applyDivision(stepDurationUs(), currentAssignment(slot).division);
+    }
+
     void startRun(uint8_t sourceKey, uint8_t patternKey, RunShape shape, uint32_t now) noexcept {
         const DegreeState& degree = degrees_[sourceKey];
-        run_.start(degree.rootNote, degree.scale, sourceKey,
-                   isDrumPreset(preset_) ? RunShape::Repeat : shape, stepDurationUs(), now);
+        const PatternAssignment& assignment = currentAssignment(patternKey - kHarmonyStartKey);
+        const RunShape targetShape = isDrumPreset(preset_) ? RunShape::Repeat : shape;
+        const uint32_t duration = applyDivision(stepDurationUs(), assignment.division);
+        if (run_.active() && runSourceKey_ == sourceKey && run_.shape() == RunShape::Repeat && targetShape == RunShape::Repeat)
+            run_.setStepDuration(duration, now);
+        else
+            run_.start(degree.rootNote, degree.scale, sourceKey, targetShape, duration, now);
         runSourceKey_ = run_.active() ? sourceKey : kNoRunSource;
         runPatternKey_ = run_.active() ? patternKey : kNoRunSource;
+        runDivision_ = assignment.division;
     }
 
     uint8_t soundingTarget(const DegreeState& degree, int16_t* target) const noexcept {
@@ -355,15 +448,20 @@ private:
         const ChordRecipe& recipe = *harmonySlotRecipe(degree.preset, slot);
         for (uint8_t i = 0; i < recipe.voiceCount; ++i)
             target[i] = foldNote(static_cast<int16_t>(degree.rootNote +
-                scaleDegreeOffset(degree.scale, degree.key + recipe.degrees[i]) -
-                scaleDegreeOffset(degree.scale, degree.key) + recipe.octaveDisplacements[i]));
+                (recipe.chromaticIntervals
+                    ? recipe.degrees[i]
+                    : scaleDegreeOffset(degree.scale, degree.key + recipe.degrees[i]) -
+                      scaleDegreeOffset(degree.scale, degree.key)) +
+                recipe.octaveDisplacements[i]));
         sortNotes(target, recipe.voiceCount);
         return recipe.voiceCount;
     }
 
     void soundingUnion(std::array<bool, 128>& sounding) const noexcept {
-        const int16_t runNote = run_.note();
-        if (runNote >= 0) sounding[static_cast<uint8_t>(runNote)] = true;
+        for (uint8_t voice = 0; voice < run_.soundingCount(); ++voice) {
+            const int16_t runNote = run_.soundingNote(voice);
+            if (runNote >= 0) sounding[static_cast<uint8_t>(runNote)] = true;
+        }
         for (const DegreeState& degree : degrees_) {
             if (!degree.held) continue;
             if (degree.key == runSourceKey_) continue;
@@ -404,6 +502,11 @@ private:
                 candidate.releaseDegree(key);
             else if (role == PadRole::HarmonySlot) candidate.releaseHarmony(key);
             else if (role == PadRole::PatternSlot) candidate.releasePattern(key);
+            const bool restoresRepeat = candidate.run_.active() && candidate.runPatternKey_ == key &&
+                candidate.run_.shape() == RunShape::Repeat && candidate.patternCount_ > 0 &&
+                candidate.runSourceKey_ != kNoRunSource && candidate.degrees_[candidate.runSourceKey_].held;
+            if (restoresRepeat)
+                candidate.startRun(candidate.runSourceKey_, candidate.heldPatternKey(), candidate.currentPattern(), now);
             const bool stopsRun = candidate.run_.active() &&
                 (candidate.runSourceKey_ == key || candidate.runPatternKey_ == key);
             if (stopsRun) {
@@ -451,9 +554,31 @@ private:
     uint8_t harmonyCount_{};
     std::array<uint8_t, kHarmonyKeyCount> patternStack_{};
     uint8_t patternCount_{};
-    std::array<RunShape, kHarmonyKeyCount> patternAssign_{{
-        RunShape::RunUp, RunShape::RunDown, RunShape::UpDown, RunShape::DownUp,
-        RunShape::ThirdsUp, RunShape::ThirdsDown, RunShape::ArpUp, RunShape::ArpDown
+    const PatternAssignment& currentAssignment(uint8_t slot) const noexcept {
+        return patternAssign_[static_cast<uint8_t>(patternBank_)][slot];
+    }
+
+    std::array<std::array<PatternAssignment, kHarmonyKeyCount>, 5> patternAssign_{{
+        {{{RunShape::RunUp, RateDivision::Sixteenth}, {RunShape::RunDown, RateDivision::Sixteenth},
+          {RunShape::UpDown, RateDivision::Sixteenth}, {RunShape::DownUp, RateDivision::Sixteenth},
+          {RunShape::ThirdsUp, RateDivision::Sixteenth}, {RunShape::ThirdsDown, RateDivision::Sixteenth},
+          {RunShape::ArpUp, RateDivision::Sixteenth}, {RunShape::ArpDown, RateDivision::Sixteenth}}},
+        {{{RunShape::FutureLift, RateDivision::Sixteenth}, {RunShape::FutureBounce, RateDivision::Sixteenth},
+          {RunShape::FutureWide, RateDivision::Sixteenth}, {RunShape::FutureSeven, RateDivision::Sixteenth},
+          {RunShape::FutureNine, RateDivision::Sixteenth}, {RunShape::FutureSparkle, RateDivision::Sixteenth},
+          {RunShape::FutureRise, RateDivision::Sixteenth}, {RunShape::FutureFall, RateDivision::Sixteenth}}},
+        {{{RunShape::FuturePulse, RateDivision::Sixteenth}, {RunShape::FutureOffbeat, RateDivision::Sixteenth},
+          {RunShape::FutureDouble, RateDivision::Sixteenth}, {RunShape::FuturePush, RateDivision::Sixteenth},
+          {RunShape::FutureSync, RateDivision::Sixteenth}, {RunShape::FutureHold, RateDivision::Sixteenth},
+          {RunShape::FutureSevenChop, RateDivision::Sixteenth}, {RunShape::FutureNineChop, RateDivision::Sixteenth}}},
+        {{{RunShape::KawaiiAdd9Arp, RateDivision::Sixteenth}, {RunShape::KawaiiSevenBounce, RateDivision::Sixteenth},
+          {RunShape::KawaiiNineChop, RateDivision::Sixteenth}, {RunShape::KawaiiSixNinePulse, RateDivision::Sixteenth},
+          {RunShape::KawaiiDom7Arp, RateDivision::Sixteenth}, {RunShape::KawaiiDomFlatNineChop, RateDivision::Sixteenth},
+          {RunShape::KawaiiMin9Arp, RateDivision::Sixteenth}, {RunShape::KawaiiMin6Pulse, RateDivision::Sixteenth}}},
+        {{{RunShape::Repeat, RateDivision::Quarter}, {RunShape::Repeat, RateDivision::Eighth},
+          {RunShape::Repeat, RateDivision::Sixteenth}, {RunShape::Repeat, RateDivision::ThirtySecond},
+          {RunShape::Repeat, RateDivision::QuarterTriplet}, {RunShape::Repeat, RateDivision::EighthTriplet},
+          {RunShape::Repeat, RateDivision::SixteenthTriplet}, {RunShape::Repeat, RateDivision::ThirtySecondTriplet}}}
     }};
     int8_t octave_{};
     uint8_t rootPitchClass_{};
@@ -465,6 +590,8 @@ private:
     uint16_t tempo_{120};
     uint8_t frequencyIndex_{29};
     ClockMode clockMode_{ClockMode::Tempo};
+    PatternBank patternBank_{PatternBank::Orchestral};
+    RateDivision runDivision_{RateDivision::Sixteenth};
     std::array<PadRole, kShiftKey> roles_{};
     RunPattern run_{};
 };

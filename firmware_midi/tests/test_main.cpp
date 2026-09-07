@@ -48,6 +48,12 @@ EventList release(SimpleMidiController& controller, uint8_t key) {
     return list;
 }
 
+EventList release(SimpleMidiController& controller, uint8_t key, uint32_t now) {
+    EventList list;
+    list.count = controller.release(key, us(now), list.items, kCap);
+    return list;
+}
+
 EventList press(SimpleMidiController& controller, uint8_t key, uint32_t now) {
     EventList list;
     list.count = controller.press(key, us(now), list.items, kCap);
@@ -146,9 +152,95 @@ void testPatterns() {
         SimpleMidiController controller;
         for (uint8_t slot = 0; slot < 8; ++slot)
             assert(std::string(amen::runShapeName(controller.slotAssignment(slot))) == names[slot]);
-        assert(amen::kRunShapeCount == 12);
+        assert(amen::kRunShapeCount == 36);
         assert(std::string(amen::runShapeName(amen::RunShape::Repeat)) == "REPEAT");
         assert(amen::runShapeName(static_cast<amen::RunShape>(255))[0] == '\0');
+    }
+
+    {
+        g_block = "pattern-banks-defaults";
+        SimpleMidiController controller;
+        togglePage(controller);
+        assert(controller.patternBank() == amen::PatternBank::Orchestral);
+        assert(controller.nextPatternBank());
+        assert(controller.patternBank() == amen::PatternBank::FutureArp);
+        assert(controller.slotAssignment(0) == amen::RunShape::FutureLift);
+        assert(controller.nextPatternBank());
+        assert(controller.patternBank() == amen::PatternBank::FuturePattern);
+        assert(controller.slotAssignment(0) == amen::RunShape::FuturePulse);
+        assert(controller.nextPatternBank());
+        assert(controller.patternBank() == amen::PatternBank::Kawaii);
+        assert(controller.slotAssignment(0) == amen::RunShape::KawaiiAdd9Arp);
+        assert(controller.nextPatternBank());
+        assert(controller.patternBank() == amen::PatternBank::Repeat);
+        assert(controller.slotAssignment(0) == amen::RunShape::Repeat);
+        assert(controller.slotDivision(0) == amen::RateDivision::Quarter);
+        assert(std::string(controller.currentDivisionName()) == "1/4");
+        assert(controller.nextPatternBank());
+        assert(controller.patternBank() == amen::PatternBank::Orchestral);
+    }
+
+    {
+        g_block = "future-pattern-polyphonic-rests";
+        SimpleMidiController controller;
+        togglePage(controller);
+        controller.nextPatternBank();
+        controller.nextPatternBank();
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assertEvents(press(controller, 12, 0), {on(64), on(67)});
+        assertEvents(tick(controller, 125), {off(60), off(64), off(67)});
+        assertEvents(tick(controller, 250), {on(60), on(64), on(67)});
+        assertEvents(release(controller, 12), {off(64), off(67)});
+        assertEvents(release(controller, 0), {off(60)});
+    }
+
+    {
+        g_block = "repeat-bank-pad-divisions";
+        SimpleMidiController controller;
+        togglePage(controller);
+        controller.nextPatternBank();
+        controller.nextPatternBank();
+        controller.nextPatternBank();
+        controller.nextPatternBank();
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assertEvents(press(controller, 13, 100), {});
+        assert(controller.slotDivision(1) == amen::RateDivision::Eighth);
+        assertEvents(release(controller, 13, 100), {});
+        assertEvents(tick(controller, 374), {});
+        assertEvents(tick(controller, 375), {off(60)});
+        assertEvents(tick(controller, 500), {on(60)});
+        assertEvents(release(controller, 12), {});
+        assertEvents(release(controller, 0), {off(60)});
+    }
+
+    {
+        g_block = "kawaii-pattern-altered-dominant";
+        SimpleMidiController controller;
+        togglePage(controller);
+        controller.nextPatternBank();
+        controller.nextPatternBank();
+        controller.nextPatternBank();
+        assert(controller.patternBank() == amen::PatternBank::Kawaii);
+        press(controller, 16);
+        assertEvents(press(controller, 2, 0), {on(64)});
+        assertEvents(tick(controller, 125), {off(64), on(68)});
+        assertEvents(tick(controller, 250), {off(68), on(71)});
+        assertEvents(tick(controller, 375), {off(71), on(74)});
+        release(controller, 2);
+        release(controller, 16);
+    }
+
+    {
+        g_block = "mode-turn-and-rate-click";
+        SimpleMidiController controller;
+        MidiCommand commands[kCap];
+        assert(controller.turnPage(-1, commands, kCap) == 0);
+        assert(controller.page() == amen::PerformancePage::None);
+        assert(!controller.nextPatternBank());
+        assert(controller.clockMode() == amen::ClockMode::Tempo);
+        assert(controller.toggleClockMode(0));
+        assert(controller.clockMode() == amen::ClockMode::Frequency);
     }
 
     {
@@ -156,9 +248,10 @@ void testPatterns() {
         for (uint8_t shape = 0; shape < amen::kRunShapeCount; ++shape) {
             for (uint8_t mode = 0; mode < amen::kDiatonicModeCount; ++mode) {
                 amen::RunPattern run;
+                const amen::RunPatternDefinition& def = amen::kRunShapes[shape];
+                if (def.degrees == nullptr) continue;
                 run.start(60, static_cast<amen::DiatonicMode>(mode), 0,
                           static_cast<amen::RunShape>(shape), 80, 0);
-                const amen::RunPatternDefinition& def = amen::kRunShapes[shape];
                 for (uint8_t step = 0; step < def.degreeCount; ++step) {
                     run.tick(step * 80U);
                     assert(run.note() == 60 + amen::signedScaleDegreeOffset(
@@ -166,7 +259,8 @@ void testPatterns() {
                 }
                 run.tick(def.degreeCount * 80U);
                 assert(run.active());
-                assert(run.note() == 60);
+                assert(run.note() == 60 + amen::signedScaleDegreeOffset(
+                    static_cast<amen::DiatonicMode>(mode), def.degrees[0]));
             }
         }
     }
@@ -520,7 +614,7 @@ void testPatterns() {
         assert(controller.slotAssignment(0) == amen::RunShape::RunDown);
         assert(controller.runShape() == amen::RunShape::RunUp);
         assertEvents(tick(controller, 125), {off(60), on(62)});
-        for (int i = 0; i < amen::kRunShapeCount - 1; ++i) assert(controller.turnPattern(1));
+        for (int i = 0; i < 11; ++i) assert(controller.turnPattern(1));
         assert(controller.slotAssignment(0) == amen::RunShape::RunUp);
         assert(!controller.turnPattern(0));
         tick(controller, 1000);
@@ -811,7 +905,7 @@ void testPatterns() {
         assert(ui.render(controller, amen::E2Page::Root, 0).pixels() == expected.pixels());
         ui.showPage(10);
         expected.clear();
-        expected.drawText(0, 0, "PAGE", 2);
+        expected.drawText(0, 0, "MODE", 2);
         expected.drawText(96, 0, "NONE", 2);
         expected.drawText(49, 18, "NONE", 2);
         assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
@@ -1005,14 +1099,14 @@ int main() {
         assert(controller.rootPitchClass() == 0);
         assert(!controller.turnRoot(12));
         assert(controller.turnPreset(-1));
-        assert(controller.preset() == amen::MusicalPreset::Prism);
+        assert(controller.preset() == amen::MusicalPreset::Kawaii);
         assert(!controller.drums());
         assert(controller.turnPreset(1));
         assert(controller.preset() == amen::MusicalPreset::Major);
         assert(controller.turnPreset(6));
         assert(controller.preset() == amen::MusicalPreset::GmKit);
         assert(controller.midiChannel() == amen::SimpleMidiController::kDrumChannel);
-        assert(controller.turnPreset(2));
+        assert(controller.turnPreset(4));
         assert(controller.preset() == amen::MusicalPreset::Major);
         assert(!controller.turnPreset(amen::kMusicalPresetCount));
 
@@ -1199,8 +1293,12 @@ int main() {
                     const int root = controller.rootNote() + amen::scaleDegreeOffset(controller.scale(), key);
                     const amen::ChordRecipe* recipe = slot < 0 ? nullptr : amen::harmonySlotRecipe(controller.preset(), static_cast<uint8_t>(slot));
                     for (uint8_t voice = 0; voice < (recipe ? recipe->voiceCount : 1); ++voice) {
-                        int note = root + (recipe ? amen::scaleDegreeOffset(controller.scale(), key + recipe->degrees[voice]) -
-                            amen::scaleDegreeOffset(controller.scale(), key) + recipe->octaveDisplacements[voice] : 0);
+                        int note = root + (recipe
+                            ? (recipe->chromaticIntervals
+                                ? recipe->degrees[voice]
+                                : amen::scaleDegreeOffset(controller.scale(), key + recipe->degrees[voice]) -
+                                  amen::scaleDegreeOffset(controller.scale(), key)) + recipe->octaveDisplacements[voice]
+                            : 0);
                         while (note > 127) note -= 12;
                         expected[note] = true;
                     }
@@ -1613,7 +1711,7 @@ int main() {
     {
         g_block = "preset-data-and-wrapping";
         constexpr std::array<const char*, amen::kMusicalPresetCount> names{
-            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC", "GM KIT", "PRISM"}};
+            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC", "GM KIT", "PRISM MAJ", "PRISM MIN", "KAWAII"}};
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             SimpleMidiController controller;
             controller.turnPreset(preset);
@@ -1640,18 +1738,25 @@ int main() {
                 assert(recipe && std::string(recipe->name).size() * 8 - 2 <= 128);
                 std::array<bool, 128> notes{};
                 for (uint8_t voice = 0; voice < recipe->voiceCount; ++voice)
-                    notes[amen::scaleDegreeOffset(controller.scale(), recipe->degrees[voice]) + recipe->octaveDisplacements[voice]] = true;
+                    notes[(recipe->chromaticIntervals ? recipe->degrees[voice]
+                        : amen::scaleDegreeOffset(controller.scale(), recipe->degrees[voice])) + recipe->octaveDisplacements[voice]] = true;
                 for (uint8_t other = 0; other < slot; ++other) {
                     const auto* earlier = amen::harmonySlotRecipe(controller.preset(), other);
                     std::array<bool, 128> previous{};
                     for (uint8_t voice = 0; voice < earlier->voiceCount; ++voice)
-                        previous[amen::scaleDegreeOffset(controller.scale(), earlier->degrees[voice]) + earlier->octaveDisplacements[voice]] = true;
+                        previous[(earlier->chromaticIntervals ? earlier->degrees[voice]
+                            : amen::scaleDegreeOffset(controller.scale(), earlier->degrees[voice])) + earlier->octaveDisplacements[voice]] = true;
                     assert(notes != previous);
                 }
             }
             assert(controller.turnPreset(1));
             assert(static_cast<uint8_t>(controller.preset()) == (preset + 1) % amen::kMusicalPresetCount);
         }
+        assert(amen::musicalPreset(amen::MusicalPreset::PrismMajor).scale == amen::DiatonicMode::Ionian);
+        assert(amen::musicalPreset(amen::MusicalPreset::PrismMinor).scale == amen::DiatonicMode::Aeolian);
+        for (uint8_t slot = 0; slot < amen::kHarmonySlotCount; ++slot)
+            assert(amen::harmonySlotRecipe(amen::MusicalPreset::PrismMajor, slot) ==
+                   amen::harmonySlotRecipe(amen::MusicalPreset::PrismMinor, slot));
         SimpleMidiController controller;
         int64_t expected = 0;
         for (int delta : {std::numeric_limits<int>::max(), std::numeric_limits<int>::min(), -1000003, 1000003, 0, 500}) {
@@ -1661,6 +1766,33 @@ int main() {
             assert(static_cast<uint8_t>(controller.preset()) == expected);
         }
         assert(amen::harmonySlotRecipe(static_cast<amen::MusicalPreset>(255), 0) == nullptr);
+    }
+
+    {
+        g_block = "kawaii-harmony-chromatic-recipes";
+        SimpleMidiController controller;
+        controller.turnPreset(static_cast<int>(amen::MusicalPreset::Kawaii));
+        assert(controller.scale() == amen::DiatonicMode::Ionian);
+
+        press(controller, 16);
+        assertNoteOns(press(controller, 2), {64, 68, 71, 74});
+        assertEvents(release(controller, 2), {off(64), off(68), off(71), off(74)});
+        release(controller, 16);
+
+        press(controller, 17);
+        assertNoteOns(press(controller, 2), {64, 68, 71, 74, 77});
+        assertEvents(release(controller, 2), {off(64), off(68), off(71), off(74), off(77)});
+        release(controller, 17);
+
+        press(controller, 18);
+        assertNoteOns(press(controller, 3), {65, 68, 72, 75, 79});
+        assertEvents(release(controller, 3), {off(65), off(68), off(72), off(75), off(79)});
+        release(controller, 18);
+
+        press(controller, 19);
+        assertNoteOns(press(controller, 3), {65, 68, 72, 74});
+        assertEvents(release(controller, 3), {off(65), off(68), off(72), off(74)});
+        release(controller, 19);
     }
 
     {

@@ -146,6 +146,26 @@ public:
         overlayChangedAt_ = now;
     }
 
+    void showRoot(uint32_t now) noexcept {
+        overlay_ = Overlay::Root;
+        overlayChangedAt_ = now;
+    }
+
+    void showPreset(uint32_t now) noexcept {
+        overlay_ = Overlay::Preset;
+        overlayChangedAt_ = now;
+    }
+
+    void showMode(uint32_t now) noexcept {
+        overlay_ = Overlay::Page;
+        overlayChangedAt_ = now;
+    }
+
+    void showBank(uint32_t now) noexcept {
+        overlay_ = Overlay::Bank;
+        overlayChangedAt_ = now;
+    }
+
     const MonoFramebuffer& render(const SimpleMidiController& controller, E2Page page, uint32_t now) noexcept {
         framebuffer_.clear();
         if (overlay_ != Overlay::None && now - overlayChangedAt_ < 800U) renderOverlay(controller);
@@ -172,7 +192,8 @@ private:
         Harmony,
         Page,
         Pattern,
-        PatternEdit
+        PatternEdit,
+        Bank
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
@@ -199,17 +220,21 @@ private:
 
     void renderOverlay(const SimpleMidiController& controller) noexcept {
         char value[36];
-        if (overlay_ == Overlay::Page || overlay_ == Overlay::Pattern || overlay_ == Overlay::PatternEdit) {
-            const char* label = overlay_ == Overlay::Page ? "PAGE"
-                : (overlay_ == Overlay::PatternEdit ? "SLOT" : "PATTERN");
+        if (overlay_ == Overlay::Page || overlay_ == Overlay::Pattern || overlay_ == Overlay::PatternEdit || overlay_ == Overlay::Bank) {
+            const char* label = overlay_ == Overlay::Page ? "MODE"
+                : (overlay_ == Overlay::PatternEdit ? "ASSIGN" : (overlay_ == Overlay::Bank ? "BANK" : "PATTERN"));
             framebuffer_.drawText(0, 0, label, 2);
             if (overlay_ == Overlay::Page) {
                 drawCenteredText(18,
                     controller.page() == PerformancePage::Harmony ? "HARMONY"
                     : controller.page() == PerformancePage::Pattern ? "PATTERN" : "NONE", 2);
+            } else if (overlay_ == Overlay::Bank) {
+                drawCenteredText(18, controller.patternBankName(), 2);
             } else if (overlay_ == Overlay::PatternEdit) {
-                std::snprintf(value, sizeof(value), "%u %s", controller.patternSlot(),
-                              controller.runShapeName());
+                if (controller.patternBank() == PatternBank::Repeat)
+                    std::snprintf(value, sizeof(value), "%u %s", controller.patternSlot() + 1, controller.currentDivisionName());
+                else
+                    std::snprintf(value, sizeof(value), "%u %s", controller.patternSlot() + 1, controller.runShapeName());
                 drawCenteredText(18, value, 2);
             } else {
                 std::snprintf(value, sizeof(value), "%s %s", controller.runShapeName(),
