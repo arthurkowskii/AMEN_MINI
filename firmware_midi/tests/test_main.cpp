@@ -27,6 +27,10 @@ const char* g_block = "";
 
 constexpr uint8_t kCap = SimpleMidiController::kMaxEventsPerAction;
 
+constexpr uint32_t us(uint32_t milliseconds) {
+    return milliseconds * 1000U;
+}
+
 struct EventList {
     MidiCommand items[kCap];
     uint8_t count{};
@@ -46,11 +50,23 @@ EventList release(SimpleMidiController& controller, uint8_t key) {
 
 EventList press(SimpleMidiController& controller, uint8_t key, uint32_t now) {
     EventList list;
-    list.count = controller.press(key, now, list.items, kCap);
+    list.count = controller.press(key, us(now), list.items, kCap);
     return list;
 }
 
 EventList tick(SimpleMidiController& controller, uint32_t now) {
+    EventList list;
+    list.count = controller.tick(us(now), list.items, kCap);
+    return list;
+}
+
+EventList pressUs(SimpleMidiController& controller, uint8_t key, uint32_t now) {
+    EventList list;
+    list.count = controller.press(key, now, list.items, kCap);
+    return list;
+}
+
+EventList tickUs(SimpleMidiController& controller, uint32_t now) {
     EventList list;
     list.count = controller.tick(now, list.items, kCap);
     return list;
@@ -106,21 +122,20 @@ constexpr MidiCommand off(uint8_t note) {
 }
 
 void walkRun(SimpleMidiController& controller, std::initializer_list<uint8_t> notes,
-             uint32_t stepMs, uint32_t start, int restoreNote = -1) {
+             uint32_t stepDuration, uint32_t start, int = -1) {
     const size_t count = notes.size();
     for (size_t i = 1; i < count; ++i) {
-        const uint32_t t = start + static_cast<uint32_t>(i) * stepMs;
+        const uint32_t t = start + static_cast<uint32_t>(i) * stepDuration;
         assertEvents(tick(controller, t - 1), {});
         assertEvents(tick(controller, t), {off(notes.begin()[i - 1]), on(notes.begin()[i])});
     }
-    const uint32_t end = start + static_cast<uint32_t>(count) * stepMs;
+    const uint32_t end = start + static_cast<uint32_t>(count) * stepDuration;
     assertEvents(tick(controller, end - 1), {});
+    const uint8_t first = notes.begin()[0];
     const uint8_t last = notes.begin()[count - 1];
-    if (restoreNote >= 0 && static_cast<uint8_t>(restoreNote) == last) assertEvents(tick(controller, end), {});
-    else if (restoreNote >= 0)
-        assertEvents(tick(controller, end), {off(last), on(static_cast<uint8_t>(restoreNote))});
-    else assertEvents(tick(controller, end), {off(last)});
-    assert(!controller.runActive());
+    if (first == last) assertEvents(tick(controller, end), {});
+    else assertEvents(tick(controller, end), {off(last), on(first)});
+    assert(controller.runActive());
 }
 
 void testPatterns() {
@@ -131,12 +146,14 @@ void testPatterns() {
         SimpleMidiController controller;
         for (uint8_t slot = 0; slot < 8; ++slot)
             assert(std::string(amen::runShapeName(controller.slotAssignment(slot))) == names[slot]);
+        assert(amen::kRunShapeCount == 9);
+        assert(std::string(amen::runShapeName(amen::RunShape::Repeat)) == "REPEAT");
         assert(amen::runShapeName(static_cast<amen::RunShape>(255))[0] == '\0');
     }
 
     {
         g_block = "run-contours-all-shapes";
-        for (uint8_t shape = 0; shape < amen::kRunShapeCount; ++shape) {
+        for (uint8_t shape = 0; shape < amen::kRunShapeCount - 1; ++shape) {
             for (uint8_t mode = 0; mode < amen::kDiatonicModeCount; ++mode) {
                 amen::RunPattern run;
                 run.start(60, static_cast<amen::DiatonicMode>(mode), 0,
@@ -148,7 +165,8 @@ void testPatterns() {
                         static_cast<amen::DiatonicMode>(mode), def.degrees[step]));
                 }
                 run.tick(def.degreeCount * 80U);
-                assert(!run.active());
+                assert(run.active());
+                assert(run.note() == 60);
             }
         }
     }
@@ -156,14 +174,14 @@ void testPatterns() {
     {
         g_block = "run-up-timeline";
         SimpleMidiController controller;
-        assert(controller.page() == amen::PerformancePage::Harmony && controller.stepMs() == 80);
+        assert(controller.page() == amen::PerformancePage::Harmony && controller.tempo() == 120);
         assertEvents(togglePage(controller), {});
         assert(controller.page() == amen::PerformancePage::Pattern);
         assertEvents(press(controller, 12), {});
         assert(controller.patternHeld());
         assertEvents(press(controller, 0, 0), {on(60)});
-        assert(controller.runActive() && controller.runFinalOff() == 640);
-        walkRun(controller, {60, 62, 64, 65, 67, 69, 71, 72}, 80, 0, 60);
+        assert(controller.runActive());
+        walkRun(controller, {60, 62, 64, 65, 67, 69, 71, 72}, 125, 0, 60);
         release(controller, 0);
         release(controller, 12);
     }
@@ -174,7 +192,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 13);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 59, 57, 55, 53, 52, 50, 48}, 80, 0, 60);
+        walkRun(controller, {60, 59, 57, 55, 53, 52, 50, 48}, 125, 0, 60);
         release(controller, 0);
         release(controller, 13);
     }
@@ -185,7 +203,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 14);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67, 65, 64, 62, 60}, 80, 0, 60);
+        walkRun(controller, {60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67, 65, 64, 62}, 125, 0, 60);
         release(controller, 0);
         release(controller, 14);
     }
@@ -196,7 +214,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 15);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 59, 57, 55, 53, 52, 50, 48, 50, 52, 53, 55, 57, 59, 60}, 80, 0, 60);
+        walkRun(controller, {60, 59, 57, 55, 53, 52, 50, 48, 50, 52, 53, 55, 57, 59}, 125, 0, 60);
         release(controller, 0);
         release(controller, 15);
     }
@@ -207,7 +225,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 16);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 64, 62, 65, 64, 67, 65, 69, 67, 71, 69, 72}, 80, 0, 60);
+        walkRun(controller, {60, 64, 62, 65, 64, 67, 65, 69, 67, 71, 69, 72}, 125, 0, 60);
         release(controller, 0);
         release(controller, 16);
     }
@@ -218,7 +236,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 17);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 57, 59, 55, 57, 53, 55, 52, 53, 50, 52, 48}, 80, 0, 60);
+        walkRun(controller, {60, 57, 59, 55, 57, 53, 55, 52, 53, 50, 52, 48}, 125, 0, 60);
         release(controller, 0);
         release(controller, 17);
     }
@@ -229,7 +247,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 18);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 64, 67, 72}, 80, 0, 60);
+        walkRun(controller, {60, 64, 67, 72}, 125, 0, 60);
         release(controller, 0);
         release(controller, 18);
     }
@@ -240,9 +258,60 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 19);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 55, 52, 48}, 80, 0, 60);
+        walkRun(controller, {60, 55, 52, 48}, 125, 0, 60);
         release(controller, 0);
         release(controller, 19);
+    }
+
+    {
+        g_block = "repeat-gate-and-release-pattern";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 12);
+        assert(controller.turnPattern(-1));
+        assert(controller.currentPattern() == amen::RunShape::Repeat);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assert(controller.runActive());
+        assertEvents(tick(controller, 93), {});
+        assertEvents(tick(controller, 94), {off(60)});
+        assertEvents(tick(controller, 124), {});
+        assertEvents(tick(controller, 125), {on(60)});
+        assertEvents(tick(controller, 219), {off(60)});
+        assertEvents(tick(controller, 250), {on(60)});
+        assertEvents(release(controller, 12), {});
+        assert(!controller.runActive());
+        assertEvents(release(controller, 0), {off(60)});
+    }
+
+    {
+        g_block = "repeat-release-source-and-live-tempo";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 12);
+        controller.turnPattern(-1);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assert(controller.turnTempo(180, 0) && controller.tempo() == 300);
+        assertEvents(tick(controller, 38), {off(60)});
+        assertEvents(tick(controller, 50), {on(60)});
+        assertEvents(release(controller, 0), {off(60)});
+        assert(!controller.runActive());
+        release(controller, 12);
+    }
+
+    {
+        g_block = "repeat-lower-first-restores-from-gap";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 12);
+        controller.turnPattern(-1);
+        release(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assertEvents(press(controller, 12, 0), {});
+        assert(controller.runShape() == amen::RunShape::Repeat);
+        assertEvents(tick(controller, 94), {off(60)});
+        assertEvents(release(controller, 12), {on(60)});
+        assert(!controller.runActive());
+        assertEvents(release(controller, 0), {off(60)});
     }
 
     {
@@ -254,7 +323,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 12);
         assertEvents(press(controller, 6, 0), {on(117)});
-        walkRun(controller, {117, 119, 121, 122, 124, 126, 127}, 80, 0, 117);
+        walkRun(controller, {117, 119, 121, 122, 124, 126, 127}, 125, 0, 117);
         release(controller, 6);
         release(controller, 12);
     }
@@ -266,26 +335,29 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 13);
         assertEvents(press(controller, 0, 0), {on(0)});
-        assert(controller.runActive() && controller.runFinalOff() == 80);
-        assertEvents(tick(controller, 80), {});
-        assert(!controller.runActive());
+        assert(controller.runActive());
+        assertEvents(tick(controller, 125), {});
+        assert(controller.runActive());
         assertEvents(release(controller, 0), {off(0)});
+        assert(!controller.runActive());
         release(controller, 13);
     }
 
     {
         g_block = "run-down-nonnegative-all-presets";
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
+            if (amen::SimpleMidiController::isDrumPreset(static_cast<amen::MusicalPreset>(preset))) continue;
             SimpleMidiController controller;
             controller.turnPreset(preset);
             controller.turnOctave(-100);
             togglePage(controller);
             press(controller, 13);
             assertEvents(press(controller, 0, 0), {on(0)});
-            assert(controller.runFinalOff() == 80);
-            assertEvents(tick(controller, 80), {});
-            assert(!controller.runActive());
+            assert(controller.runActive());
+            assertEvents(tick(controller, 125), {});
+            assert(controller.runActive());
             assertEvents(release(controller, 0), {off(0)});
+            assert(!controller.runActive());
             release(controller, 13);
         }
     }
@@ -298,17 +370,18 @@ void testPatterns() {
         assert(controller.heldCount() == 1 && !controller.runActive());
         assertEvents(press(controller, 12, 0), {});
         assert(controller.runActive() && controller.runSourceKey() == 0);
-        assertEvents(tick(controller, 80), {off(60), on(62)});
-        assertEvents(tick(controller, 160), {off(62), on(64)});
-        assertEvents(tick(controller, 240), {off(64), on(65)});
-        assertEvents(tick(controller, 320), {off(65), on(67)});
-        assertEvents(tick(controller, 400), {off(67), on(69)});
-        assertEvents(tick(controller, 480), {off(69), on(71)});
-        assertEvents(tick(controller, 560), {off(71), on(72)});
-        assertEvents(tick(controller, 640), {off(72), on(60)});
-        assert(!controller.runActive() && controller.heldCount() == 1);
-        release(controller, 0);
-        release(controller, 12);
+        assertEvents(tick(controller, 125), {off(60), on(62)});
+        assertEvents(tick(controller, 250), {off(62), on(64)});
+        assertEvents(tick(controller, 375), {off(64), on(65)});
+        assertEvents(tick(controller, 500), {off(65), on(67)});
+        assertEvents(tick(controller, 625), {off(67), on(69)});
+        assertEvents(tick(controller, 750), {off(69), on(71)});
+        assertEvents(tick(controller, 875), {off(71), on(72)});
+        assertEvents(tick(controller, 1000), {off(72), on(60)});
+        assert(controller.runActive() && controller.heldCount() == 1);
+        assertEvents(release(controller, 12), {});
+        assert(!controller.runActive());
+        assertEvents(release(controller, 0), {off(60)});
     }
 
     {
@@ -318,17 +391,18 @@ void testPatterns() {
         press(controller, 13);
         assertEvents(press(controller, 0, 0), {on(60)});
         assert(controller.runSourceKey() == 0 && controller.runShape() == amen::RunShape::RunDown);
-        assertEvents(tick(controller, 80), {off(60), on(59)});
-        assertEvents(tick(controller, 160), {off(59), on(57)});
-        assertEvents(tick(controller, 240), {off(57), on(55)});
-        assertEvents(tick(controller, 320), {off(55), on(53)});
-        assertEvents(tick(controller, 400), {off(53), on(52)});
-        assertEvents(tick(controller, 480), {off(52), on(50)});
-        assertEvents(tick(controller, 560), {off(50), on(48)});
-        assertEvents(tick(controller, 640), {off(48), on(60)});
-        assert(!controller.runActive() && controller.heldCount() == 1);
-        release(controller, 0);
-        release(controller, 13);
+        assertEvents(tick(controller, 125), {off(60), on(59)});
+        assertEvents(tick(controller, 250), {off(59), on(57)});
+        assertEvents(tick(controller, 375), {off(57), on(55)});
+        assertEvents(tick(controller, 500), {off(55), on(53)});
+        assertEvents(tick(controller, 625), {off(53), on(52)});
+        assertEvents(tick(controller, 750), {off(52), on(50)});
+        assertEvents(tick(controller, 875), {off(50), on(48)});
+        assertEvents(tick(controller, 1000), {off(48), on(60)});
+        assert(controller.runActive() && controller.heldCount() == 1);
+        assertEvents(release(controller, 13), {});
+        assert(!controller.runActive());
+        assertEvents(release(controller, 0), {off(60)});
     }
 
     {
@@ -339,17 +413,17 @@ void testPatterns() {
         togglePage(controller);
         assertEvents(press(controller, 13, 0), {off(64), off(67)});
         assert(controller.runActive());
-        assertEvents(tick(controller, 80), {off(60), on(59)});
-        assertEvents(tick(controller, 160), {off(59), on(57)});
-        assertEvents(tick(controller, 240), {off(57), on(55)});
-        assertEvents(tick(controller, 320), {off(55), on(53)});
-        assertEvents(tick(controller, 400), {off(53), on(52)});
-        assertEvents(tick(controller, 480), {off(52), on(50)});
-        assertEvents(tick(controller, 560), {off(50), on(48)});
-        assertEvents(tick(controller, 640), {off(48), on(60), on(64), on(67)});
-        release(controller, 0);
+        assertEvents(tick(controller, 125), {off(60), on(59)});
+        assertEvents(tick(controller, 250), {off(59), on(57)});
+        assertEvents(tick(controller, 375), {off(57), on(55)});
+        assertEvents(tick(controller, 500), {off(55), on(53)});
+        assertEvents(tick(controller, 625), {off(53), on(52)});
+        assertEvents(tick(controller, 750), {off(52), on(50)});
+        assertEvents(tick(controller, 875), {off(50), on(48)});
+        assertEvents(tick(controller, 1000), {off(48), on(60)});
+        assertEvents(release(controller, 13), {on(64), on(67)});
+        assertEvents(release(controller, 0), {off(60), off(64), off(67)});
         release(controller, 12);
-        release(controller, 13);
     }
 
     {
@@ -358,7 +432,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 0, 0);
         press(controller, 12, 0);
-        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(tick(controller, 125), {off(60), on(62)});
         assertEvents(cancelRun(controller), {off(62), on(60)});
         assert(!controller.runActive() && controller.runSourceKey() == amen::SimpleMidiController::kNoRunSource);
         release(controller, 0);
@@ -371,15 +445,7 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 0, 0);
         press(controller, 12, 0);
-        assertEvents(release(controller, 0), {});
-        assertEvents(tick(controller, 80), {off(60), on(62)});
-        assertEvents(tick(controller, 160), {off(62), on(64)});
-        assertEvents(tick(controller, 240), {off(64), on(65)});
-        assertEvents(tick(controller, 320), {off(65), on(67)});
-        assertEvents(tick(controller, 400), {off(67), on(69)});
-        assertEvents(tick(controller, 480), {off(69), on(71)});
-        assertEvents(tick(controller, 560), {off(71), on(72)});
-        assertEvents(tick(controller, 640), {off(72)});
+        assertEvents(release(controller, 0), {off(60)});
         assert(!controller.runActive() && controller.heldCount() == 0);
         release(controller, 12);
     }
@@ -390,17 +456,17 @@ void testPatterns() {
         togglePage(controller);
         assertEvents(press(controller, 0, 0), {on(60)});
         assertEvents(press(controller, 12, 0), {});
-        assertEvents(tick(controller, 80), {off(60), on(62)});
-        assertEvents(press(controller, 4, 100), {off(62), on(60), on(67)});
+        assertEvents(tick(controller, 125), {off(60), on(62)});
+        assertEvents(press(controller, 4, 150), {off(62), on(60), on(67)});
         assert(controller.runSourceKey() == 4);
-        assertEvents(tick(controller, 180), {off(67), on(69)});
-        assertEvents(tick(controller, 260), {off(69), on(71)});
-        assertEvents(tick(controller, 340), {off(71), on(72)});
-        assertEvents(tick(controller, 420), {off(72), on(74)});
-        assertEvents(tick(controller, 500), {off(74), on(76)});
-        assertEvents(tick(controller, 580), {off(76), on(77)});
-        assertEvents(tick(controller, 660), {off(77), on(79)});
-        assertEvents(tick(controller, 740), {off(79), on(67)});
+        assertEvents(tick(controller, 275), {off(67), on(69)});
+        assertEvents(tick(controller, 400), {off(69), on(71)});
+        assertEvents(tick(controller, 525), {off(71), on(72)});
+        assertEvents(tick(controller, 650), {off(72), on(74)});
+        assertEvents(tick(controller, 775), {off(74), on(76)});
+        assertEvents(tick(controller, 900), {off(76), on(77)});
+        assertEvents(tick(controller, 1025), {off(77), on(79)});
+        assertEvents(tick(controller, 1150), {off(79), on(67)});
         release(controller, 0);
         release(controller, 4);
         release(controller, 12);
@@ -430,14 +496,14 @@ void testPatterns() {
         assertEvents(press(controller, 0, 0), {on(60)});
         assert(controller.runShape() == amen::RunShape::RunDown);
         release(controller, 0);
-        tick(controller, 640);
+        tick(controller, 1000);
         assert(!controller.runActive());
         release(controller, 13);
         assert(controller.patternSlot() == 0);
-        assertEvents(press(controller, 0, 700), {on(60)});
+        assertEvents(press(controller, 0, 1100), {on(60)});
         assert(controller.runShape() == amen::RunShape::RunUp);
         release(controller, 0);
-        tick(controller, 1340);
+        tick(controller, 2100);
         release(controller, 12);
     }
 
@@ -453,11 +519,11 @@ void testPatterns() {
         assert(controller.turnPattern(1));
         assert(controller.slotAssignment(0) == amen::RunShape::RunDown);
         assert(controller.runShape() == amen::RunShape::RunUp);
-        assertEvents(tick(controller, 80), {off(60), on(62)});
-        for (int i = 0; i < 7; ++i) assert(controller.turnPattern(1));
+        assertEvents(tick(controller, 125), {off(60), on(62)});
+        for (int i = 0; i < 8; ++i) assert(controller.turnPattern(1));
         assert(controller.slotAssignment(0) == amen::RunShape::RunUp);
         assert(!controller.turnPattern(0));
-        tick(controller, 640);
+        tick(controller, 1000);
         release(controller, 0);
         release(controller, 12);
     }
@@ -469,42 +535,82 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 12);
         assertEvents(press(controller, 0, 0), {on(60)});
-        assertEvents(tick(controller, 560), {off(60)});
+        assertEvents(tick(controller, 875), {off(60)});
         assert(controller.runNote() == 72);
-        assertEvents(tick(controller, 640), {on(60)});
+        assertEvents(tick(controller, 1000), {on(60)});
         assertEvents(release(controller, 7), {off(72)});
         release(controller, 0);
         release(controller, 12);
     }
 
     {
-        g_block = "run-frozen-settings-step";
+        g_block = "run-live-tempo";
         SimpleMidiController controller;
-        assert(controller.turnStep(1) && controller.stepMs() == 85);
-        assert(controller.turnStep(-1) && controller.stepMs() == 80);
+        assert(controller.turnTempo(1, 0) && controller.tempo() == 121);
+        assert(controller.turnTempo(-1, 0) && controller.tempo() == 120);
         togglePage(controller);
         press(controller, 12);
         assertEvents(press(controller, 0, 0), {on(60)});
         controller.turnRoot(9);
         controller.turnPreset(2);
         controller.turnOctave(1);
-        controller.turnStep(4);
-        assert(controller.stepMs() == 100 && controller.runFinalOff() == 640);
-        assertEvents(tick(controller, 160), {off(60), on(64)});
-        assertEvents(tick(controller, 560), {off(64), on(72)});
+        controller.turnTempo(30, 0);
+        assert(controller.tempo() == 150);
+        assertEvents(tick(controller, 200), {off(60), on(64)});
+        assertEvents(tick(controller, 700), {off(64), on(72)});
+        assertEvents(release(controller, 0), {off(72)});
+        assertEvents(tick(controller, 800), {});
+        assertEvents(press(controller, 0, 900), {on(81)});
+        assertEvents(tick(controller, 999), {});
+        assertEvents(tick(controller, 1000), {off(81), on(83)});
+        assertEvents(release(controller, 0), {off(83)});
+        assertEvents(tick(controller, 1500), {});
+        assertEvents(tick(controller, 1700), {});
+        assert(controller.turnTempo(std::numeric_limits<int>::max(), us(1700)) && controller.tempo() == 300);
+        assert(!controller.turnTempo(1, us(1700)));
+        assert(controller.turnTempo(std::numeric_limits<int>::min(), us(1700)) && controller.tempo() == 20);
+        assert(!controller.turnTempo(-1, us(1700)) && !controller.turnTempo(0, us(1700)));
+        release(controller, 12);
+    }
+
+    {
+        g_block = "run-live-tempo-preserves-phase";
+        SimpleMidiController controller;
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assertEvents(tick(controller, 62), {});
+        assert(controller.turnTempo(180, us(62)));
+        assertEvents(tick(controller, 87), {});
+        assertEvents(tick(controller, 88), {off(60), on(62)});
         release(controller, 0);
-        assertEvents(tick(controller, 640), {off(72)});
-        assertEvents(press(controller, 0, 700), {on(81)});
-        assert(controller.runFinalOff() == 1500);
-        assertEvents(tick(controller, 899), {off(81), on(83)});
-        assertEvents(tick(controller, 900), {off(83), on(84)});
-        release(controller, 0);
-        assertEvents(tick(controller, 1300), {off(84), on(92)});
-        assertEvents(tick(controller, 1500), {off(92)});
-        assert(controller.turnStep(std::numeric_limits<int>::max()) && controller.stepMs() == 200);
-        assert(!controller.turnStep(1));
-        assert(controller.turnStep(std::numeric_limits<int>::min()) && controller.stepMs() == 30);
-        assert(!controller.turnStep(-1) && !controller.turnStep(0));
+        release(controller, 12);
+    }
+
+    {
+        g_block = "frequency-clock-range-and-switching";
+        SimpleMidiController controller;
+        assert(controller.clockMode() == amen::ClockMode::Tempo);
+        assert(controller.frequencyTenths() == 81);
+        assert(controller.turnFrequency(std::numeric_limits<int>::min(), 0));
+        assert(controller.clockMode() == amen::ClockMode::Frequency && controller.frequencyTenths() == 5);
+        assert(!controller.turnFrequency(-1, 0));
+        assert(controller.turnFrequency(std::numeric_limits<int>::max(), 0));
+        assert(controller.frequencyTenths() == 500);
+        assert(!controller.turnFrequency(1, 0));
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60)});
+        assertEvents(tick(controller, 19), {});
+        assertEvents(tick(controller, 20), {off(60), on(62)});
+        assert(controller.turnTempo(0, us(20)));
+        assert(controller.clockMode() == amen::ClockMode::Tempo);
+        assertEvents(tick(controller, 144), {});
+        assertEvents(tick(controller, 145), {off(62), on(64)});
+        assert(controller.turnFrequency(std::numeric_limits<int>::min(), us(145)));
+        assertEvents(tick(controller, 2144), {});
+        assertEvents(tick(controller, 2145), {off(64), on(65)});
+        assertEvents(release(controller, 0), {off(65)});
         release(controller, 12);
     }
 
@@ -513,17 +619,15 @@ void testPatterns() {
         SimpleMidiController controller;
         togglePage(controller);
         press(controller, 12);
-        const uint32_t start = std::numeric_limits<uint32_t>::max() - 39;
-        assertEvents(press(controller, 0, start), {on(60)});
-        assert(controller.runFinalOff() == 600);
-        assertEvents(tick(controller, 39), {});
-        assertEvents(tick(controller, 40), {off(60), on(62)});
-        assertEvents(tick(controller, 370), {off(62), on(69)});
-        assertEvents(tick(controller, 439), {});
-        assertEvents(tick(controller, 440), {off(69), on(71)});
-        assertEvents(tick(controller, 599), {off(71), on(72)});
-        release(controller, 0);
-        assertEvents(tick(controller, 600), {off(72)});
+        const uint32_t start = std::numeric_limits<uint32_t>::max() - 39999U;
+        assertEvents(pressUs(controller, 0, start), {on(60)});
+        assertEvents(tickUs(controller, 84999), {});
+        assertEvents(tickUs(controller, 85000), {off(60), on(62)});
+        assertEvents(tickUs(controller, 584999), {off(62), on(67)});
+        assertEvents(tickUs(controller, 585000), {off(67), on(69)});
+        assertEvents(tickUs(controller, 709999), {});
+        assertEvents(tickUs(controller, 710000), {off(69), on(71)});
+        assertEvents(release(controller, 0), {off(71)});
         release(controller, 12);
     }
 
@@ -533,7 +637,7 @@ void testPatterns() {
         togglePage(controller);
         assertEvents(press(controller, 0, 0), {on(60)});
         press(controller, 12, 0);
-        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(tick(controller, 125), {off(60), on(62)});
         assertEvents(togglePage(controller), {off(62), on(60)});
         assert(controller.page() == amen::PerformancePage::None && !controller.runActive());
         assert(controller.runSourceKey() == amen::SimpleMidiController::kNoRunSource);
@@ -561,7 +665,6 @@ void testPatterns() {
                 assert(actual.page() == initial.page());
                 assert(actual.runActive() == initial.runActive());
                 assert(actual.runShape() == initial.runShape());
-                assert(actual.runFinalOff() == initial.runFinalOff());
                 assert(actual.patternHeld() == initial.patternHeld());
                 assert(actual.heldCount() == initial.heldCount());
                 assert(actual.harmonyStackSize() == initial.harmonyStackSize());
@@ -587,7 +690,7 @@ void testPatterns() {
         };
         const auto page = [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.togglePage(out, cap); };
         const auto trigger = [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.press(0, 0, out, cap); };
-        const auto advance = [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.tick(80, out, cap); };
+        const auto advance = [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.tick(us(125), out, cap); };
         SimpleMidiController controller;
         check(controller, page);
         togglePage(controller);
@@ -597,7 +700,7 @@ void testPatterns() {
         press(controller, 0, 0);
         check(controller, advance);
         check(controller, page);
-        check(controller, [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.tick(640, out, cap); });
+        check(controller, [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.tick(us(1000), out, cap); });
         check(controller, [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.release(0, out, cap); });
         check(controller, [](SimpleMidiController& c, MidiCommand* out, uint8_t cap) { return c.release(12, out, cap); });
     }
@@ -631,12 +734,12 @@ void testPatterns() {
         togglePage(controller);
         press(controller, 12);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 61, 62, 63, 64, 65, 66, 67}, 80, 0, 60);
+        walkRun(controller, {60, 61, 62, 63, 64, 65, 66, 67}, 125, 0, 60);
         release(controller, 0);
         release(controller, 12);
         press(controller, 19);
         assertEvents(press(controller, 0, 0), {on(60)});
-        walkRun(controller, {60, 57, 55, 53}, 80, 0, 60);
+        walkRun(controller, {60, 57, 55, 53}, 125, 0, 60);
         release(controller, 0);
         release(controller, 19);
     }
@@ -686,7 +789,7 @@ void testPatterns() {
         togglePage(controller);
         assertEvents(press(controller, 0, 0), {on(60)});
         press(controller, 12, 0);
-        assertEvents(tick(controller, 80), {off(60), on(62)});
+        assertEvents(tick(controller, 125), {off(60), on(62)});
         assertEvents(togglePage(controller), {off(62), on(60)});
         assert(controller.page() == amen::PerformancePage::None && !controller.runActive());
         assertEvents(release(controller, 12), {});
@@ -712,6 +815,54 @@ void testPatterns() {
         expected.drawText(96, 0, "NONE", 2);
         expected.drawText(49, 18, "NONE", 2);
         assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
+    }
+
+    {
+        g_block = "gm-kit-notes-roll-and-channel";
+        SimpleMidiController controller;
+        controller.turnPreset(6);
+        assert(controller.drums());
+        assert(controller.midiChannel() == 10);
+        assert(!controller.turnOctave(5) && !controller.turnRoot(3));
+        constexpr std::array<std::array<uint8_t, 2>, 20> expected{{
+            {{36, 56}}, {{38, 58}}, {{39, 59}}, {{40, 57}}, {{42, 60}},
+            {{44, 62}}, {{46, 64}}, {{48, 66}}, {{49, 68}}, {{50, 70}},
+            {{51, 72}}, {{53, 74}}, {{54, 75}}, {{55, 76}}, {{56, 77}},
+            {{57, 78}}, {{59, 80}}, {{60, 81}}, {{63, 82}}, {{64, 83}}
+        }};
+        for (uint8_t key = 0; key < controller.kKeyCount; ++key) {
+            const EventList down = press(controller, key);
+            assert(down.count == 1 && down.items[0].note == expected[key][0]);
+            const EventList up = release(controller, key);
+            assert(up.count == 1 && up.items[0].note == expected[key][0]);
+        }
+        for (uint8_t key = 0; key < amen::kGmDrumNotes.size(); ++key)
+            assert(amen::kGmDrumNotes[key] == expected[key][0]);
+        assert(std::string(amen::gmDrumLabel(0)) == "BD" && std::string(amen::gmDrumLabel(19)) == "LC");
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(36)});
+        assert(controller.runShape() == amen::RunShape::Repeat);
+        assertEvents(tick(controller, 93), {});
+        assertEvents(tick(controller, 94), {off(36)});
+        assertEvents(tick(controller, 125), {on(36)});
+        assertEvents(release(controller, 0), {off(36)});
+        release(controller, 12);
+    }
+
+    {
+        g_block = "gm-kit-home-label";
+        SimpleMidiController controller;
+        amen::OledUi ui;
+        controller.turnPreset(6);
+        const auto idle = ui.render(controller, amen::E2Page::Root, 0).pixels();
+        press(controller, 0);
+        const auto drumLabel = ui.render(controller, amen::E2Page::Root, 0).pixels();
+        assert(drumLabel != idle);
+        assert(controller.currentNoteName()[0] != '\0' &&
+               std::string(controller.currentNoteName()) == "BD");
+        release(controller, 0);
+        assert(ui.render(controller, amen::E2Page::Root, 0).pixels() == idle);
     }
 }
 }  // namespace
@@ -854,10 +1005,15 @@ int main() {
         assert(controller.rootPitchClass() == 0);
         assert(!controller.turnRoot(12));
         assert(controller.turnPreset(-1));
-        assert(controller.preset() == amen::MusicalPreset::Chromatic);
+        assert(controller.preset() == amen::MusicalPreset::GmKit);
+        assert(controller.midiChannel() == amen::SimpleMidiController::kDrumChannel);
         assert(controller.turnPreset(1));
         assert(controller.preset() == amen::MusicalPreset::Major);
-        assert(!controller.turnPreset(6));
+        assert(controller.turnPreset(6));
+        assert(controller.preset() == amen::MusicalPreset::GmKit);
+        assert(controller.turnPreset(1));
+        assert(controller.preset() == amen::MusicalPreset::Major);
+        assert(!controller.turnPreset(7));
 
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 0), {});
@@ -1005,9 +1161,10 @@ int main() {
 
     {
         g_block = "all-keys-colors";
-        for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset)
-        for (uint8_t rootClass = 0; rootClass < 12; ++rootClass)
-        for (int octave = -5; octave <= 3; ++octave) {
+        for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
+            if (amen::SimpleMidiController::isDrumPreset(static_cast<amen::MusicalPreset>(preset))) continue;
+            for (uint8_t rootClass = 0; rootClass < 12; ++rootClass)
+            for (int octave = -5; octave <= 3; ++octave) {
             SimpleMidiController controller;
             controller.turnPreset(preset);
             controller.turnOctave(octave);
@@ -1079,6 +1236,7 @@ int main() {
             }
             for (uint8_t key = 0; key < controller.kKeyCount; ++key) apply(release(controller, key));
             for (bool sounding : active) assert(!sounding);
+            }
         }
     }
 
@@ -1244,7 +1402,7 @@ int main() {
         const auto changedOctave = ui.render(uiController, amen::E2Page::Root, 4).pixels();
         assert(changedOctave != beforeOctave);
 
-        ui.showOctave(10);
+        ui.showE1(amen::E1Page::Octave, 10);
         const auto octaveOverlay = ui.render(uiController, amen::E2Page::Root, 10).pixels();
         assert(ui.overlayVisible() && octaveOverlay != changedOctave);
         assert(ui.render(uiController, amen::E2Page::Root, 810).pixels() == changedOctave);
@@ -1263,6 +1421,51 @@ int main() {
             assert(currentMode != previousMode);
             previousMode = currentMode;
         }
+    }
+
+    {
+        g_block = "ui-e1-tempo-page";
+        amen::SimpleMidiController controller;
+        amen::OledUi ui;
+        ui.showE1(amen::E1Page::Tempo, 10);
+        amen::MonoFramebuffer expected;
+        expected.drawText(0, 0, "TEMPO", 2);
+        expected.drawText(96, 0, "HARM", 2);
+        expected.drawText(84, 0, "*", 2);
+        expected.drawText(42, 12, "120", 4);
+        expected.fillRect(103, 27, 5, 1);
+        expected.fillRect(103, 31, 5, 1);
+        expected.fillRect(103, 28, 1, 3);
+        expected.fillRect(107, 28, 1, 3);
+        expected.fillRect(112, 27, 5, 5);
+        expected.fillRect(121, 27, 5, 1);
+        expected.fillRect(121, 31, 5, 1);
+        expected.fillRect(121, 28, 1, 3);
+        expected.fillRect(125, 28, 1, 3);
+        assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
+    }
+
+    {
+        g_block = "ui-e1-frequency-page";
+        amen::SimpleMidiController controller;
+        amen::OledUi ui;
+        assert(controller.turnFrequency(1, 0));
+        ui.showE1(amen::E1Page::Frequency, 10);
+        amen::MonoFramebuffer expected;
+        expected.drawText(0, 0, "FREQUENCY", 2);
+        expected.drawText(96, 0, "HARM", 2);
+        expected.drawText(84, 0, "*", 2);
+        expected.drawText(41, 16, "8.9 HZ", 2);
+        expected.fillRect(103, 27, 5, 1);
+        expected.fillRect(103, 31, 5, 1);
+        expected.fillRect(103, 28, 1, 3);
+        expected.fillRect(107, 28, 1, 3);
+        expected.fillRect(112, 27, 5, 1);
+        expected.fillRect(112, 31, 5, 1);
+        expected.fillRect(112, 28, 1, 3);
+        expected.fillRect(116, 28, 1, 3);
+        expected.fillRect(121, 27, 5, 5);
+        assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
     }
 
     {
@@ -1409,11 +1612,22 @@ int main() {
     {
         g_block = "preset-data-and-wrapping";
         constexpr std::array<const char*, amen::kMusicalPresetCount> names{
-            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC"}};
+            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC", "GM KIT"}};
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             SimpleMidiController controller;
             controller.turnPreset(preset);
             assert(std::string(controller.presetName()) == names[preset]);
+            if (controller.drums()) {
+                assert(controller.midiChannel() == amen::SimpleMidiController::kDrumChannel);
+                assert(std::string(amen::gmDrumLabel(0)) == "BD");
+                press(controller, 0);
+                assert(std::string(controller.currentNoteName()) == "BD");
+                release(controller, 0);
+                assert(controller.runShapeName() != nullptr);
+                controller.turnPreset(1);
+                assert(static_cast<uint8_t>(controller.preset()) == (preset + 1) % amen::kMusicalPresetCount);
+                continue;
+            }
             for (uint8_t root = 0; root < 12; ++root) {
                 press(controller, 0);
                 assert(std::string(controller.currentNoteName()) == amen::pitchClassName(root));
@@ -1457,7 +1671,8 @@ int main() {
         amen::MonoFramebuffer expected;
         expected.drawText(0, 0, "O5 C", 2);
         expected.drawText(96, 0, "HARM", 2);
-        expected.drawText(0, 11, "HARM MIN* C", 2);
+        expected.drawText(0, 11, "HARM MIN*", 2);
+        expected.drawText(static_cast<int>(std::strlen("HARM MIN*")) * 8 + 4, 11, "C", 2);
         expected.drawText(25, 22, "(MINOR #7)", 2);
         assert(ui.render(controller, amen::E2Page::Preset, 0).pixels() == expected.pixels());
         controller.turnPreset(-2);
@@ -1475,6 +1690,10 @@ int main() {
         expected.fillRect(121, 27, 5, 5);
         assert(ui.render(controller, amen::E2Page::Preset, 1).pixels() == expected.pixels());
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
+            if (controller.drums()) {
+                controller.turnPreset(1);
+                continue;
+            }
             for (uint8_t slot = 0; slot < amen::kHarmonySlotCount; ++slot) {
                 press(controller, 12 + slot);
                 ui.showHarmony(10);

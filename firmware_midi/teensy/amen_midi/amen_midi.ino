@@ -21,6 +21,9 @@ uint32_t changedAt[21] = {};
 volatile int32_t encoderPositions[7] = {};
 uint8_t encoderAb[7] = {};
 int8_t encoderPartial[7] = {};
+volatile bool e1Push = false;
+bool e1PushRaw = false;
+uint32_t e1PushChangedAt = 0;
 volatile bool e2Push = false;
 bool e2PushRaw = false;
 uint32_t e2PushChangedAt = 0;
@@ -34,12 +37,17 @@ IntervalTimer scanTimer;
 amen::SimpleMidiController controller;
 bool previousContacts[21] = {};
 int32_t previousEncoderPositions[7] = {};
+bool previousE1Push = false;
 bool previousE2Push = false;
 bool previousE3Push = false;
 bool inputReady = false;
 amen::OledUi oledUi;
+amen::E1Page e1Page = amen::E1Page::Octave;
 amen::E2Page e2Page = amen::E2Page::Root;
 std::array<uint8_t, amen::MonoFramebuffer::kSize> displayedFrame{};
+std::array<uint8_t, amen::MonoFramebuffer::kSize> pendingFrame{};
+size_t displayOffset = 0;
+bool displayPending = false;
 uint8_t oledAddress = 0;
 uint32_t lastDisplayAt = 0;
 bool oledReady = false;
@@ -68,19 +76,33 @@ bool beginOled() {
     return oledWrite(0x00, init, sizeof(init));
 }
 
-bool display(const amen::MonoFramebuffer& framebuffer) {
-    const uint8_t window[] = {0x21, 0, 127, 0x22, 0, 3};
-    if (!oledWrite(0x00, window, sizeof(window))) return false;
+void queueDisplay(const amen::MonoFramebuffer& framebuffer) {
     const auto& pixels = framebuffer.pixels();
-    for (size_t offset = 0; offset < pixels.size(); offset += 16)
-        if (!oledWrite(0x40, pixels.data() + offset, 16)) return false;
-    displayedFrame = pixels;
+    if ((!displayPending && pixels == displayedFrame) || (displayPending && pixels == pendingFrame)) return;
+    pendingFrame = pixels;
+    displayOffset = 0;
+    displayPending = true;
+}
+
+bool flushDisplay() {
+    if (!displayPending) return true;
+    if (displayOffset == 0) {
+        const uint8_t window[] = {0x21, 0, 127, 0x22, 0, 3};
+        if (!oledWrite(0x00, window, sizeof(window))) return false;
+    }
+    if (!oledWrite(0x40, pendingFrame.data() + displayOffset, 16)) return false;
+    displayOffset += 16;
+    if (displayOffset == pendingFrame.size()) {
+        displayedFrame = pendingFrame;
+        displayPending = false;
+    }
     return true;
 }
 
 void scanInputs() {
     const uint32_t now = micros();
     bool sample[21];
+    const bool e1PushSample = !digitalRead(PUSH[0]);
     const bool e2PushSample = !digitalRead(PUSH[1]);
     const bool e3PushSample = !digitalRead(PUSH[2]);
 
@@ -122,6 +144,15 @@ void scanInputs() {
     }
 
     if (firstScan) {
+        e1PushRaw = e1Push = e1PushSample;
+        e1PushChangedAt = now;
+    } else if (e1PushSample != e1PushRaw) {
+        e1PushRaw = e1PushSample;
+        e1PushChangedAt = now;
+    }
+    if (e1Push != e1PushRaw && now - e1PushChangedAt >= DEBOUNCE_US) e1Push = e1PushRaw;
+
+    if (firstScan) {
         e2PushRaw = e2Push = e2PushSample;
         e2PushChangedAt = now;
     } else if (e2PushSample != e2PushRaw) {
@@ -144,10 +175,11 @@ void scanInputs() {
 }
 
 void sendMidi(const amen::MidiCommand& command) {
+    const uint8_t channel = controller.midiChannel();
     if (command.type == amen::MidiCommandType::NoteOn) {
-        usbMIDI.sendNoteOn(command.note, command.velocity, amen::SimpleMidiController::kChannel);
+        usbMIDI.sendNoteOn(command.note, command.velocity, channel);
     } else if (command.type == amen::MidiCommandType::NoteOff) {
-        usbMIDI.sendNoteOff(command.note, command.velocity, amen::SimpleMidiController::kChannel);
+        usbMIDI.sendNoteOff(command.note, command.velocity, channel);
     }
 }
 
@@ -168,13 +200,14 @@ void setup() {
     oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
-    Serial.println("AMEN MIDI HARMONY / PATTERN / NONE, E3 CLICK page, E3 TURN assign, E4 STEP 30-200 MS (+5)");
+    Serial.println("AMEN MIDI HARMONY / PATTERN / NONE, E1 OCTAVE / TEMPO, E3 CLICK page, E3 TURN assign");
     if (!oledReady) Serial.println("OLED unavailable");
 }
 
 void loop() {
     bool contactSnapshot[21];
     int32_t encoderSnapshot[7];
+    bool e1PushSnapshot;
     bool e2PushSnapshot;
     bool e3PushSnapshot;
     uint32_t scans;
@@ -182,6 +215,7 @@ void loop() {
     noInterrupts();
     for (uint8_t i = 0; i < 21; ++i) contactSnapshot[i] = contacts[i];
     for (uint8_t i = 0; i < 7; ++i) encoderSnapshot[i] = encoderPositions[i];
+    e1PushSnapshot = e1Push;
     e2PushSnapshot = e2Push;
     e3PushSnapshot = e3Push;
     scans = scanCount;
@@ -191,6 +225,7 @@ void loop() {
         if (scans < 20) return;
         for (uint8_t i = 0; i < 21; ++i) previousContacts[i] = contactSnapshot[i];
         for (uint8_t i = 0; i < 7; ++i) previousEncoderPositions[i] = encoderSnapshot[i];
+        previousE1Push = e1PushSnapshot;
         previousE2Push = e2PushSnapshot;
         previousE3Push = e3PushSnapshot;
         inputReady = true;
@@ -200,11 +235,15 @@ void loop() {
     bool sent = false;
     amen::MidiCommand commands[amen::SimpleMidiController::kMaxEventsPerAction];
     const uint32_t inputNow = millis();
+    const uint32_t clockNow = micros();
+    const uint8_t tickCount = controller.tick(clockNow, commands, amen::SimpleMidiController::kMaxEventsPerAction);
+    for (uint8_t i = 0; i < tickCount; ++i) sendMidi(commands[i]);
+    sent = tickCount > 0;
     if (e3PushSnapshot != previousE3Push) {
         if (e3PushSnapshot) {
             const uint8_t count = controller.togglePage(commands, amen::SimpleMidiController::kMaxEventsPerAction);
             for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
-            sent = count > 0;
+            sent = sent || count > 0;
             oledUi.showPage(inputNow);
         }
         previousE3Push = e3PushSnapshot;
@@ -213,7 +252,7 @@ void loop() {
         const uint8_t key = index < 8 ? index + 12 : (index < 20 ? index - 8 : 20);
         if (contactSnapshot[key] == previousContacts[key]) continue;
         const uint8_t count = contactSnapshot[key]
-            ? controller.press(key, inputNow, commands, amen::SimpleMidiController::kMaxEventsPerAction)
+            ? controller.press(key, clockNow, commands, amen::SimpleMidiController::kMaxEventsPerAction)
             : controller.release(key, commands, amen::SimpleMidiController::kMaxEventsPerAction);
         for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
         sent = sent || count > 0;
@@ -225,11 +264,31 @@ void loop() {
         previousContacts[key] = contactSnapshot[key];
     }
 
-    const int32_t octaveDelta = encoderSnapshot[0] - previousEncoderPositions[0];
-    if (octaveDelta != 0) {
-        if (controller.turnOctave(octaveDelta)) {
-            Serial.printf("Octave O%u, SW1=%u, SW12=%u\n", controller.octaveNumber(), controller.rootNote(), controller.highestNote());
-            oledUi.showOctave(millis());
+    if (e1PushSnapshot != previousE1Push) {
+        if (e1PushSnapshot) {
+            e1Page = e1Page == amen::E1Page::Octave ? amen::E1Page::Tempo
+                : (e1Page == amen::E1Page::Tempo ? amen::E1Page::Frequency : amen::E1Page::Octave);
+            oledUi.showE1(e1Page, millis());
+            Serial.printf("E1 %s\n", e1Page == amen::E1Page::Octave ? "OCTAVE"
+                : (e1Page == amen::E1Page::Tempo ? "TEMPO" : "FREQUENCY"));
+        }
+        previousE1Push = e1PushSnapshot;
+    }
+
+    const int32_t e1Delta = encoderSnapshot[0] - previousEncoderPositions[0];
+    if (e1Delta != 0) {
+        const bool changed = e1Page == amen::E1Page::Octave ? controller.turnOctave(e1Delta)
+            : (e1Page == amen::E1Page::Tempo ? controller.turnTempo(e1Delta, clockNow)
+                                             : controller.turnFrequency(e1Delta, clockNow));
+        if (changed) {
+            oledUi.showE1(e1Page, millis());
+            if (e1Page == amen::E1Page::Octave)
+                Serial.printf("Octave O%u, SW1=%u, SW12=%u\n", controller.octaveNumber(), controller.rootNote(), controller.highestNote());
+            else if (e1Page == amen::E1Page::Tempo) Serial.printf("Tempo %u BPM\n", controller.tempo());
+            else {
+                const uint16_t tenths = controller.frequencyTenths();
+                Serial.printf("Frequency %u.%u Hz\n", tenths / 10U, tenths % 10U);
+            }
         }
         previousEncoderPositions[0] = encoderSnapshot[0];
     }
@@ -264,14 +323,8 @@ void loop() {
     }
 
     const int32_t e4Delta = encoderSnapshot[3] - previousEncoderPositions[3];
-    if (e4Delta != 0) {
-        if (controller.turnStep(e4Delta)) oledUi.showStep(millis());
-        previousEncoderPositions[3] = encoderSnapshot[3];
-    }
+    if (e4Delta != 0) previousEncoderPositions[3] = encoderSnapshot[3];
 
-    const uint8_t tickCount = controller.tick(millis(), commands, amen::SimpleMidiController::kMaxEventsPerAction);
-    for (uint8_t i = 0; i < tickCount; ++i) sendMidi(commands[i]);
-    sent = sent || tickCount > 0;
     if (sent) usbMIDI.send_now();
     while (usbMIDI.read()) {}
 
@@ -279,9 +332,10 @@ void loop() {
     if (oledReady && now - lastDisplayAt >= 33U) {
         lastDisplayAt = now;
         const auto& framebuffer = oledUi.render(controller, e2Page, now);
-        if (framebuffer.pixels() != displayedFrame && !display(framebuffer)) {
-            oledReady = false;
-            Serial.println("OLED write failed");
-        }
+        queueDisplay(framebuffer);
+    }
+    if (oledReady && !flushDisplay()) {
+        oledReady = false;
+        Serial.println("OLED write failed");
     }
 }

@@ -6,8 +6,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 namespace amen {
+
+enum class E1Page : uint8_t {
+    Octave,
+    Tempo,
+    Frequency
+};
 
 enum class E2Page : uint8_t {
     Root,
@@ -50,6 +57,7 @@ private:
             case '+': return {0, 2, 7, 2, 0};
             case '*': return {0, 5, 2, 5, 0};
             case '-': return {0, 0, 7, 0, 0};
+            case '.': return {0, 0, 0, 0, 2};
             case '/': return {4, 4, 2, 2, 1};
             case '0': return {7, 5, 5, 5, 7};
             case '1': return {2, 6, 2, 2, 7};
@@ -107,8 +115,9 @@ private:
 
 class OledUi {
 public:
-    void showOctave(uint32_t now) noexcept {
-        overlay_ = Overlay::Octave;
+    void showE1(E1Page page, uint32_t now) noexcept {
+        overlay_ = page == E1Page::Octave ? Overlay::Octave
+            : (page == E1Page::Tempo ? Overlay::Tempo : Overlay::Frequency);
         overlayChangedAt_ = now;
     }
 
@@ -137,11 +146,6 @@ public:
         overlayChangedAt_ = now;
     }
 
-    void showStep(uint32_t now) noexcept {
-        overlay_ = Overlay::Step;
-        overlayChangedAt_ = now;
-    }
-
     const MonoFramebuffer& render(const SimpleMidiController& controller, E2Page page, uint32_t now) noexcept {
         framebuffer_.clear();
         if (overlay_ != Overlay::None && now - overlayChangedAt_ < 800U) renderOverlay(controller);
@@ -161,13 +165,14 @@ private:
     enum class Overlay : uint8_t {
         None,
         Octave,
+        Tempo,
+        Frequency,
         Root,
         Preset,
         Harmony,
         Page,
         Pattern,
-        PatternEdit,
-        Step
+        PatternEdit
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
@@ -176,9 +181,13 @@ private:
                       pitchClassName(controller.rootPitchClass()));
         framebuffer_.drawText(0, 0, line, 2);
         const char* currentNote = controller.currentNoteName();
-        std::snprintf(line, sizeof(line), "%s%s %s", controller.presetName(),
-                      controller.hasHeldPresetMismatch() ? "*" : "", currentNote);
+        std::snprintf(line, sizeof(line), "%s%s", controller.presetName(),
+                      controller.hasHeldPresetMismatch() ? "*" : "");
         framebuffer_.drawText(0, 11, line, 2);
+        if (currentNote[0] != '\0') {
+            framebuffer_.drawText(static_cast<int>(std::strlen(line)) * 8 + 4, 11,
+                                  currentNote, controller.drums() ? 1 : 2);
+        }
         if (controller.page() == PerformancePage::Pattern) {
             char state[24];
             std::snprintf(state, sizeof(state), "%s %s", controller.runShapeName(),
@@ -190,15 +199,11 @@ private:
 
     void renderOverlay(const SimpleMidiController& controller) noexcept {
         char value[36];
-        if (overlay_ == Overlay::Page || overlay_ == Overlay::Pattern || overlay_ == Overlay::PatternEdit || overlay_ == Overlay::Step) {
-            const char* label = overlay_ == Overlay::Step ? "STEP MS"
-                : (overlay_ == Overlay::Page ? "PAGE"
-                : (overlay_ == Overlay::PatternEdit ? "SLOT" : "PATTERN"));
+        if (overlay_ == Overlay::Page || overlay_ == Overlay::Pattern || overlay_ == Overlay::PatternEdit) {
+            const char* label = overlay_ == Overlay::Page ? "PAGE"
+                : (overlay_ == Overlay::PatternEdit ? "SLOT" : "PATTERN");
             framebuffer_.drawText(0, 0, label, 2);
-            if (overlay_ == Overlay::Step) {
-                std::snprintf(value, sizeof(value), "%u", controller.stepMs());
-                drawCenteredText(12, value, 4);
-            } else if (overlay_ == Overlay::Page) {
+            if (overlay_ == Overlay::Page) {
                 drawCenteredText(18,
                     controller.page() == PerformancePage::Harmony ? "HARMONY"
                     : controller.page() == PerformancePage::Pattern ? "PATTERN" : "NONE", 2);
@@ -213,10 +218,21 @@ private:
             }
             return;
         }
-        if (overlay_ == Overlay::Octave) {
-            framebuffer_.drawText(0, 0, "OCTAVE", 2);
-            std::snprintf(value, sizeof(value), "O%u", controller.octaveNumber());
-            drawCenteredText(12, value, 4);
+        if (overlay_ == Overlay::Octave || overlay_ == Overlay::Tempo || overlay_ == Overlay::Frequency) {
+            const bool tempoPage = overlay_ == Overlay::Tempo;
+            const bool frequencyPage = overlay_ == Overlay::Frequency;
+            framebuffer_.drawText(0, 0, frequencyPage ? "FREQUENCY" : (tempoPage ? "TEMPO" : "OCTAVE"), 2);
+            if (tempoPage) std::snprintf(value, sizeof(value), "%u", controller.tempo());
+            else if (frequencyPage) {
+                const uint16_t tenths = controller.frequencyTenths();
+                std::snprintf(value, sizeof(value), "%u.%u HZ", tenths / 10U, tenths % 10U);
+            }
+            else std::snprintf(value, sizeof(value), "O%u", controller.octaveNumber());
+            drawCenteredText(frequencyPage ? 16 : 12, value, frequencyPage ? 2 : 4);
+            if ((tempoPage && controller.clockMode() == ClockMode::Tempo) ||
+                (frequencyPage && controller.clockMode() == ClockMode::Frequency))
+                framebuffer_.drawText(84, 0, "*", 2);
+            drawPageDots(frequencyPage ? 2 : (tempoPage ? 1 : 0), 3);
             return;
         }
 
@@ -232,7 +248,7 @@ private:
         framebuffer_.drawText(0, 0, rootPage ? "ROOT" : "PRESET", 2);
         if (rootPage) drawCenteredText(12, pitchClassName(controller.rootPitchClass()), 4);
         else drawCenteredText(14, controller.presetName(), 2);
-        drawPageDots(rootPage ? E2Page::Root : E2Page::Preset);
+        drawPageDots(rootPage ? 0 : 1, 2);
     }
 
     void drawCenteredText(int y, const char* text, int scale) noexcept {
@@ -242,10 +258,11 @@ private:
         framebuffer_.drawText((MonoFramebuffer::kWidth - width) / 2, y, text, scale);
     }
 
-    void drawPageDots(E2Page page) noexcept {
-        for (uint8_t index = 0; index < 2; ++index) {
-            const int x = 112 + index * 9;
-            const bool active = index == static_cast<uint8_t>(page);
+    void drawPageDots(uint8_t page, uint8_t count) noexcept {
+        const int startX = count == 3 ? 103 : 112;
+        for (uint8_t index = 0; index < count; ++index) {
+            const int x = startX + index * 9;
+            const bool active = index == page;
             if (active) framebuffer_.fillRect(x, 27, 5, 5);
             else {
                 framebuffer_.fillRect(x, 27, 5, 1);

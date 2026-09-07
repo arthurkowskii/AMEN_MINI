@@ -5,6 +5,7 @@
 #include "run_pattern.h"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 namespace amen {
@@ -27,6 +28,11 @@ enum class PerformancePage : uint8_t {
     None
 };
 
+enum class ClockMode : uint8_t {
+    Tempo,
+    Frequency
+};
+
 class SimpleMidiController {
 public:
     static constexpr uint8_t kKeyCount = 12;
@@ -39,6 +45,11 @@ public:
     static constexpr uint8_t kMaxChordVoices = kMaxRecipeVoices;
     static constexpr uint8_t kMaxEventsPerAction = 128;
     static constexpr uint8_t kNoRunSource = 255;
+    static constexpr uint8_t kDrumChannel = 10;
+
+    static constexpr bool isDrumPreset(MusicalPreset preset) noexcept {
+        return preset == MusicalPreset::GmKit;
+    }
 
     uint8_t press(uint8_t key, MidiCommand* out, uint8_t capacity) noexcept {
         return press(key, 0, out, capacity);
@@ -55,8 +66,10 @@ public:
     uint8_t tick(uint32_t now, MidiCommand* out, uint8_t capacity) noexcept {
         SimpleMidiController candidate = *this;
         candidate.run_.tick(now);
-        if (!candidate.run_.active() && candidate.runSourceKey_ != kNoRunSource)
+        if (!candidate.run_.active()) {
             candidate.runSourceKey_ = kNoRunSource;
+            candidate.runPatternKey_ = kNoRunSource;
+        }
         return commit(candidate, out, capacity);
     }
 
@@ -64,6 +77,7 @@ public:
         SimpleMidiController candidate = *this;
         candidate.run_.cancel();
         candidate.runSourceKey_ = kNoRunSource;
+        candidate.runPatternKey_ = kNoRunSource;
         return commit(candidate, out, capacity);
     }
 
@@ -75,15 +89,29 @@ public:
         if (candidate.page_ != PerformancePage::Pattern) {
             candidate.run_.cancel();
             candidate.runSourceKey_ = kNoRunSource;
+            candidate.runPatternKey_ = kNoRunSource;
         }
         return commit(candidate, out, capacity);
     }
 
-    bool turnStep(int delta) noexcept {
-        const int64_t next = static_cast<int64_t>(stepMs_) + static_cast<int64_t>(delta) * 5;
-        const uint16_t clamped = next < 30 ? 30 : (next > 200 ? 200 : static_cast<uint16_t>(next));
-        if (clamped == stepMs_) return false;
-        stepMs_ = clamped;
+    bool turnTempo(int delta, uint32_t now) noexcept {
+        const int64_t next = static_cast<int64_t>(tempo_) + delta;
+        const uint16_t clamped = next < 20 ? 20 : (next > 300 ? 300 : static_cast<uint16_t>(next));
+        if (clamped == tempo_ && clockMode_ == ClockMode::Tempo) return false;
+        tempo_ = clamped;
+        clockMode_ = ClockMode::Tempo;
+        run_.setStepDuration(stepDurationUs(), now);
+        return true;
+    }
+
+    bool turnFrequency(int delta, uint32_t now) noexcept {
+        const int64_t next = static_cast<int64_t>(frequencyIndex_) + delta;
+        const uint8_t clamped = next < 0 ? 0 : (next > kMaxFrequencyIndex
+            ? kMaxFrequencyIndex : static_cast<uint8_t>(next));
+        if (clamped == frequencyIndex_ && clockMode_ == ClockMode::Frequency) return false;
+        frequencyIndex_ = clamped;
+        clockMode_ = ClockMode::Frequency;
+        run_.setStepDuration(stepDurationUs(), now);
         return true;
     }
 
@@ -100,10 +128,13 @@ public:
     }
 
     PerformancePage page() const noexcept { return page_; }
-    uint16_t stepMs() const noexcept { return stepMs_; }
+    uint16_t tempo() const noexcept { return tempo_; }
+    ClockMode clockMode() const noexcept { return clockMode_; }
+    uint16_t frequencyTenths() const noexcept {
+        return static_cast<uint16_t>((frequencyHundredths() + 5U) / 10U);
+    }
     bool runActive() const noexcept { return run_.active(); }
     int16_t runNote() const noexcept { return run_.note(); }
-    uint32_t runFinalOff() const noexcept { return run_.finalOff(); }
     RunShape runShape() const noexcept { return run_.shape(); }
     bool patternHeld() const noexcept { return patternCount_ > 0; }
     RunShape currentPattern() const noexcept {
@@ -120,6 +151,7 @@ public:
     const char* runShapeName() const noexcept { return amen::runShapeName(run_.active() ? run_.shape() : currentPattern()); }
 
     bool turnOctave(int delta) noexcept {
+        if (isDrumPreset(preset_)) return false;
         const int64_t next = static_cast<int64_t>(octave_) + delta;
         const int clamped = next < kMinOctave ? kMinOctave : (next > kMaxOctave ? kMaxOctave : static_cast<int>(next));
         if (clamped == octave_) return false;
@@ -128,6 +160,7 @@ public:
     }
 
     bool turnRoot(int delta) noexcept {
+        if (isDrumPreset(preset_)) return false;
         const uint8_t next = wrap(rootPitchClass_, delta, 12);
         if (next == rootPitchClass_) return false;
         rootPitchClass_ = next;
@@ -147,6 +180,10 @@ public:
     uint8_t rootPitchClass() const noexcept { return rootPitchClass_; }
     MusicalPreset preset() const noexcept { return preset_; }
     const char* presetName() const noexcept { return musicalPreset(preset_).name; }
+    uint8_t midiChannel() const noexcept {
+        return isDrumPreset(preset_) ? kDrumChannel : kChannel;
+    }
+    bool drums() const noexcept { return isDrumPreset(preset_); }
     DiatonicMode scale() const noexcept { return musicalPreset(preset_).scale; }
     bool hasHeldPresetMismatch() const noexcept {
         for (const DegreeState& degree : degrees_)
@@ -166,12 +203,15 @@ public:
     uint8_t heldCount() const noexcept { return heldCount_; }
     const char* currentNoteName() const noexcept {
         if (heldCount_ == 0) return "";
+        if (isDrumPreset(preset_))
+            return gmDrumLabel(degrees_[heldOrder_[heldCount_ - 1]].key);
         return degrees_[heldOrder_[heldCount_ - 1]].spelling.text.data();
     }
 
 private:
     static constexpr int kMinOctave = -5;
     static constexpr int kMaxOctave = 3;
+    static constexpr uint8_t kMaxFrequencyIndex = 48;
 
     enum class PadRole : uint8_t {
         None,
@@ -214,6 +254,7 @@ private:
     }
 
     uint8_t noteForKey(uint8_t key) const noexcept {
+        if (isDrumPreset(preset_)) return kGmDrumNotes[key % kGmDrumNotes.size()];
         const int note = 60 + octave_ * 12 + rootPitchClass_ + scaleDegreeOffset(scale(), key);
         return note > 127 ? 127 : static_cast<uint8_t>(note);
     }
@@ -226,7 +267,9 @@ private:
         degree.scale = scale();
         degree.preset = preset_;
         degree.key = key;
-        degree.spelling = spellScaleDegree(rootPitchClass_, degree.scale, key);
+        degree.spelling = isDrumPreset(preset_)
+            ? NoteSpelling{{static_cast<char>(key + 'A')}}
+            : spellScaleDegree(rootPitchClass_, degree.scale, key);
         heldOrder_[heldCount_++] = key;
     }
 
@@ -281,10 +324,26 @@ private:
         return key >= kHarmonyStartKey && key < kShiftKey;
     }
 
-    void startRun(uint8_t sourceKey, RunShape shape, uint32_t now) noexcept {
+    uint16_t frequencyHundredths() const noexcept {
+        if (frequencyIndex_ == 0) return 50;
+        if (frequencyIndex_ == kMaxFrequencyIndex) return 5000;
+        return static_cast<uint16_t>(std::lround(
+            50.0 * std::pow(100.0, static_cast<double>(frequencyIndex_) / kMaxFrequencyIndex)));
+    }
+
+    uint32_t stepDurationUs() const noexcept {
+        if (clockMode_ == ClockMode::Tempo)
+            return static_cast<uint32_t>((15000000ULL + tempo_ / 2U) / tempo_);
+        const uint16_t hundredths = frequencyHundredths();
+        return static_cast<uint32_t>((100000000ULL + hundredths / 2U) / hundredths);
+    }
+
+    void startRun(uint8_t sourceKey, uint8_t patternKey, RunShape shape, uint32_t now) noexcept {
         const DegreeState& degree = degrees_[sourceKey];
-        run_.start(degree.rootNote, degree.scale, sourceKey, shape, stepMs_, now);
+        run_.start(degree.rootNote, degree.scale, sourceKey,
+                   isDrumPreset(preset_) ? RunShape::Repeat : shape, stepDurationUs(), now);
         runSourceKey_ = run_.active() ? sourceKey : kNoRunSource;
+        runPatternKey_ = run_.active() ? patternKey : kNoRunSource;
     }
 
     uint8_t soundingTarget(const DegreeState& degree, int16_t* target) const noexcept {
@@ -303,7 +362,8 @@ private:
     }
 
     void soundingUnion(std::array<bool, 128>& sounding) const noexcept {
-        if (run_.active()) sounding[static_cast<uint8_t>(run_.note())] = true;
+        const int16_t runNote = run_.note();
+        if (runNote >= 0) sounding[static_cast<uint8_t>(runNote)] = true;
         for (const DegreeState& degree : degrees_) {
             if (!degree.held) continue;
             if (degree.key == runSourceKey_) continue;
@@ -324,7 +384,7 @@ private:
                 candidate.pressDegree(key);
                 role = page_ == PerformancePage::Harmony ? PadRole::HarmonyDegree : PadRole::ManualDegree;
                 if (page_ == PerformancePage::Pattern && candidate.patternCount_ > 0)
-                    candidate.startRun(key, candidate.currentPattern(), now);
+                    candidate.startRun(key, candidate.heldPatternKey(), candidate.currentPattern(), now);
             } else if (isUpper(key)) {
                 if (page_ == PerformancePage::Harmony) {
                     role = PadRole::HarmonySlot;
@@ -333,7 +393,7 @@ private:
                     role = PadRole::PatternSlot;
                     candidate.pressPattern(key);
                     const uint8_t lower = candidate.lowerHeldKey();
-                    if (lower != kNoRunSource) candidate.startRun(lower, candidate.currentPattern(), now);
+                    if (lower != kNoRunSource) candidate.startRun(lower, key, candidate.currentPattern(), now);
                 } else {
                     role = PadRole::ManualDegree;
                     candidate.pressDegree(key);
@@ -344,7 +404,13 @@ private:
                 candidate.releaseDegree(key);
             else if (role == PadRole::HarmonySlot) candidate.releaseHarmony(key);
             else if (role == PadRole::PatternSlot) candidate.releasePattern(key);
-            if (candidate.runSourceKey_ == key) candidate.runSourceKey_ = kNoRunSource;
+            const bool stopsRun = candidate.run_.active() &&
+                (candidate.runSourceKey_ == key || candidate.runPatternKey_ == key);
+            if (stopsRun) {
+                candidate.run_.cancel();
+                candidate.runSourceKey_ = kNoRunSource;
+                candidate.runPatternKey_ = kNoRunSource;
+            } else if (candidate.runSourceKey_ == key) candidate.runSourceKey_ = kNoRunSource;
             role = PadRole::None;
         }
         return commit(candidate, out, capacity);
@@ -393,9 +459,12 @@ private:
     uint8_t rootPitchClass_{};
     uint8_t heldCount_{};
     uint8_t runSourceKey_{kNoRunSource};
+    uint8_t runPatternKey_{kNoRunSource};
     MusicalPreset preset_{MusicalPreset::Major};
     PerformancePage page_{PerformancePage::Harmony};
-    uint16_t stepMs_{80};
+    uint16_t tempo_{120};
+    uint8_t frequencyIndex_{29};
+    ClockMode clockMode_{ClockMode::Tempo};
     std::array<PadRole, kShiftKey> roles_{};
     RunPattern run_{};
 };
