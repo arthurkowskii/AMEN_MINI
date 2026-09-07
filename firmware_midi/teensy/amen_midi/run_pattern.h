@@ -16,10 +16,13 @@ enum class RunShape : uint8_t {
     ThirdsDown,
     ArpUp,
     ArpDown,
-    Repeat
+    Repeat,
+    Arp7,
+    Arp9,
+    Arp69
 };
 
-static constexpr uint8_t kRunShapeCount = 9;
+static constexpr uint8_t kRunShapeCount = 12;
 
 struct RunPatternDefinition {
     const char* name;
@@ -36,6 +39,9 @@ static constexpr int8_t kThirdsDownDegrees[]{0, -2, -1, -3, -2, -4, -3, -5, -4, 
 static constexpr int8_t kArpUpDegrees[]{0, 2, 4, 7};
 static constexpr int8_t kArpDownDegrees[]{0, -3, -5, -7};
 static constexpr int8_t kRepeatDegrees[]{0};
+static constexpr int8_t kArp7Degrees[]{0, 2, 4, 6};
+static constexpr int8_t kArp9Degrees[]{0, 2, 4, 6, 8};
+static constexpr int8_t kArp69Degrees[]{0, 2, 4, 5, 8};
 
 static constexpr std::array<RunPatternDefinition, kRunShapeCount> kRunShapes{{
     {"RUN UP", kRunUpDegrees, 8},
@@ -47,6 +53,9 @@ static constexpr std::array<RunPatternDefinition, kRunShapeCount> kRunShapes{{
     {"ARP UP", kArpUpDegrees, 4},
     {"ARP DOWN", kArpDownDegrees, 4},
     {"REPEAT", kRepeatDegrees, 1},
+    {"ARP 7", kArp7Degrees, 4},
+    {"ARP 9", kArp9Degrees, 5},
+    {"ARP 69", kArp69Degrees, 5},
 }};
 
 constexpr const char* runShapeName(RunShape shape) noexcept {

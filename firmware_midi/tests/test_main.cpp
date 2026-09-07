@@ -146,14 +146,14 @@ void testPatterns() {
         SimpleMidiController controller;
         for (uint8_t slot = 0; slot < 8; ++slot)
             assert(std::string(amen::runShapeName(controller.slotAssignment(slot))) == names[slot]);
-        assert(amen::kRunShapeCount == 9);
+        assert(amen::kRunShapeCount == 12);
         assert(std::string(amen::runShapeName(amen::RunShape::Repeat)) == "REPEAT");
         assert(amen::runShapeName(static_cast<amen::RunShape>(255))[0] == '\0');
     }
 
     {
         g_block = "run-contours-all-shapes";
-        for (uint8_t shape = 0; shape < amen::kRunShapeCount - 1; ++shape) {
+        for (uint8_t shape = 0; shape < amen::kRunShapeCount; ++shape) {
             for (uint8_t mode = 0; mode < amen::kDiatonicModeCount; ++mode) {
                 amen::RunPattern run;
                 run.start(60, static_cast<amen::DiatonicMode>(mode), 0,
@@ -268,7 +268,7 @@ void testPatterns() {
         SimpleMidiController controller;
         togglePage(controller);
         press(controller, 12);
-        assert(controller.turnPattern(-1));
+        assert(controller.turnPattern(static_cast<int>(amen::RunShape::Repeat)));
         assert(controller.currentPattern() == amen::RunShape::Repeat);
         assertEvents(press(controller, 0, 0), {on(60)});
         assert(controller.runActive());
@@ -288,7 +288,7 @@ void testPatterns() {
         SimpleMidiController controller;
         togglePage(controller);
         press(controller, 12);
-        controller.turnPattern(-1);
+        controller.turnPattern(static_cast<int>(amen::RunShape::Repeat));
         assertEvents(press(controller, 0, 0), {on(60)});
         assert(controller.turnTempo(180, 0) && controller.tempo() == 300);
         assertEvents(tick(controller, 38), {off(60)});
@@ -303,7 +303,7 @@ void testPatterns() {
         SimpleMidiController controller;
         togglePage(controller);
         press(controller, 12);
-        controller.turnPattern(-1);
+        controller.turnPattern(static_cast<int>(amen::RunShape::Repeat));
         release(controller, 12);
         assertEvents(press(controller, 0, 0), {on(60)});
         assertEvents(press(controller, 12, 0), {});
@@ -520,7 +520,7 @@ void testPatterns() {
         assert(controller.slotAssignment(0) == amen::RunShape::RunDown);
         assert(controller.runShape() == amen::RunShape::RunUp);
         assertEvents(tick(controller, 125), {off(60), on(62)});
-        for (int i = 0; i < 8; ++i) assert(controller.turnPattern(1));
+        for (int i = 0; i < amen::kRunShapeCount - 1; ++i) assert(controller.turnPattern(1));
         assert(controller.slotAssignment(0) == amen::RunShape::RunUp);
         assert(!controller.turnPattern(0));
         tick(controller, 1000);
@@ -1005,15 +1005,16 @@ int main() {
         assert(controller.rootPitchClass() == 0);
         assert(!controller.turnRoot(12));
         assert(controller.turnPreset(-1));
-        assert(controller.preset() == amen::MusicalPreset::GmKit);
-        assert(controller.midiChannel() == amen::SimpleMidiController::kDrumChannel);
+        assert(controller.preset() == amen::MusicalPreset::Prism);
+        assert(!controller.drums());
         assert(controller.turnPreset(1));
         assert(controller.preset() == amen::MusicalPreset::Major);
         assert(controller.turnPreset(6));
         assert(controller.preset() == amen::MusicalPreset::GmKit);
-        assert(controller.turnPreset(1));
+        assert(controller.midiChannel() == amen::SimpleMidiController::kDrumChannel);
+        assert(controller.turnPreset(2));
         assert(controller.preset() == amen::MusicalPreset::Major);
-        assert(!controller.turnPreset(7));
+        assert(!controller.turnPreset(amen::kMusicalPresetCount));
 
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 0), {});
@@ -1612,7 +1613,7 @@ int main() {
     {
         g_block = "preset-data-and-wrapping";
         constexpr std::array<const char*, amen::kMusicalPresetCount> names{
-            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC", "GM KIT"}};
+            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC", "GM KIT", "PRISM"}};
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             SimpleMidiController controller;
             controller.turnPreset(preset);
