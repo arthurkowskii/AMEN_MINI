@@ -166,6 +166,11 @@ public:
         overlayChangedAt_ = now;
     }
 
+    void showShift(uint32_t now) noexcept {
+        overlay_ = Overlay::Shift;
+        overlayChangedAt_ = now;
+    }
+
     const MonoFramebuffer& render(const SimpleMidiController& controller, E2Page page, uint32_t now) noexcept {
         framebuffer_.clear();
         if (overlay_ != Overlay::None && now - overlayChangedAt_ < 800U) renderOverlay(controller);
@@ -193,7 +198,8 @@ private:
         Page,
         Pattern,
         PatternEdit,
-        Bank
+        Bank,
+        Shift
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
@@ -220,6 +226,11 @@ private:
 
     void renderOverlay(const SimpleMidiController& controller) noexcept {
         char value[36];
+        if (overlay_ == Overlay::Shift) {
+            framebuffer_.drawText(0, 0, "SHIFT", 2);
+            drawCenteredText(14, controller.shiftModeName(), 2);
+            return;
+        }
         if (overlay_ == Overlay::Page || overlay_ == Overlay::Pattern || overlay_ == Overlay::PatternEdit || overlay_ == Overlay::Bank) {
             const char* label = overlay_ == Overlay::Page ? "MODE"
                 : (overlay_ == Overlay::PatternEdit ? "ASSIGN" : (overlay_ == Overlay::Bank ? "BANK" : "PATTERN"));

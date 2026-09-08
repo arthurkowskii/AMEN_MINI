@@ -90,6 +90,12 @@ EventList cancelRun(SimpleMidiController& controller) {
     return list;
 }
 
+EventList turnShift(SimpleMidiController& controller, int delta, uint32_t now) {
+    EventList list;
+    list.count = controller.turnShiftMode(delta, us(now), list.items, kCap);
+    return list;
+}
+
 void assertEvents(const EventList& list, std::initializer_list<MidiCommand> expected) {
     if (static_cast<std::size_t>(list.count) != expected.size() ||
         !std::equal(expected.begin(), expected.end(), list.items,
@@ -125,6 +131,10 @@ constexpr MidiCommand on(uint8_t note) {
 
 constexpr MidiCommand off(uint8_t note) {
     return {MidiCommandType::NoteOff, note, 0};
+}
+
+constexpr MidiCommand cc(uint8_t control, uint8_t value) {
+    return {MidiCommandType::ControlChange, control, value};
 }
 
 void walkRun(SimpleMidiController& controller, std::initializer_list<uint8_t> notes,
@@ -1053,7 +1063,8 @@ int main() {
         assertEvents(press(controller, 0), {});
         assertEvents(release(controller, 0), {off(60)});
         assertEvents(release(controller, 0), {});
-        assertEvents(press(controller, controller.kShiftKey), {});
+        assertEvents(press(controller, controller.kShiftKey), {cc(64, 127)});
+        assertEvents(release(controller, controller.kShiftKey), {cc(64, 0)});
         assert(controller.currentNoteName()[0] == '\0');
     }
 
@@ -1841,6 +1852,85 @@ int main() {
             }
             controller.turnPreset(1);
         }
+    }
+
+    {
+        g_block = "shift-hold-and-live-modulation";
+        SimpleMidiController controller;
+        assert(controller.shiftMode() == amen::ShiftMode::Hold);
+        assertEvents(press(controller, controller.kShiftKey, 0), {cc(64, 127)});
+        assertEvents(turnShift(controller, 1, 0), {cc(64, 0)});
+        assert(controller.shiftMode() == amen::ShiftMode::Mod);
+        assertEvents(tick(controller, 500), {cc(1, 63)});
+        assertEvents(tick(controller, 1000), {cc(1, 127)});
+        assertEvents(release(controller, controller.kShiftKey, 1000), {});
+        assertEvents(tick(controller, 1500), {cc(1, 64)});
+        assertEvents(tick(controller, 2000), {cc(1, 0)});
+    }
+
+    {
+        g_block = "shift-transpose-snapshots-new-pads";
+        SimpleMidiController controller;
+        assertEvents(press(controller, 0), {on(60)});
+        assertEvents(press(controller, controller.kShiftKey, 0), {cc(64, 127)});
+        assertEvents(turnShift(controller, 2, 0), {cc(64, 0)});
+        assert(controller.shiftMode() == amen::ShiftMode::OctaveUp);
+        assertEvents(press(controller, 1), {on(74)});
+        assertEvents(release(controller, controller.kShiftKey, 10), {});
+        assertEvents(release(controller, 1), {off(74)});
+        assertEvents(release(controller, 0), {off(60)});
+
+        assertEvents(press(controller, controller.kShiftKey, 20), {});
+        assertEvents(turnShift(controller, 1, 20), {});
+        assert(controller.shiftMode() == amen::ShiftMode::SemitoneUp);
+        assertEvents(press(controller, 0), {on(61)});
+        assertEvents(release(controller, 0), {off(61)});
+        assertEvents(turnShift(controller, 2, 20), {});
+        assert(controller.shiftMode() == amen::ShiftMode::SemitoneDown);
+        assertEvents(press(controller, 0), {on(59)});
+        assertEvents(release(controller, 0), {off(59)});
+        assertEvents(turnShift(controller, -1, 20), {});
+        assert(controller.shiftMode() == amen::ShiftMode::OctaveDown);
+        assertEvents(press(controller, 0), {on(48)});
+        assertEvents(release(controller, 0), {off(48)});
+        assertEvents(release(controller, controller.kShiftKey, 20), {});
+    }
+
+    {
+        g_block = "shift-transpose-chord-pattern-boundary-and-ui";
+        SimpleMidiController controller;
+        press(controller, 12);
+        press(controller, controller.kShiftKey, 0);
+        turnShift(controller, 2, 0);
+        assertEvents(press(controller, 0), {on(72), on(76), on(79)});
+        assertEvents(release(controller, 0), {off(72), off(76), off(79)});
+        release(controller, 12);
+        release(controller, controller.kShiftKey, 0);
+
+        SimpleMidiController patternController;
+        togglePage(patternController);
+        press(patternController, patternController.kShiftKey, 0);
+        turnShift(patternController, 2, 0);
+        press(patternController, 12, 0);
+        assertEvents(press(patternController, 0, 0), {on(72)});
+        assertEvents(tick(patternController, 125), {off(72), on(74)});
+        assertEvents(release(patternController, 0), {off(74)});
+        release(patternController, 12);
+        release(patternController, patternController.kShiftKey, 125);
+
+        controller.turnOctave(-5);
+        press(controller, controller.kShiftKey, 0);
+        turnShift(controller, 2, 0);
+        assertEvents(press(controller, 0), {});
+        assertEvents(release(controller, 0), {});
+
+        amen::OledUi ui;
+        ui.showShift(10);
+        amen::MonoFramebuffer expected;
+        expected.drawText(0, 0, "SHIFT", 2);
+        expected.drawText(96, 0, "HARM", 2);
+        expected.drawText(41, 14, "-1 OCT", 2);
+        assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
     }
 
     testPatterns();

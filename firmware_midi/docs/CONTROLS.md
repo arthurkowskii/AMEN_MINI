@@ -4,12 +4,12 @@
 
 - SW1–SW12 jouent douze degrés consécutifs de la gamme sélectionnée.
 - SW13–SW20 sélectionnent chacun un slot harmonique global tant qu’ils sont tenus : les degrés déjà enfoncés et ceux joués ensuite deviennent des accords. Un autre pad remplace temporairement le slot ; relâcher le pad actif restaure le précédent encore tenu (empilement LIFO). Chaque degré utilise la recette de ce slot dans sa palette d’origine.
-- SW21 reste réservé à Shift.
+- SW21 applique tant qu'il est tenu le mode Shift sélectionné. Maintenir SW21 et tourner E4 parcourt `HOLD`, `MOD`, `+1 OCT`, `+1 ST`, `-1 OCT`, `-1 ST`; le changement est actif immédiatement. `HOLD` envoie la pédale de sustain (CC64=127 à l'appui, CC64=0 au relâchement). `MOD` fait monter CC1 linéairement de 0 à 127 en une seconde, puis le fait redescendre en une seconde au relâchement. Les quatre transpositions concernent uniquement les pads enfoncés pendant SW21 et restent figées jusqu'au relâchement de ces pads, accords et patterns compris. Les notes qui dépasseraient MIDI 0–127 sont omises.
 - E1 possède trois pages. `OCTAVE` transpose les douze degrés sur neuf octaves affichées `O0` à `O8`. `TEMPO` règle l'horloge synchronisée de 20 à 300 BPM, 120 au démarrage, avec un pas par double-croche. `FREQUENCY` règle une horloge libre de 0,5 à 50 Hz sur une course logarithmique d'environ 10 % par cran. Un clic E1 parcourt les trois pages sans changer d'horloge ; tourner `TEMPO` ou `FREQUENCY` active le mode correspondant, signalé par `*`, et conserve la phase du pas courant.
 - E2 contrôle la fondamentale au démarrage. Un clic alterne entre `ROOT` et `PRESET`; tourner sélectionne la fondamentale chromatique ou l’un des sept presets, avec bouclage en fin de liste.
 - Le clic E3 fait défiler les pages persistantes `HARMONY` → `PATTERN` → `NONE` → `HARMONY`. Le démarrage se fait en `HARMONY`.
 - En page `PATTERN`, la rotation E3 réassigne le slot pattern du pad supérieur tenu le plus récent ; en `HARMONY` elle est sans effet.
-- E4 est libre.
+- E4 sélectionne le preset normalement. Quand SW21 est tenu, E4 sélectionne le mode Shift sans modifier le preset.
 
 `MAJOR` utilise l’ionien, `MINOR` l’éolien et `HARM MIN` le mineur harmonique. Ils partagent, de SW13 à SW20 : `TRIAD`, `SEVENTH`, `NINTH`, `ADD9`, `SUS2`, `SUS4`, `SIXTH`, `SIX9`.
 
@@ -46,7 +46,7 @@ Revenir en `HARMONY` ou passer en `NONE` avec E3 annule le run et restaure la so
 
 L'accueil utilise trois lignes en caractères doubles : octave et fondamentale, preset et dernière note tenue, puis harmonie/description de gamme ou état du pattern courant suivi de `IDLE`, `READY` ou `PLAY`. `HARM`, `PATT` ou `NONE` reste visible en haut à droite, y compris pendant les overlays. Un `*` après le preset indique une ancienne tenue appartenant à un autre preset ; le nom harmonique affiché concerne le preset sélectionné. L'orthographe des notes tenues reste mémorisée.
 
-Cliquer ou tourner E1 ouvre temporairement un écran `OCTAVE`, `TEMPO` ou `FREQUENCY`; trois points indiquent la page et `*` l'horloge active. Cliquer ou tourner E2 ouvre temporairement un écran explicite `ROOT` ou `PRESET` avec sa propre pagination. Appuyer sur SW13–SW20 ouvre temporairement un écran `HARMONY` : le nom de la recette est en caractères quadruples s’il tient, sinon doubles. Ces overlays durent 800 ms. Le backend transmet l'OLED par fragments afin de ne pas bloquer les patterns rapides.
+Cliquer ou tourner E1 ouvre temporairement un écran `OCTAVE`, `TEMPO` ou `FREQUENCY`; trois points indiquent la page et `*` l'horloge active. Cliquer ou tourner E2 ouvre temporairement un écran explicite `ROOT` ou `PRESET` avec sa propre pagination. Appuyer sur SW13–SW20 ouvre temporairement un écran `HARMONY` : le nom de la recette est en caractères quadruples s’il tient, sinon doubles. SW21 et SW21 + E4 affichent `SHIFT` et le mode sélectionné. Ces overlays durent 800 ms. Le backend transmet l'OLED par fragments afin de ne pas bloquer les patterns rapides.
 
 En page pattern, les pads supérieurs ouvrent `PATTERN` avec l'état du run ; la rotation E3 sur un pad tenu ouvre `SLOT` avec l'index et le nom réassigné. E3 ouvre `PAGE`. Les points de pagination sont placés en bas à droite pour laisser la page de jeu visible.
 

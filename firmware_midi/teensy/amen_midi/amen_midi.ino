@@ -194,6 +194,8 @@ void sendMidi(const amen::MidiCommand& command) {
         usbMIDI.sendNoteOn(command.note, command.velocity, channel);
     } else if (command.type == amen::MidiCommandType::NoteOff) {
         usbMIDI.sendNoteOff(command.note, command.velocity, channel);
+    } else if (command.type == amen::MidiCommandType::ControlChange) {
+        usbMIDI.sendControlChange(command.note, command.velocity, channel);
     }
 }
 
@@ -257,7 +259,20 @@ void loop() {
     for (uint8_t i = 0; i < tickCount; ++i) sendMidi(commands[i]);
     sent = tickCount > 0;
     if (e3PushSnapshot != previousE3Push) previousE3Push = e3PushSnapshot;
-    for (uint8_t index = 0; index < SCANNED_KEYS; ++index) {
+    if (contactSnapshot[amen::SimpleMidiController::kShiftKey] !=
+        previousContacts[amen::SimpleMidiController::kShiftKey]) {
+        const bool down = contactSnapshot[amen::SimpleMidiController::kShiftKey];
+        const uint8_t count = down
+            ? controller.press(amen::SimpleMidiController::kShiftKey, clockNow, commands,
+                               amen::SimpleMidiController::kMaxEventsPerAction)
+            : controller.release(amen::SimpleMidiController::kShiftKey, clockNow, commands,
+                                 amen::SimpleMidiController::kMaxEventsPerAction);
+        for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
+        sent = sent || count > 0;
+        if (down) oledUi.showShift(inputNow);
+        previousContacts[amen::SimpleMidiController::kShiftKey] = down;
+    }
+    for (uint8_t index = 0; index < SCANNED_KEYS - 1; ++index) {
         const uint8_t key = index < 8 ? index + 12 : (index < 20 ? index - 8 : 20);
         if (contactSnapshot[key] == previousContacts[key]) continue;
         const uint8_t count = contactSnapshot[key]
@@ -313,7 +328,13 @@ void loop() {
 
     const int32_t e4Delta = encoderSnapshot[3] - previousEncoderPositions[3];
     if (e4Delta != 0) {
-        if (controller.turnPreset(e4Delta)) oledUi.showPreset(millis());
+        if (controller.shiftHeld()) {
+            const uint8_t count = controller.turnShiftMode(
+                e4Delta, clockNow, commands, amen::SimpleMidiController::kMaxEventsPerAction);
+            for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
+            sent = sent || count > 0;
+            oledUi.showShift(millis());
+        } else if (controller.turnPreset(e4Delta)) oledUi.showPreset(millis());
         previousEncoderPositions[3] = encoderSnapshot[3];
     }
 

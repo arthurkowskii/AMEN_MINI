@@ -13,7 +13,8 @@ namespace amen {
 enum class MidiCommandType : uint8_t {
     None,
     NoteOn,
-    NoteOff
+    NoteOff,
+    ControlChange
 };
 
 struct MidiCommand {
@@ -31,6 +32,15 @@ enum class PerformancePage : uint8_t {
 enum class ClockMode : uint8_t {
     Tempo,
     Frequency
+};
+
+enum class ShiftMode : uint8_t {
+    Hold,
+    Mod,
+    OctaveUp,
+    SemitoneUp,
+    OctaveDown,
+    SemitoneDown
 };
 
 enum class PatternBank : uint8_t {
@@ -94,6 +104,7 @@ public:
     uint8_t tick(uint32_t now, MidiCommand* out, uint8_t capacity) noexcept {
         SimpleMidiController candidate = *this;
         candidate.run_.tick(now);
+        candidate.advanceModulation(now);
         if (!candidate.run_.active()) {
             candidate.runSourceKey_ = kNoRunSource;
             candidate.runPatternKey_ = kNoRunSource;
@@ -183,6 +194,17 @@ public:
         return true;
     }
 
+    uint8_t turnShiftMode(int delta, uint32_t now, MidiCommand* out, uint8_t capacity) noexcept {
+        if (out == nullptr || capacity == 0 || delta == 0) return 0;
+        SimpleMidiController candidate = *this;
+        candidate.advanceModulation(now);
+        candidate.setShiftModeActive(false, now);
+        candidate.shiftMode_ = static_cast<ShiftMode>(
+            wrap(static_cast<uint8_t>(candidate.shiftMode_), delta, 6));
+        candidate.setShiftModeActive(candidate.shiftHeld_, now);
+        return commit(candidate, out, capacity);
+    }
+
     PerformancePage page() const noexcept { return page_; }
     uint16_t tempo() const noexcept { return tempo_; }
     ClockMode clockMode() const noexcept { return clockMode_; }
@@ -257,6 +279,19 @@ public:
         return isDrumPreset(preset_) ? kDrumChannel : kChannel;
     }
     bool drums() const noexcept { return isDrumPreset(preset_); }
+    bool shiftHeld() const noexcept { return shiftHeld_; }
+    ShiftMode shiftMode() const noexcept { return shiftMode_; }
+    const char* shiftModeName() const noexcept {
+        switch (shiftMode_) {
+            case ShiftMode::Hold: return "HOLD";
+            case ShiftMode::Mod: return "MOD";
+            case ShiftMode::OctaveUp: return "+1 OCT";
+            case ShiftMode::SemitoneUp: return "+1 ST";
+            case ShiftMode::OctaveDown: return "-1 OCT";
+            case ShiftMode::SemitoneDown: return "-1 ST";
+        }
+        return "";
+    }
     DiatonicMode scale() const noexcept { return musicalPreset(preset_).scale; }
     bool hasHeldPresetMismatch() const noexcept {
         for (const DegreeState& degree : degrees_)
@@ -300,6 +335,7 @@ private:
         DiatonicMode scale{};
         MusicalPreset preset{};
         uint8_t key{};
+        int8_t transpose{};
         bool held{};
     };
 
@@ -340,6 +376,7 @@ private:
         degree.scale = scale();
         degree.preset = preset_;
         degree.key = key;
+        degree.transpose = currentTranspose();
         degree.spelling = isDrumPreset(preset_)
             ? NoteSpelling{{static_cast<char>(key + 'A')}}
             : spellScaleDegree(rootPitchClass_, degree.scale, key);
@@ -433,7 +470,8 @@ private:
         if (run_.active() && runSourceKey_ == sourceKey && run_.shape() == RunShape::Repeat && targetShape == RunShape::Repeat)
             run_.setStepDuration(duration, now);
         else
-            run_.start(degree.rootNote, degree.scale, sourceKey, targetShape, duration, now);
+            run_.start(static_cast<int16_t>(degree.rootNote + degree.transpose), degree.scale,
+                       sourceKey, targetShape, duration, now);
         runSourceKey_ = run_.active() ? sourceKey : kNoRunSource;
         runPatternKey_ = run_.active() ? patternKey : kNoRunSource;
         runDivision_ = assignment.division;
@@ -441,20 +479,25 @@ private:
 
     uint8_t soundingTarget(const DegreeState& degree, int16_t* target) const noexcept {
         if (harmonyCount_ == 0 || roles_[degree.key] == PadRole::ManualDegree) {
-            target[0] = degree.rootNote;
+            const int16_t note = static_cast<int16_t>(degree.rootNote + degree.transpose);
+            if (note < 0 || note > 127) return 0;
+            target[0] = note;
             return 1;
         }
         const uint8_t slot = static_cast<uint8_t>(harmonyStack_[harmonyCount_ - 1] - kHarmonyStartKey);
         const ChordRecipe& recipe = *harmonySlotRecipe(degree.preset, slot);
-        for (uint8_t i = 0; i < recipe.voiceCount; ++i)
-            target[i] = foldNote(static_cast<int16_t>(degree.rootNote +
+        uint8_t count = 0;
+        for (uint8_t i = 0; i < recipe.voiceCount; ++i) {
+            const int16_t note = static_cast<int16_t>(foldNote(static_cast<int16_t>(degree.rootNote +
                 (recipe.chromaticIntervals
                     ? recipe.degrees[i]
                     : scaleDegreeOffset(degree.scale, degree.key + recipe.degrees[i]) -
                       scaleDegreeOffset(degree.scale, degree.key)) +
-                recipe.octaveDisplacements[i]));
-        sortNotes(target, recipe.voiceCount);
-        return recipe.voiceCount;
+                recipe.octaveDisplacements[i])) + degree.transpose);
+            if (note >= 0 && note <= 127) target[count++] = note;
+        }
+        sortNotes(target, count);
+        return count;
     }
 
     void soundingUnion(std::array<bool, 128>& sounding) const noexcept {
@@ -473,7 +516,15 @@ private:
 
     uint8_t applyAction(uint8_t key, bool down, uint32_t now, MidiCommand* out, uint8_t capacity) noexcept {
         if (out == nullptr || capacity == 0) return 0;
-        if (key >= kShiftKey) return 0;
+        if (key > kShiftKey) return 0;
+        if (key == kShiftKey) {
+            if (down == shiftHeld_) return 0;
+            SimpleMidiController candidate = *this;
+            candidate.advanceModulation(now);
+            candidate.shiftHeld_ = down;
+            candidate.setShiftModeActive(down, now);
+            return commit(candidate, out, capacity);
+        }
         SimpleMidiController candidate = *this;
         PadRole& role = candidate.roles_[key];
         if (down) {
@@ -528,6 +579,8 @@ private:
         uint16_t required = 0;
         for (uint16_t note = 0; note < 128; ++note)
             if (oldSounding[note] != newSounding[note]) ++required;
+        if (sustainValue_ != candidate.sustainValue_) ++required;
+        if (modulationValue_ != candidate.modulationValue_) ++required;
         if (required > capacity) return 0;
         uint8_t count = 0;
         for (uint16_t note = 0; note < 128; ++note)
@@ -536,8 +589,49 @@ private:
         for (uint16_t note = 0; note < 128; ++note)
             if (!oldSounding[note] && newSounding[note])
                 out[count++] = {MidiCommandType::NoteOn, static_cast<uint8_t>(note), kVelocity};
+        if (sustainValue_ != candidate.sustainValue_)
+            out[count++] = {MidiCommandType::ControlChange, 64, candidate.sustainValue_};
+        if (modulationValue_ != candidate.modulationValue_)
+            out[count++] = {MidiCommandType::ControlChange, 1, candidate.modulationValue_};
         *this = candidate;
         return count;
+    }
+
+    int8_t currentTranspose() const noexcept {
+        if (!shiftHeld_) return 0;
+        switch (shiftMode_) {
+            case ShiftMode::OctaveUp: return 12;
+            case ShiftMode::SemitoneUp: return 1;
+            case ShiftMode::OctaveDown: return -12;
+            case ShiftMode::SemitoneDown: return -1;
+            default: return 0;
+        }
+    }
+
+    void setShiftModeActive(bool active, uint32_t now) noexcept {
+        if (shiftMode_ == ShiftMode::Hold) sustainValue_ = active ? 127 : 0;
+        if (shiftMode_ == ShiftMode::Mod) setModulationTarget(active ? 127 : 0, now);
+    }
+
+    void setModulationTarget(uint8_t target, uint32_t now) noexcept {
+        advanceModulation(now);
+        modulationStartValue_ = modulationValue_;
+        modulationTarget_ = target;
+        modulationStartedAt_ = now;
+    }
+
+    void advanceModulation(uint32_t now) noexcept {
+        if (modulationValue_ == modulationTarget_) return;
+        constexpr uint32_t rampUs = 1000000U;
+        const uint32_t elapsed = now - modulationStartedAt_;
+        if (elapsed >= rampUs) {
+            modulationValue_ = modulationTarget_;
+            return;
+        }
+        const int32_t start = modulationStartValue_;
+        const int32_t distance = static_cast<int32_t>(modulationTarget_) - start;
+        modulationValue_ = static_cast<uint8_t>(start + distance * static_cast<int32_t>(elapsed) /
+                                                static_cast<int32_t>(rampUs));
     }
 
     void removeHeldKey(uint8_t key) noexcept {
@@ -594,6 +688,13 @@ private:
     RateDivision runDivision_{RateDivision::Sixteenth};
     std::array<PadRole, kShiftKey> roles_{};
     RunPattern run_{};
+    ShiftMode shiftMode_{ShiftMode::Hold};
+    bool shiftHeld_{};
+    uint8_t sustainValue_{};
+    uint8_t modulationValue_{};
+    uint8_t modulationStartValue_{};
+    uint8_t modulationTarget_{};
+    uint32_t modulationStartedAt_{};
 };
 
 }
