@@ -2,32 +2,32 @@
 
 ## Source Of Truth
 
-- Active development is on `dev`, not the default `main` branch; `firmware/docs/ROADMAP.md` records the current milestones and verification criteria.
-- The current `dev` hardware and firmware target is AMEN_MINI on Teensy 4.1. Root `README.md` reflects the active architecture; `hardware/COMPONENT_HANDOFF.md` still describes the older AKOR_01/Pico design and contradicts the actual `hardware/AMEN_MINI.*` files, so do not use it to infer the active architecture.
-- `firmware/src/engine/` is the portable C++17 audio engine. It must remain free of Arduino/Teensy includes; hardware integration belongs under the `firmware/src/teensy/` layer.
-- Root-level C++ files and `compOut/` are standalone learning prototypes, not firmware entrypoints.
-- `firmware.ino` and `src/teensy/` are the Teensy integration layer in progress; Arduino commands in the roadmap describe future work, not a verification step that works today.
+- Active development is on `dev`. The former MIDI and PSRAM audio drafts were retired at Arthur's request in September 2026 and remain in Git history.
+- The current target is a Teensy 4.1 SD sample player: 20 assignable pads, four simultaneous sources, WAV PCM16 mono/stereo at 44.1 kHz, no PSRAM dependency.
+- Shift + pad opens assignment, E1 browses, its click enters folders or assigns a file, and a new Shift press cancels. Assignments are volatile. Playback is one-shot; retrigger replaces the same pad's voice and a fifth source steals the oldest voice.
+- E7 (A=33, B=34) adjusts headphone volume from 0 to 100, starting muted at every boot. This controls the SGTL5000 headphone output, not line-out. Volume writes require a successfully initialized codec.
+- `firmware/firmware.ino` is the hardware entrypoint. Portable C++17 belongs under `firmware/src/engine/`; Arduino/Teensy code belongs under `firmware/src/teensy/`.
+- `hardware/AMEN_MINI.*` describes the active PCB. `hardware/COMPONENT_HANDOFF.md` describes an obsolete Pico design and must not be used for the active architecture.
+- `diagnostics/` is the independent, validated control-surface diagnostic. Root-level C++ files and `compOut/` are learning prototypes.
 
-## Native Verification
+## Verification
 
-Run native commands from `firmware/`.
+- Use `build_firmware.ps1` for the Teensy build with `teensy:avr` 1.62.0. It accepts `-ArduinoCli` and `-ConfigFile`, builds USB Serial, and places the HEX in ignored `firmware/build/`.
+- `arduino-cli` may not be in PATH; the build script also checks the session's temporary installation under `%LOCALAPPDATA%/Temp/opencode/arduino-cli/`.
+- Use `start_firmware.ps1` for the Windows listening harness. Keep its source tracking, build options and displayed controls aligned with `firmware/test_native/rt_player.cpp`.
+- Native tests: configure `cmake -S firmware -B "$env:LOCALAPPDATA/Temp/opencode/amen-stream-build" -G "MinGW Makefiles"`, build that directory, then run `ctest --test-dir` on it with `--output-on-failure`. `start_firmware.ps1 -Smoke` runs the separate PC audio integration check.
+- `firmware/amen_rt.exe` is an intentionally tracked runnable deliverable. Rebuild it in place after harness or shared-engine changes; never restore a stale binary as cleanup. Verify its new controls and leave its modification alongside source changes.
+- Keep `firmware/test_native/third_party/miniaudio.h` vendored. Third-party compiler warnings should be distinguished from project warnings.
+- Native tests and successful compilation do not validate physical SD latency, codec wiring, OLED operation or four-source playback. Record only measurements actually made on the instrument.
 
-- Build the WAV loader test with warnings enabled (PowerShell): `g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -I src/engine test_native/main.cpp src/engine/wav_loader.cpp -o "$env:TEMP/amen_test.exe"`.
-- The loader test writes `out.wav` in its working directory. Run it from a temporary directory if you do not want an artifact in the repo.
-- Full format validation is `python3 test_native/check_formats.py`, but the script hardcodes its test executable as `/tmp/amen_test`; it is directly usable on Linux after compiling to that path, not from ordinary Windows Python. It also regenerates the committed files under `test_native/test_wavs/`.
-- Build the Windows listening harness: `g++ -std=c++17 -O2 test_native/rt_player.cpp test_native/sample_catalog_scanner.cpp test_native/screen_preview.cpp src/browser/sample_catalog.cpp src/engine/wav_loader.cpp src/engine/sample_player.cpp src/engine/voice_manager.cpp src/engine/fx/live_repeat.cpp src/ui/screen_ui.cpp -I src/browser -I src/engine -I src/ui -I test_native -I test_native/third_party -o amen_rt.exe -lole32 -lwinmm -lgdi32 -luser32`.
-- Run `amen_rt.exe test_native/test.wav`. The keyboard simulates the front panel: numpad 1-6 = voice pads (press = trigger the break, hold = SD browser opens), numpad 7-9 = FX pads (hold = activate the assigned FX), F1-F7 select the active encoder, arrows turn the selected encoder, Enter clicks it, Space retriggers the last played pad, Backspace moves to the parent folder, and `q` exits. E1 browses/assigns, E2 = Repeat dry/wet amount, E3 = Repeat division (1/4, 1/8, 1/16, 1/32), E4 = sample speed, E5 = mode, E6 = reserved, E7 = BPM. The assignable list is BLANK, REPEAT, REVERSE, TRANCE GATE; only Repeat has DSP currently. See `firmware/docs/CONTROLS.md`. Adding strict warnings to this target currently emits warnings from vendored `miniaudio.h`, unlike the engine-only tests.
-- After changing listening-harness sources, dependencies, compiler/linker options, or controls, update `start_firmware.ps1` when necessary and run it as the integration check. Its source tracking, build command, and displayed controls must remain aligned with the manual command above.
-- `firmware/amen_rt.exe` is an intentionally tracked runnable deliverable, not a disposable build artifact. After changing any listening-harness source, rebuild it in place and leave the updated executable in the worktree. Never restore, discard, or replace it with the previous Git version as cleanup: doing so can give the stale binary a newer timestamp than its sources, causing `start_firmware.ps1` to report `deja compile` and launch old behavior. Before finishing, verify the executable contains or exhibits the new controls and that `git status` shows `firmware/amen_rt.exe` modified alongside the relevant sources.
-- `arduino-cli` is not currently installed in the repository's Windows development environment.
+## Real-Time Contracts
 
-## Engine Contracts
-
-- `WavData.samples` is interleaved signed `int16_t`; WAV conversion happens once in `wav_load()`. Real-time `render()` outputs separate float channels in `[-1, 1]`.
-- `SamplePlayer::setSample()` stores a pointer rather than copying samples, so the supplied `WavData` must outlive the player.
-- Keep `firmware/test_native/third_party/miniaudio.h` vendored; it is the header-only backend for the PC listening harness.
+- File access, directory scans, allocation and OLED I/O must stay outside the audio callback.
+- Audio consumes bounded PCM buffers. Cross-context ownership and publication must be explicit; never mask interrupts around an SD operation.
+- Reject invalid/unsupported WAV files before replacing an assignment. Handle short reads, end-of-file and buffer starvation explicitly.
+- Keep input scanning consistent with the validated diagnostic: inactive rows high impedance, columns pulled up, 3 us settling and symmetric 5 ms debounce.
 
 ## Operational Gotchas
 
-- Do not rewrite `.kicad_sch` or `.kicad_pcb` by script. KiCad lock, session, and `hardware/.history/` files are machine-local and ignored.
-- `firmware/scripts/notion_roadmap.py` is not portable: it contains absolute Linux paths and replaces the existing Notion page contents. Do not run it as a routine local verification command.
+- Do not rewrite `.kicad_sch` or `.kicad_pcb` by script. KiCad lock/session/history files are machine-local and ignored.
+- Do not recreate the old PSRAM sampler, harmonic MIDI engine or their roadmaps as part of the new minimal player.

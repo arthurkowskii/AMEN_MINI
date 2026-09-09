@@ -6,3 +6,4 @@ hardware/*.lck
 hardware/.history/
 firmware/test_native/samples
 *.o
+firmware/build/
