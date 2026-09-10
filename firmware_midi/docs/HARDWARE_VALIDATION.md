@@ -1,5 +1,7 @@
 # AMEN MIDI — Validation matérielle (roadmap de bring-up)
 
+Statut : checklist historique du moteur d’août 2026, exclu du build actif. Les cases et validations ci-dessous concernent cet ancien périmètre, pas le sketch actuel. Le socle actuel a été compilé, uploadé et auditionné sur le premier PCB assemblé ; voir [../README.md](../README.md) pour le bilan daté et [CONTROLS.md](CONTROLS.md) pour les fonctions réellement disponibles.
+
 Le cœur hôte est validé (Debug/Release/ASan/UBSan, revues conformité + qualité APPROVED).
 Cette liste est la **seule partie non validée** : elle demande le PCB AMEN_MINI soudé + Teensy 4.1.
 
@@ -27,7 +29,7 @@ dans cette page, sur Notion et dans un commit.
 
 ## 3. Encodeurs (ENC1..ENC7)
 
-- [ ] Sens de rotation correct pour E1..E7 (sinon échanger A/B dans `src/teensy/teensy_pinmap.h`)
+- [ ] Sens de rotation correct pour E1..E7 (sinon échanger A/B dans `amen_midi.ino`)
 - [ ] Un cran = un pas, pas de saut ni d'inversion en rotation rapide
 - [ ] Clics détectés (debounce OK), notamment Shift + clic E7 = Panic
 - [ ] E5 parcourt bien les 9 formes NOTE → THIRTEENTH

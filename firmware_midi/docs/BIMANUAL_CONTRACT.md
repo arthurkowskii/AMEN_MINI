@@ -1,5 +1,7 @@
 # Contrat bimanuel
 
+Statut : contrat historique du moteur d'août 2026, supprimé du dépôt le 6 septembre 2026 (tree `firmware_midi/src/` retirée). Les tokens, FX, Gate/Latch et autres comportements ci-dessous ne décrivent pas le sketch actuel ; voir [CONTROLS.md](CONTROLS.md).
+
 ## Sources et tokens
 
 Chaque `noteDown` accepté reçoit un `SourceToken` global `uint64_t`; zéro est invalide. Le compteur n'est lié ni au degré ni au slot réutilisé. Un `noteUp` retardé d'une ancienne source est donc ignoré, y compris si un autre degré réutilise le même emplacement de stockage.

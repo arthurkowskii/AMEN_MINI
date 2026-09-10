@@ -1,6 +1,6 @@
 # AMEN_MINI
 
-AMEN_MINI is a standalone break machine: drop a break on the SD card, slice it, and play it live on 12 pads.
+AMEN_MINI is a standalone sample player for sound design: assign WAV files from the native microSD card to 20 pads and play up to four sources simultaneously.
 
 ## The PCB
 
@@ -20,25 +20,27 @@ The board is a 2-layer, 1.6 mm PCB hosting a socketed Teensy 4.1, with the PJRC 
 
 ## Hardware
 
-- **Teensy 4.1** (Cortex-M7, 600 MHz) — control processor, native microSD, USB, 8 MB PSRAM;
-- **PJRC Audio Adapter SGTL5000** — headphone + line output, onboard mic input pads (direct recording, J15);
-- 21 MX-compatible switches: 12 chop pads + 8 FX pads + Shift;
+- **Teensy 4.1** (Cortex-M7, 600 MHz) — control processor, native microSD and USB; no PSRAM required;
+- **PJRC Audio Adapter SGTL5000** — headphone + line output;
+- 21 MX-compatible switches: 20 source pads + Shift;
 - 7 EC11 push encoders;
 - SSD1306 I²C OLED, 0.91″, 128 × 32;
-- WAV 16-bit / 44.1 kHz loaded from SD and decoded once into PSRAM — voices read from RAM (random access), never from the SD card inside the audio callback.
+- WAV PCM 16-bit / 44.1 kHz, mono or stereo, streamed from SD through fixed RAM buffers.
 
 ## Firmware
 
-- `firmware/src/engine/` — portable C++17 audio engine (WAV loader, sample player, voice pool with oldest-voice stealing, granular mode, FX: repeat, reverse, phase distortion, spectral gate, spectral freeze), zero Arduino/Teensy includes;
-- `firmware/test_native/` — PC listening harness (`amen_rt.exe`) simulating the front panel: pads, encoders, OLED preview, SD browser;
-- `firmware/src/teensy/` — Teensy layer: PSRAM arena, SD WAV reader, sample loader, `firmware.ino`;
-- Workflow LOAD → MUTATE → COMMIT: auto-assign a break into 12 slices, mutate it live (granular cloud, trance gate, freeze), and commit the last 15 seconds of the mix as new assignable material;
-- Docs: `firmware/docs/CONCEPT.md`, `firmware/docs/CONTROLS.md`, `firmware/docs/ROADMAP.md`.
+- `firmware/firmware.ino` — Teensy entrypoint;
+- `firmware/src/engine/` — portable C++17 WAV parser and four-voice streaming mixer;
+- `firmware/src/teensy/` — SD, I2S/SGTL5000, controls and OLED integration;
+- `firmware/test_native/` — native verification and Windows listening harness;
+- `build_firmware.ps1` — Teensy build; `start_firmware.ps1` — PC listening harness.
+
+Shift + pad opens assignment. Turn E1 to browse; click E1 to enter a folder or assign a WAV. Press Shift again to cancel. E7 controls headphone volume, displayed on the OLED and reset to mute at startup. Pads play one-shots; assignments are volatile. Crop, effects and MIDI are outside this initial firmware.
 
 ## Status
 
 - **Hardware**: PCB fabricated and photographed (above). The Teensy 4.1 + Audio Adapter build is the current target.
-- **Firmware**: active development on the `dev` branch (never `main`). The engine and the PC harness are shipped; the Teensy integration layer (J12/J13) is in progress. See `firmware/docs/ROADMAP.md` for milestones and verification criteria.
+- **Firmware**: active development on `dev`. The MIDI firmware (`firmware_midi/`, restored, boots CHROMATIC + NONE) is the currently flashed instrument firmware; native tests and Teensy build pass. The minimal SD sample player (`firmware/`) is blocked on hardware: the SGTL5000 never acknowledges (retried at 100/50/10 kHz on 0x0A/0x2A), consecutive bus scans minutes apart report different phantom addresses with only 0x3C stable, and OLED writes have started failing too. The fault is electrical (shield seating/power or shared I2C wiring), not fixable in software.
 
 ## License
 

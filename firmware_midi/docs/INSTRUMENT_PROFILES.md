@@ -1,5 +1,7 @@
 # Profils instruments
 
+Statut : profils historiques du moteur d'août 2026, supprimé du dépôt le 6 septembre 2026 (tree `firmware_midi/src/` retirée). Le sketch actuel ne propose pas ces profils ni leur routage CC ; voir [CONTROLS.md](CONTROLS.md).
+
 Les profils sont indépendants de l'harmonie et des scènes. Ils fournissent sept libellés et sept CC modifiables dans le catalogue source.
 
 - Serum: CC 16,17,18,19,74,11,91;
