@@ -40,7 +40,7 @@ Shift + pad opens assignment. Turn E1 to browse; click E1 to enter a folder or a
 ## Status
 
 - **Hardware**: PCB fabricated and photographed (above). The Teensy 4.1 + Audio Adapter build is the current target.
-- **Firmware**: active development on `dev`. The previous MIDI and audio drafts have been replaced; they remain in Git history. Native tests and the Teensy build pass. The new firmware boots on the connected Teensy with SD working; the SGTL5000 never acknowledges (retried at 100/50/10 kHz on 0x0A/0x2A), consecutive bus scans minutes apart report different phantom addresses with only 0x3C stable, and OLED writes have started failing too. The fault is electrical (shield seating/power or shared I2C wiring), not fixable in software. Hardware playback, latency and polyphony remain unverified.
+- **Firmware**: active development on `dev`. The MIDI firmware (`firmware_midi/`, restored, boots CHROMATIC + NONE) is the currently flashed instrument firmware; native tests and Teensy build pass. The minimal SD sample player (`firmware/`) is blocked on hardware: the SGTL5000 never acknowledges (retried at 100/50/10 kHz on 0x0A/0x2A), consecutive bus scans minutes apart report different phantom addresses with only 0x3C stable, and OLED writes have started failing too. The fault is electrical (shield seating/power or shared I2C wiring), not fixable in software.
 
 ## License
 
