@@ -143,6 +143,14 @@ public:
         return true;
     }
 
+    bool toggleSmartVoicing() noexcept {
+        smartVoicing_ = !smartVoicing_;
+        smartReferenceCount_ = 0;
+        return smartVoicing_;
+    }
+
+    bool smartVoicing() const noexcept { return smartVoicing_; }
+
     bool toggleClockMode(uint32_t now) noexcept {
         clockMode_ = clockMode_ == ClockMode::Tempo ? ClockMode::Frequency : ClockMode::Tempo;
         run_.setStepDuration(currentStepDurationUs(), now);
@@ -251,6 +259,7 @@ public:
         const int clamped = next < kMinOctave ? kMinOctave : (next > kMaxOctave ? kMaxOctave : static_cast<int>(next));
         if (clamped == octave_) return false;
         octave_ = static_cast<int8_t>(clamped);
+        smartReferenceCount_ = 0;
         return true;
     }
 
@@ -497,7 +506,51 @@ private:
             if (note >= 0 && note <= 127) target[count++] = note;
         }
         sortNotes(target, count);
+        if (smartVoicing_ && smartReferenceCount_ > 0 && count > 1) applySmartVoicing(target, count);
         return count;
+    }
+
+    void applySmartVoicing(int16_t* notes, uint8_t count) const noexcept {
+        int16_t best[kMaxChordVoices]{};
+        uint32_t bestScore = UINT32_MAX;
+        const int16_t registerLow = static_cast<int16_t>(notes[0] - 12);
+        const int16_t registerHigh = static_cast<int16_t>(notes[count - 1] + 12);
+        for (uint8_t inversion = 0; inversion < count; ++inversion) {
+            int16_t candidate[kMaxChordVoices]{};
+            for (uint8_t i = 0; i < count; ++i) {
+                const uint8_t source = static_cast<uint8_t>((i + inversion) % count);
+                candidate[i] = static_cast<int16_t>(notes[source] + (source < inversion ? 12 : 0));
+            }
+            for (int8_t octave = -2; octave <= 2; ++octave) {
+                uint32_t score = 0;
+                for (uint8_t i = 0; i < count; ++i) {
+                    const int16_t shifted = static_cast<int16_t>(candidate[i] + octave * 12);
+                    if (shifted < 0 || shifted > 127 || shifted < registerLow || shifted > registerHigh) {
+                        score = UINT32_MAX;
+                        break;
+                    }
+                    const uint8_t reference = i < smartReferenceCount_ ? i : smartReferenceCount_ - 1;
+                    const int distance = shifted - smartReference_[reference];
+                    score += static_cast<uint32_t>(distance < 0 ? -distance : distance);
+                }
+                if (score < bestScore) {
+                    bestScore = score;
+                    for (uint8_t i = 0; i < count; ++i)
+                        best[i] = static_cast<int16_t>(candidate[i] + octave * 12);
+                }
+            }
+        }
+        if (bestScore != UINT32_MAX)
+            for (uint8_t i = 0; i < count; ++i) notes[i] = best[i];
+    }
+
+    void captureSmartReference() noexcept {
+        if (!smartVoicing_ || harmonyCount_ == 0 || heldCount_ == 0) return;
+        const DegreeState& degree = degrees_[lowerHeldKey()];
+        int16_t target[kMaxChordVoices]{};
+        const uint8_t count = soundingTarget(degree, target);
+        for (uint8_t i = 0; i < count; ++i) smartReference_[i] = target[i];
+        smartReferenceCount_ = count;
     }
 
     void soundingUnion(std::array<bool, 128>& sounding) const noexcept {
@@ -594,6 +647,7 @@ private:
         if (modulationValue_ != candidate.modulationValue_)
             out[count++] = {MidiCommandType::ControlChange, 1, candidate.modulationValue_};
         *this = candidate;
+        captureSmartReference();
         return count;
     }
 
@@ -695,6 +749,9 @@ private:
     uint8_t modulationStartValue_{};
     uint8_t modulationTarget_{};
     uint32_t modulationStartedAt_{};
+    std::array<int16_t, kMaxChordVoices> smartReference_{};
+    uint8_t smartReferenceCount_{};
+    bool smartVoicing_{};
 };
 
 }

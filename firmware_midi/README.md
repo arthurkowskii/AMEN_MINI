@@ -16,7 +16,7 @@ Les huit pads supérieurs sélectionnent un slot harmonique global momentané en
 
 Le cœur musical et l’interface OLED sont des en-têtes C++17 portables, statiques et sans dépendance Arduino. L’accueil affiche l’octave `O0` à `O8`, la fondamentale et le preset ; `*` indique qu’un degré tenu appartient à un autre preset. La dernière note tenue garde son orthographe ; avec harmonie, elle apparaît avec le nom du slot dans le preset sélectionné. Les overlays sont `OCTAVE`, `TEMPO`, `FREQUENCY`, `ROOT`, `PRESET`, `HARMONY`, `PAGE`, `PATTERN` et `SLOT`. `amen_midi.ino` assure le scan, l’USB-MIDI et le backend OLED I²C direct. Voir [les contrôles](docs/CONTROLS.md).
 
-Le voice leading automatique, Shift et E5–E7 restent futurs. Les neuf patterns sont livrés ; l'assignation est en RAM et l'éditeur E3 réassigne le slot tenu. Aucun preset d’artiste n’est proposé. Le [plan de refondation](docs/MUSICAL_REDESIGN_PLAN.md) conserve la recherche et distingue ce socle des ambitions futures ; les autres anciens documents de conception sont historiques.
+Le clic E7 active un premier mode de voice leading automatique : il conserve les notes de chaque recette et choisit le renversement et l'octave les plus proches de l'accord de référence. Il démarre désactivé. Les patterns sont livrés ; leur personnalisation et leur animation directe depuis la page HARMONY restent à développer. Aucun preset d’artiste n’est proposé. Le [plan de refondation](docs/MUSICAL_REDESIGN_PLAN.md) conserve la recherche et distingue ce socle des ambitions futures ; les autres anciens documents de conception sont historiques.
 
 ## Tests natifs
 

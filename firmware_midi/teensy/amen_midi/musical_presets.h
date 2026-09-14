@@ -28,7 +28,7 @@ struct PresetDefinition {
 static constexpr uint8_t kMusicalPresetCount = 10;
 static constexpr std::array<std::array<uint8_t, kHarmonySlotCount>, 6> kHarmonyPalettes{{
     {{0, 1, 2, 3, 4, 5, 6, 7}},
-    {{8, 9, 10, 11, 12, 13, 14, 15}},
+    {{8, 9, 10, 31, 12, 13, 14, 15}},
     {{0, 1, 2, 16, 17, 4, 13, 11}},
     {{18, 19, 20, 21, 22, 23, 24, 25}},
     {{11, 12, 3, 9, 2, 10, 15, 26}},

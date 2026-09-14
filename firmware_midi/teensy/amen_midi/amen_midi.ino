@@ -33,6 +33,9 @@ uint32_t e3PushChangedAt = 0;
 volatile bool e5Push = false;
 bool e5PushRaw = false;
 uint32_t e5PushChangedAt = 0;
+volatile bool e7Push = false;
+bool e7PushRaw = false;
+uint32_t e7PushChangedAt = 0;
 volatile uint32_t scanCount = 0;
 bool firstScan = true;
 IntervalTimer scanTimer;
@@ -44,6 +47,7 @@ bool previousE1Push = false;
 bool previousE2Push = false;
 bool previousE3Push = false;
 bool previousE5Push = false;
+bool previousE7Push = false;
 bool inputReady = false;
 amen::OledUi oledUi;
 amen::E1Page e1Page = amen::E1Page::Octave;
@@ -110,6 +114,7 @@ void scanInputs() {
     const bool e2PushSample = !digitalRead(PUSH[1]);
     const bool e3PushSample = !digitalRead(PUSH[2]);
     const bool e5PushSample = !digitalRead(PUSH[4]);
+    const bool e7PushSample = !digitalRead(PUSH[6]);
 
     for (uint8_t row = 0; row < 5; ++row) {
         digitalWrite(ROWS[row], LOW);
@@ -184,6 +189,15 @@ void scanInputs() {
     }
     if (e5Push != e5PushRaw && now - e5PushChangedAt >= DEBOUNCE_US) e5Push = e5PushRaw;
 
+    if (firstScan) {
+        e7PushRaw = e7Push = e7PushSample;
+        e7PushChangedAt = now;
+    } else if (e7PushSample != e7PushRaw) {
+        e7PushRaw = e7PushSample;
+        e7PushChangedAt = now;
+    }
+    if (e7Push != e7PushRaw && now - e7PushChangedAt >= DEBOUNCE_US) e7Push = e7PushRaw;
+
     firstScan = false;
     ++scanCount;
 }
@@ -216,7 +230,7 @@ void setup() {
     oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
-    Serial.println("AMEN MIDI E1 OCTAVE, E2 RATE, E3 ROOT, E4 SCALE, E5 MODE/BANK, E6 ASSIGN");
+    Serial.println("AMEN MIDI E1 OCTAVE, E2 RATE, E3 ROOT, E4 SCALE, E5 MODE/BANK, E6 ASSIGN, E7 SMART VOICING");
     if (!oledReady) Serial.println("OLED unavailable");
 }
 
@@ -227,6 +241,7 @@ void loop() {
     bool e2PushSnapshot;
     bool e3PushSnapshot;
     bool e5PushSnapshot;
+    bool e7PushSnapshot;
     uint32_t scans;
 
     noInterrupts();
@@ -236,6 +251,7 @@ void loop() {
     e2PushSnapshot = e2Push;
     e3PushSnapshot = e3Push;
     e5PushSnapshot = e5Push;
+    e7PushSnapshot = e7Push;
     scans = scanCount;
     interrupts();
 
@@ -247,6 +263,7 @@ void loop() {
         previousE2Push = e2PushSnapshot;
         previousE3Push = e3PushSnapshot;
         previousE5Push = e5PushSnapshot;
+        previousE7Push = e7PushSnapshot;
         inputReady = true;
         return;
     }
@@ -350,6 +367,14 @@ void loop() {
     if (e5PushSnapshot != previousE5Push) {
         if (e5PushSnapshot && controller.nextPatternBank()) oledUi.showBank(millis());
         previousE5Push = e5PushSnapshot;
+    }
+
+    if (e7PushSnapshot != previousE7Push) {
+        if (e7PushSnapshot) {
+            controller.toggleSmartVoicing();
+            oledUi.showSmartVoicing(inputNow);
+        }
+        previousE7Push = e7PushSnapshot;
     }
 
     const int32_t e6Delta = encoderSnapshot[5] - previousEncoderPositions[5];

@@ -16,7 +16,7 @@ struct ChordRecipe {
 static constexpr uint8_t kHarmonySlotCount = 8;
 static constexpr uint8_t kMaxRecipeVoices = 5;
 
-static constexpr std::array<ChordRecipe, 31> kChordRecipes{{
+static constexpr std::array<ChordRecipe, 32> kChordRecipes{{
     {"TRIAD", 3, {{0, 2, 4}}, {}},
     {"SEVENTH", 4, {{0, 2, 4, 6}}, {}},
     {"NINTH", 5, {{0, 2, 4, 6, 8}}, {}},
@@ -48,6 +48,7 @@ static constexpr std::array<ChordRecipe, 31> kChordRecipes{{
     {"DOM7b9", 5, {{0, 4, 7, 10, 13}}, {}, true},
     {"MIN9", 5, {{0, 3, 7, 10, 14}}, {}, true},
     {"MIN6", 4, {{0, 3, 7, 9}}, {}, true},
+    {"LYDIAN SUS", 4, {{0, 3, 4, 8}}, {}},
 }};
 
 }

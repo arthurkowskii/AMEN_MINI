@@ -1032,6 +1032,36 @@ void testPatterns() {
 
 int main() {
     {
+        g_block = "cinema-lydian-sus-replaces-fifth";
+        const amen::ChordRecipe* recipe = amen::harmonySlotRecipe(amen::MusicalPreset::Cinema, 3);
+        assert(std::string(recipe->name) == "LYDIAN SUS");
+        assert(recipe->voiceCount == 4);
+        assert((recipe->degrees == std::array<uint8_t, 5>{{0, 3, 4, 8, 0}}));
+        assert(std::string(amen::harmonySlotName(amen::MusicalPreset::PrismMajor, 0)) == "FIFTH");
+    }
+
+    {
+        g_block = "smart-voicing-toggle-and-closest-inversion";
+        SimpleMidiController controller;
+        assert(!controller.smartVoicing());
+        assert(controller.toggleSmartVoicing());
+        assert(controller.smartVoicing());
+        togglePage(controller);
+        assertEvents(press(controller, 12), {});
+        assertNoteOns(press(controller, 0), {60, 64, 67});
+        assertEvents(release(controller, 0), {off(60), off(64), off(67)});
+        assertEvents(press(controller, 7), {on(59), on(62), on(67)});
+        assertEvents(tick(controller, 1), {});
+        assertEvents(release(controller, 7), {off(59), off(62), off(67)});
+        assert(controller.turnOctave(1));
+        assertNoteOns(press(controller, 0), {72, 76, 79});
+        assertEvents(tick(controller, 2), {});
+        assertEvents(release(controller, 0), {off(72), off(76), off(79)});
+        assert(!controller.toggleSmartVoicing());
+        assert(!controller.smartVoicing());
+    }
+
+    {
         constexpr std::array<std::array<uint8_t, 7>, 8> expectedIntervals{{
             {{0, 2, 4, 5, 7, 9, 11}},
             {{0, 2, 3, 5, 7, 9, 10}},

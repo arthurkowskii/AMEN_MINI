@@ -171,6 +171,11 @@ public:
         overlayChangedAt_ = now;
     }
 
+    void showSmartVoicing(uint32_t now) noexcept {
+        overlay_ = Overlay::SmartVoicing;
+        overlayChangedAt_ = now;
+    }
+
     const MonoFramebuffer& render(const SimpleMidiController& controller, E2Page page, uint32_t now) noexcept {
         framebuffer_.clear();
         if (overlay_ != Overlay::None && now - overlayChangedAt_ < 800U) renderOverlay(controller);
@@ -199,7 +204,8 @@ private:
         Pattern,
         PatternEdit,
         Bank,
-        Shift
+        Shift,
+        SmartVoicing
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
@@ -229,6 +235,11 @@ private:
         if (overlay_ == Overlay::Shift) {
             framebuffer_.drawText(0, 0, "SHIFT", 2);
             drawCenteredText(14, controller.shiftModeName(), 2);
+            return;
+        }
+        if (overlay_ == Overlay::SmartVoicing) {
+            framebuffer_.drawText(0, 0, "SMART VOICING", 2);
+            drawCenteredText(18, controller.smartVoicing() ? "ON" : "OFF", 2);
             return;
         }
         if (overlay_ == Overlay::Page || overlay_ == Overlay::Pattern || overlay_ == Overlay::PatternEdit || overlay_ == Overlay::Bank) {
