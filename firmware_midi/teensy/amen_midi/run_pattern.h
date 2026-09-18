@@ -62,6 +62,8 @@ struct RunPatternDefinition {
     const PolyPatternStep* steps{};
     uint8_t stepCount{};
     const ChordRecipe* chordRecipe{};
+    const uint8_t* stepVelocities{};
+    uint8_t gateSixteenths{4};
 };
 
 static constexpr int8_t kRunUpDegrees[]{0, 1, 2, 3, 4, 5, 6, 7};
@@ -133,7 +135,7 @@ static constexpr std::array<RunPatternDefinition, kRunShapeCount> kRunShapes{{
     {"THIRDS DN", kThirdsDownDegrees, 12},
     {"ARP UP", kArpUpDegrees, 4},
     {"ARP DOWN", kArpDownDegrees, 4},
-    {"REPEAT", kRepeatDegrees, 1},
+    {"REPEAT", kRepeatDegrees, 1, nullptr, 0, nullptr, nullptr, 3},
     {"ARP 7", kArp7Degrees, 4},
     {"ARP 9", kArp9Degrees, 5},
     {"ARP 69", kArp69Degrees, 5},
@@ -189,6 +191,7 @@ public:
         shape_ = shape;
         const int base = baseNote - signedScaleDegreeOffset(scale, sourceDegree);
         voiceCounts_.fill(0);
+        stepVelocities_.fill(100);
         count_ = 0;
         if (definition.steps == nullptr) {
             for (uint8_t step = 0; step < definition.degreeCount; ++step) {
@@ -211,6 +214,11 @@ public:
                 }
             }
         }
+        if (definition.stepVelocities != nullptr)
+            for (uint8_t step = 0; step < count_; ++step)
+                stepVelocities_[step] = definition.stepVelocities[step];
+        gateSixteenths_ = definition.gateSixteenths < 1 ? 1
+            : (definition.gateSixteenths > 4 ? 4 : definition.gateSixteenths);
         stepStartedAt_ = now;
         stepDurationUs_ = stepDurationUs;
         active_ = count_ != 0 && stepDurationUs_ != 0;
@@ -221,17 +229,13 @@ public:
     void tick(uint32_t now) noexcept {
         if (!active_) return;
         const uint32_t elapsed = now - stepStartedAt_;
-        if (shape_ == RunShape::Repeat) {
-            const uint32_t elapsedSteps = elapsed / stepDurationUs_;
-            stepStartedAt_ += elapsedSteps * stepDurationUs_;
-            sounding_ = now - stepStartedAt_ < gateDurationUs();
-            return;
-        }
         const uint32_t elapsedSteps = elapsed / stepDurationUs_;
-        if (elapsedSteps == 0) return;
-        index_ = static_cast<uint8_t>((index_ + elapsedSteps % count_) % count_);
-        stepStartedAt_ += elapsedSteps * stepDurationUs_;
-        sounding_ = voiceCounts_[index_] != 0;
+        if (elapsedSteps != 0) {
+            if (shape_ != RunShape::Repeat)
+                index_ = static_cast<uint8_t>((index_ + elapsedSteps % count_) % count_);
+            stepStartedAt_ += elapsedSteps * stepDurationUs_;
+        }
+        sounding_ = voiceCounts_[index_] != 0 && (now - stepStartedAt_) < gateDurationUs();
     }
 
     void setStepDuration(uint32_t stepDurationUs, uint32_t now) noexcept {
@@ -258,6 +262,7 @@ public:
     int16_t soundingNote(uint8_t voice) const noexcept {
         return voice < soundingCount() ? notes_[index_][voice] : -1;
     }
+    uint8_t stepVelocity() const noexcept { return stepVelocities_[index_]; }
 
 private:
     static int recipeNote(int16_t baseNote, DiatonicMode scale, int sourceDegree,
@@ -271,16 +276,18 @@ private:
     }
 
     uint32_t gateDurationUs() const noexcept {
-        return stepDurationUs_ * 3U / 4U;
+        return stepDurationUs_ * gateSixteenths_ / 4U;
     }
 
     std::array<std::array<int16_t, kMaxPatternVoices>, kMaxRunSteps> notes_{};
     std::array<uint8_t, kMaxRunSteps> voiceCounts_{};
+    std::array<uint8_t, kMaxRunSteps> stepVelocities_{};
     uint32_t stepStartedAt_{};
     uint32_t stepDurationUs_{};
     RunShape shape_{RunShape::RunUp};
     uint8_t count_{};
     uint8_t index_{};
+    uint8_t gateSixteenths_{4};
     bool active_{};
     bool sounding_{};
 };

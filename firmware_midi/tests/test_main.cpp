@@ -429,6 +429,45 @@ void testPatterns() {
     }
 
     {
+        g_block = "gate-defaults-preserve-legato";
+        SimpleMidiController controller;
+        controller.turnPreset(-5);
+        togglePage(controller);
+        togglePage(controller);
+        controller.nextPatternBank();
+        controller.nextPatternBank();
+        press(controller, 17);
+        const auto attack = pressUs(controller, 0, 0);
+        assert(attack.count == 4);
+        for (uint8_t i = 0; i < attack.count; ++i)
+            assert(attack.items[i].type == amen::MidiCommandType::NoteOn && attack.items[i].velocity == 100);
+        assertEvents(tickUs(controller, 125000), {});
+        assertEvents(tickUs(controller, 250000), {});
+        const auto gap = tickUs(controller, 375000);
+        assert(gap.count == 4);
+        for (uint8_t i = 0; i < gap.count; ++i)
+            assert(gap.items[i].type == amen::MidiCommandType::NoteOff);
+        const auto repeated = tickUs(controller, 500000);
+        assert(repeated.count == 4);
+        for (uint8_t i = 0; i < repeated.count; ++i)
+            assert(repeated.items[i].type == amen::MidiCommandType::NoteOn && repeated.items[i].velocity == 100);
+        const auto released = release(controller, 0);
+        assert(released.count == 4);
+        for (uint8_t i = 0; i < released.count; ++i)
+            assert(released.items[i].type == amen::MidiCommandType::NoteOff);
+        release(controller, 17);
+    }
+
+    {
+        g_block = "run-defaults-are-neutral";
+        amen::RunPattern run;
+        run.start(60, amen::DiatonicMode::Ionian, 0, amen::RunShape::RunUp, 125000, 0);
+        assert(run.stepVelocity() == 100);
+        for (uint8_t step = 0; step < run.count(); ++step)
+            assert(run.noteAt(step) >= 0);
+    }
+
+    {
         g_block = "repeat-lower-first-restores-from-gap";
         SimpleMidiController controller;
         togglePage(controller);

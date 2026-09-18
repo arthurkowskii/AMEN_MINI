@@ -4,6 +4,7 @@
 #include "musical_presets.h"
 #include "run_pattern.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -553,17 +554,21 @@ private:
         smartReferenceCount_ = count;
     }
 
-    void soundingUnion(std::array<bool, 128>& sounding) const noexcept {
+    void soundingState(std::array<uint8_t, 128>& level) const noexcept {
         for (uint8_t voice = 0; voice < run_.soundingCount(); ++voice) {
             const int16_t runNote = run_.soundingNote(voice);
-            if (runNote >= 0) sounding[static_cast<uint8_t>(runNote)] = true;
+            if (runNote >= 0) {
+                const auto note = static_cast<uint8_t>(runNote);
+                level[note] = std::max<uint8_t>(level[note], run_.stepVelocity());
+            }
         }
         for (const DegreeState& degree : degrees_) {
             if (!degree.held) continue;
             if (degree.key == runSourceKey_) continue;
             int16_t target[kMaxChordVoices];
             const uint8_t targetCount = soundingTarget(degree, target);
-            for (uint8_t i = 0; i < targetCount; ++i) sounding[target[i]] = true;
+            for (uint8_t i = 0; i < targetCount; ++i)
+                level[target[i]] = std::max<uint8_t>(level[target[i]], kVelocity);
         }
     }
 
@@ -625,23 +630,23 @@ private:
 
     uint8_t commit(const SimpleMidiController& candidate, MidiCommand* out, uint8_t capacity) noexcept {
         if (out == nullptr || capacity == 0) return 0;
-        std::array<bool, 128> oldSounding{};
-        std::array<bool, 128> newSounding{};
-        soundingUnion(oldSounding);
-        candidate.soundingUnion(newSounding);
+        std::array<uint8_t, 128> oldLevel{};
+        std::array<uint8_t, 128> newLevel{};
+        soundingState(oldLevel);
+        candidate.soundingState(newLevel);
         uint16_t required = 0;
         for (uint16_t note = 0; note < 128; ++note)
-            if (oldSounding[note] != newSounding[note]) ++required;
+            if ((oldLevel[note] != 0) != (newLevel[note] != 0)) ++required;
         if (sustainValue_ != candidate.sustainValue_) ++required;
         if (modulationValue_ != candidate.modulationValue_) ++required;
         if (required > capacity) return 0;
         uint8_t count = 0;
         for (uint16_t note = 0; note < 128; ++note)
-            if (oldSounding[note] && !newSounding[note])
+            if (oldLevel[note] != 0 && newLevel[note] == 0)
                 out[count++] = {MidiCommandType::NoteOff, static_cast<uint8_t>(note), 0};
         for (uint16_t note = 0; note < 128; ++note)
-            if (!oldSounding[note] && newSounding[note])
-                out[count++] = {MidiCommandType::NoteOn, static_cast<uint8_t>(note), kVelocity};
+            if (oldLevel[note] == 0 && newLevel[note] != 0)
+                out[count++] = {MidiCommandType::NoteOn, static_cast<uint8_t>(note), newLevel[note]};
         if (sustainValue_ != candidate.sustainValue_)
             out[count++] = {MidiCommandType::ControlChange, 64, candidate.sustainValue_};
         if (modulationValue_ != candidate.modulationValue_)
