@@ -169,11 +169,11 @@ constexpr const char* runShapeName(RunShape shape) noexcept {
 }
 
 inline int16_t signedScaleDegreeOffset(DiatonicMode mode, int degree) noexcept {
-    if (mode == DiatonicMode::Chromatic) return static_cast<int16_t>(degree);
-    int octave = degree / 7;
-    int step = degree % 7;
+    const int steps = static_cast<int>(scaleStepCount(mode));
+    int octave = degree / steps;
+    int step = degree % steps;
     if (step < 0) {
-        step += 7;
+        step += steps;
         --octave;
     }
     return static_cast<int16_t>(12 * octave + scaleDegreeOffset(mode, static_cast<uint8_t>(step)));

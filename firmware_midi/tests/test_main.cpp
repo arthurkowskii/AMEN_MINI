@@ -1062,7 +1062,7 @@ int main() {
     }
 
     {
-        constexpr std::array<std::array<uint8_t, 7>, 8> expectedIntervals{{
+        constexpr std::array<std::array<uint8_t, 7>, 10> expectedIntervals{{
             {{0, 2, 4, 5, 7, 9, 11}},
             {{0, 2, 3, 5, 7, 9, 10}},
             {{0, 1, 3, 5, 7, 8, 10}},
@@ -1071,6 +1071,8 @@ int main() {
             {{0, 2, 3, 5, 7, 8, 10}},
             {{0, 1, 3, 5, 6, 8, 10}},
             {{0, 2, 3, 5, 7, 8, 11}},
+            {{0, 2, 3, 5, 7, 9, 11}},
+            {{0, 1, 4, 5, 7, 8, 10}},
         }};
 
         for (uint8_t mode = 0; mode < amen::kDiatonicModeCount; ++mode) {
@@ -1099,7 +1101,7 @@ int main() {
         assert(amen::spellScaleDegree(3, amen::DiatonicMode::Ionian, 3).text == ab);
         assert(amen::spellScaleDegree(5, amen::DiatonicMode::Lydian, 3).text == b);
         assert(amen::spellScaleDegree(1, amen::DiatonicMode::Locrian, 1).text == ebb);
-        assert(amen::kDiatonicModeCount == expectedIntervals.size() + 1);
+        assert(amen::kDiatonicModeCount == 13);
         constexpr std::array<char, 7> letters{{'C', 'D', 'E', 'F', 'G', 'A', 'B'}};
         constexpr std::array<int, 7> natural{{0, 2, 4, 5, 7, 9, 11}};
         for (uint8_t mode = 0; mode < expectedIntervals.size(); ++mode)
@@ -1121,6 +1123,50 @@ int main() {
         for (uint8_t degree = 0; degree < 12; ++degree)
             assert(std::string(amen::spellScaleDegree(root, amen::DiatonicMode::Chromatic, degree).text.data()) ==
                    amen::pitchClassName((root + degree) % 12));
+    }
+
+    {
+        g_block = "scale-step-counts-and-octaves";
+        assert(amen::kDiatonicModeCount == 13);
+        assert(amen::scaleStepCount(amen::DiatonicMode::Ionian) == 7);
+        assert(amen::scaleStepCount(amen::DiatonicMode::MelodicMinor) == 7);
+        assert(amen::scaleStepCount(amen::DiatonicMode::PhrygianDominant) == 7);
+        assert(amen::scaleStepCount(amen::DiatonicMode::Octatonic) == 8);
+        assert(amen::scaleStepCount(amen::DiatonicMode::WholeTone) == 6);
+        assert(amen::scaleStepCount(amen::DiatonicMode::Chromatic) == 12);
+        for (uint8_t mode = 0; mode < amen::kDiatonicModeCount; ++mode) {
+            const auto selected = static_cast<amen::DiatonicMode>(mode);
+            const uint8_t steps = amen::scaleStepCount(selected);
+            assert(amen::scaleDegreeOffset(selected, 0) == 0);
+            for (uint8_t degree = 1; degree < steps; ++degree)
+                assert(amen::scaleDegreeOffset(selected, degree) > amen::scaleDegreeOffset(selected, degree - 1));
+            assert(amen::scaleDegreeOffset(selected, steps) == 12);
+            assert(amen::scaleDegreeOffset(selected, static_cast<uint8_t>(steps * 2)) == 24);
+        }
+        constexpr std::array<uint8_t, 9> octatonic{{0, 1, 3, 4, 6, 7, 9, 10, 12}};
+        for (uint8_t degree = 0; degree < octatonic.size(); ++degree)
+            assert(amen::scaleDegreeOffset(amen::DiatonicMode::Octatonic, degree) == octatonic[degree]);
+        constexpr std::array<uint8_t, 7> wholeTone{{0, 2, 4, 6, 8, 10, 12}};
+        for (uint8_t degree = 0; degree < wholeTone.size(); ++degree)
+            assert(amen::scaleDegreeOffset(amen::DiatonicMode::WholeTone, degree) == wholeTone[degree]);
+        assert(amen::signedScaleDegreeOffset(amen::DiatonicMode::Octatonic, -1) == -2);
+        assert(amen::signedScaleDegreeOffset(amen::DiatonicMode::Octatonic, -8) == -12);
+        assert(amen::signedScaleDegreeOffset(amen::DiatonicMode::WholeTone, -1) == -2);
+        assert(amen::signedScaleDegreeOffset(amen::DiatonicMode::WholeTone, -6) == -12);
+        assert(amen::signedScaleDegreeOffset(amen::DiatonicMode::Chromatic, -1) == -1);
+    }
+
+    {
+        g_block = "non-heptatonic-spelling";
+        for (uint8_t root = 0; root < 12; ++root)
+            for (uint8_t degree = 0; degree < 24; ++degree) {
+                const auto octatonic = amen::spellScaleDegree(root, amen::DiatonicMode::Octatonic, degree).text;
+                assert(std::string(octatonic.data()) == amen::pitchClassName(static_cast<uint8_t>(
+                    (root + amen::scaleDegreeOffset(amen::DiatonicMode::Octatonic, degree)) % 12)));
+                const auto whole = amen::spellScaleDegree(root, amen::DiatonicMode::WholeTone, degree).text;
+                assert(std::string(whole.data()) == amen::pitchClassName(static_cast<uint8_t>(
+                    (root + amen::scaleDegreeOffset(amen::DiatonicMode::WholeTone, degree)) % 12)));
+            }
     }
 
     for (const amen::ChordRecipe& recipe : amen::kChordRecipes) {
