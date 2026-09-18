@@ -194,7 +194,7 @@ void testPatterns() {
     {
         g_block = "future-pattern-polyphonic-rests";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         controller.nextPatternBank();
@@ -231,7 +231,7 @@ void testPatterns() {
     {
         g_block = "kawaii-pattern-altered-dominant";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         controller.nextPatternBank();
@@ -303,7 +303,7 @@ void testPatterns() {
     {
         g_block = "run-down-timeline";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 13);
@@ -316,7 +316,7 @@ void testPatterns() {
     {
         g_block = "pingpong-updown";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 14);
@@ -329,7 +329,7 @@ void testPatterns() {
     {
         g_block = "pingpong-downup";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 15);
@@ -342,7 +342,7 @@ void testPatterns() {
     {
         g_block = "thirds-up";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 16);
@@ -355,7 +355,7 @@ void testPatterns() {
     {
         g_block = "thirds-down";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 17);
@@ -368,7 +368,7 @@ void testPatterns() {
     {
         g_block = "arp-up";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 18);
@@ -381,7 +381,7 @@ void testPatterns() {
     {
         g_block = "arp-down";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 19);
@@ -481,7 +481,7 @@ void testPatterns() {
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             if (amen::SimpleMidiController::isDrumPreset(static_cast<amen::MusicalPreset>(preset))) continue;
             SimpleMidiController controller;
-            controller.turnPreset((preset + 5) % 10);
+            controller.turnPreset((preset + amen::kMusicalPresetCount - 5) % amen::kMusicalPresetCount);
             controller.turnOctave(-100);
             togglePage(controller);
             togglePage(controller);
@@ -499,7 +499,7 @@ void testPatterns() {
     {
         g_block = "order-lower-then-upper-restores-manual";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         assertEvents(press(controller, 0, 0), {on(60)});
@@ -523,7 +523,7 @@ void testPatterns() {
     {
         g_block = "order-upper-then-lower-restores-manual";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 13);
@@ -546,7 +546,7 @@ void testPatterns() {
     {
         g_block = "hold-lower-then-upper-restores-chord";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         press(controller, 12);
         assertEvents(press(controller, 0, 0), {on(60), on(64), on(67)});
@@ -569,7 +569,7 @@ void testPatterns() {
     {
         g_block = "cancel-restores-source";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 0, 0);
@@ -584,7 +584,7 @@ void testPatterns() {
     {
         g_block = "release-source-prevents-restoration";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 0, 0);
@@ -597,7 +597,7 @@ void testPatterns() {
     {
         g_block = "retrigger-transfers-restoration";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         assertEvents(press(controller, 0, 0), {on(60)});
@@ -621,7 +621,7 @@ void testPatterns() {
     {
         g_block = "reference-lifo-most-recent-lower";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 0, 0);
@@ -659,7 +659,7 @@ void testPatterns() {
     {
         g_block = "edit-under-held-wraps-no-mutate-active";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         assert(!controller.turnPattern(1));
@@ -682,7 +682,7 @@ void testPatterns() {
     {
         g_block = "run-shared-owner-pitch";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         assertEvents(press(controller, 7), {on(72)});
         togglePage(controller);
         togglePage(controller);
@@ -699,7 +699,7 @@ void testPatterns() {
     {
         g_block = "run-live-tempo";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         assert(controller.turnTempo(1, 0) && controller.tempo() == 121);
         assert(controller.turnTempo(-1, 0) && controller.tempo() == 120);
         togglePage(controller);
@@ -731,7 +731,7 @@ void testPatterns() {
     {
         g_block = "run-live-tempo-preserves-phase";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 12);
@@ -747,7 +747,7 @@ void testPatterns() {
     {
         g_block = "frequency-clock-range-and-switching";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         assert(controller.clockMode() == amen::ClockMode::Tempo);
         assert(controller.frequencyTenths() == 81);
         assert(controller.turnFrequency(std::numeric_limits<int>::min(), 0));
@@ -776,7 +776,7 @@ void testPatterns() {
     {
         g_block = "run-wrap-and-delay-skip";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         press(controller, 12);
@@ -795,7 +795,7 @@ void testPatterns() {
     {
         g_block = "toggle-page-cancels-restores";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         togglePage(controller);
         assertEvents(press(controller, 0, 0), {on(60)});
@@ -1169,6 +1169,40 @@ int main() {
             }
     }
 
+    {
+        g_block = "noir-presets-and-palettes";
+        assert(amen::kMusicalPresetCount == 15);
+        assert(amen::kChordRecipes.size() == 40);
+        assert(amen::kHarmonyPalettes.size() == 11);
+        assert(std::string(amen::musicalPreset(amen::MusicalPreset::NoirHarmonicMinor).name) == "NOIR HM");
+        assert(amen::musicalPreset(amen::MusicalPreset::NoirHarmonicMinor).scale == amen::DiatonicMode::HarmonicMinor);
+        assert(amen::musicalPreset(amen::MusicalPreset::NoirPhrygianDominant).scale == amen::DiatonicMode::PhrygianDominant);
+        assert(amen::musicalPreset(amen::MusicalPreset::NoirMelodicMinor).scale == amen::DiatonicMode::MelodicMinor);
+        assert(amen::musicalPreset(amen::MusicalPreset::NoirOctatonic).scale == amen::DiatonicMode::Octatonic);
+        assert(amen::musicalPreset(amen::MusicalPreset::NoirWholeTone).scale == amen::DiatonicMode::WholeTone);
+        const auto* seventh = amen::harmonySlotRecipe(amen::MusicalPreset::NoirHarmonicMinor, 0);
+        assert(seventh && std::string(seventh->name) == "SEVENTH");
+        const uint8_t steps[4] = {0, 2, 4, 6};
+        const uint8_t semitones[4] = {0, 3, 7, 11};
+        for (uint8_t voice = 0; voice < seventh->voiceCount; ++voice)
+            assert(amen::scaleDegreeOffset(amen::DiatonicMode::HarmonicMinor, steps[voice]) == semitones[voice]);
+        for (uint8_t preset = 10; preset < amen::kMusicalPresetCount; ++preset) {
+            const auto selected = static_cast<amen::MusicalPreset>(preset);
+            const auto scale = amen::musicalPreset(selected).scale;
+            std::array<std::array<bool, 128>, amen::kHarmonySlotCount> sets{};
+            for (uint8_t slot = 0; slot < amen::kHarmonySlotCount; ++slot) {
+                const auto* recipe = amen::harmonySlotRecipe(selected, slot);
+                assert(recipe != nullptr);
+                for (uint8_t voice = 0; voice < recipe->voiceCount; ++voice)
+                    sets[slot][static_cast<std::size_t>((recipe->chromaticIntervals
+                        ? recipe->degrees[voice]
+                        : amen::scaleDegreeOffset(scale, recipe->degrees[voice])) + recipe->octaveDisplacements[voice])] = true;
+                for (uint8_t other = 0; other < slot; ++other)
+                    assert(sets[slot] != sets[other]);
+            }
+        }
+    }
+
     for (const amen::ChordRecipe& recipe : amen::kChordRecipes) {
         assert(recipe.name[0] != '\0');
         assert(recipe.voiceCount >= 1 && recipe.voiceCount <= amen::kMaxRecipeVoices);
@@ -1250,7 +1284,7 @@ int main() {
         assert(!controller.drums());
         assert(controller.turnPreset(1));
         assert(controller.preset() == amen::MusicalPreset::Chromatic);
-        assert(controller.turnPreset(6));
+        assert(controller.turnPreset(-4));
         assert(controller.preset() == amen::MusicalPreset::Minor);
         assert(controller.midiChannel() == amen::SimpleMidiController::kChannel);
         assert(controller.turnPreset(4));
@@ -1283,7 +1317,7 @@ int main() {
         g_block = "press-under-color";
         // Déclenchement sous couleur : la racine émise est la note de départ, pas la fondamentale.
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 12), {on(64), on(67)});
@@ -1294,7 +1328,7 @@ int main() {
     {
         g_block = "triad-seventh-triad";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 12), {on(64), on(67)});
@@ -1307,7 +1341,7 @@ int main() {
         g_block = "press-after-color";
         // Racine pressée après la couleur : accord complet direct.
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 12), {});
         assert(controller.harmonyActive());
@@ -1321,7 +1355,7 @@ int main() {
         g_block = "two-roots";
         // Deux racines : chaque degré prend sa propre hauteur, aucune note n'est éteinte.
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 2), {on(64)});
@@ -1333,7 +1367,7 @@ int main() {
     {
         g_block = "shared-chord-press";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 12), {});
         assertEvents(press(controller, 0), {on(60), on(64), on(67)});
@@ -1345,7 +1379,7 @@ int main() {
     {
         g_block = "owner-transfer";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 16), {});
         assertEvents(press(controller, 0), {on(60), on(62), on(67)});
@@ -1398,7 +1432,7 @@ int main() {
             }
         };
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         press(controller, 12);
         press(controller, 1);
@@ -1422,7 +1456,7 @@ int main() {
             for (uint8_t rootClass = 0; rootClass < 12; ++rootClass)
             for (int octave = -5; octave <= 3; ++octave) {
             SimpleMidiController controller;
-            controller.turnPreset((preset + 5) % 10);
+            controller.turnPreset((preset + amen::kMusicalPresetCount - 5) % amen::kMusicalPresetCount);
             togglePage(controller);
             controller.turnOctave(octave);
             controller.turnRoot(rootClass);
@@ -1452,7 +1486,7 @@ int main() {
                 std::array<bool, 128> expected{};
                 for (uint8_t key = 0; key < controller.kKeyCount; ++key) {
                     if (!held[key]) continue;
-                    const int root = controller.rootNote() + amen::scaleDegreeOffset(controller.scale(), key);
+                    const int root = std::min(127, controller.rootNote() + amen::scaleDegreeOffset(controller.scale(), key));
                     const amen::ChordRecipe* recipe = slot < 0 ? nullptr : amen::harmonySlotRecipe(controller.preset(), static_cast<uint8_t>(slot));
                     for (uint8_t voice = 0; voice < (recipe ? recipe->voiceCount : 1); ++voice) {
                         int note = root + (recipe
@@ -1504,7 +1538,7 @@ int main() {
     {
         g_block = "seventh-ninth";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 13), {on(64), on(67), on(71)});
@@ -1514,7 +1548,7 @@ int main() {
     {
         g_block = "sixth-six9";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 18), {on(64), on(67), on(69)});
@@ -1525,7 +1559,7 @@ int main() {
         g_block = "lifo";
         // Empilement LIFO : relâcher le sommet restaure la couleur précédente encore tenue.
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, 12), {on(64), on(67)});
@@ -1545,7 +1579,7 @@ int main() {
         g_block = "pedigree";
         // Pedigree indépendant : une couleur sans racine puis une racine puis l'inverse.
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         assertEvents(press(controller, 12), {});
         assertEvents(press(controller, 0), {on(60), on(64), on(67)});
@@ -1594,7 +1628,7 @@ int main() {
         g_block = "stress";
         // Stress : chaque NoteOn a son NoteOff, même en relâchant dans le désordre.
         SimpleMidiController stress;
-        stress.turnPreset(5);
+        stress.turnPreset(-5);
         togglePage(stress);
         std::array<bool, 128> sounding{};
         const auto apply = [&sounding](const EventList& list) {
@@ -1643,7 +1677,7 @@ int main() {
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             SimpleMidiController rangeController;
             rangeController.turnOctave(-100);
-            rangeController.turnPreset(static_cast<int>((preset + 5) % 10));
+            rangeController.turnPreset(static_cast<int>((preset + amen::kMusicalPresetCount - 5) % amen::kMusicalPresetCount));
             for (uint8_t root = 0; root < 12; ++root) {
                 if (root != 0) rangeController.turnRoot(1);
                 for (uint8_t key = 0; key < rangeController.kKeyCount; ++key) {
@@ -1772,7 +1806,7 @@ int main() {
         }};
         for (uint8_t key = 0; key < 3; ++key) {
             SimpleMidiController controller;
-            controller.turnPreset(5);
+        controller.turnPreset(-5);
             togglePage(controller);
             press(controller, 12);
             const auto& notes = chords[key];
@@ -1780,7 +1814,7 @@ int main() {
             assertEvents(press(controller, 13), {on(notes[3])});
             assertEvents(release(controller, key), {off(notes[0]), off(notes[1]), off(notes[2]), off(notes[3])});
             SimpleMidiController seventh;
-            seventh.turnPreset(5);
+            seventh.turnPreset(-5);
             togglePage(seventh);
             press(seventh, 13);
             assertNoteOns(press(seventh, key), {notes[0], notes[1], notes[2], notes[3]});
@@ -1856,7 +1890,7 @@ int main() {
     {
         g_block = "frozen-context-mixed-presets";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         press(controller, 12);
         assertNoteOns(press(controller, 1), {62, 65, 69});
@@ -1882,7 +1916,7 @@ int main() {
     {
         g_block = "mixed-shared-ownership";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         press(controller, 12);
         assertNoteOns(press(controller, 0), {60, 64, 67});
@@ -1896,10 +1930,11 @@ int main() {
     {
         g_block = "preset-data-and-wrapping";
         constexpr std::array<const char*, amen::kMusicalPresetCount> names{
-            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC", "GM KIT", "PRISM MAJ", "PRISM MIN", "KAWAII"}};
+            {"MAJOR", "MINOR", "HARM MIN", "CINEMA", "DARK", "CHROMATIC", "GM KIT", "PRISM MAJ", "PRISM MIN", "KAWAII",
+             "NOIR HM", "NOIR HM5", "NOIR JZ", "NOIR DIM", "NOIR WT"}};
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             SimpleMidiController controller;
-            controller.turnPreset((preset + 5) % 10);
+            controller.turnPreset((preset + amen::kMusicalPresetCount - 5) % amen::kMusicalPresetCount);
             assert(std::string(controller.presetName()) == names[preset]);
             if (controller.drums()) {
                 assert(controller.midiChannel() == amen::SimpleMidiController::kDrumChannel);
@@ -1985,7 +2020,7 @@ int main() {
         g_block = "ui-exact-presets-and-mismatch";
         SimpleMidiController controller;
         amen::OledUi ui;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         togglePage(controller);
         press(controller, 0);
         controller.turnPreset(2);
@@ -2048,7 +2083,7 @@ int main() {
     {
         g_block = "shift-transpose-snapshots-new-pads";
         SimpleMidiController controller;
-        controller.turnPreset(5);
+        controller.turnPreset(-5);
         assertEvents(press(controller, 0), {on(60)});
         assertEvents(press(controller, controller.kShiftKey, 0), {cc(64, 127)});
         assertEvents(turnShift(controller, 2, 0), {cc(64, 0)});
@@ -2087,7 +2122,7 @@ int main() {
         release(controller, controller.kShiftKey, 0);
 
         SimpleMidiController patternController;
-        patternController.turnPreset(5);
+        patternController.turnPreset(-5);
         togglePage(patternController);
         togglePage(patternController);
         press(patternController, patternController.kShiftKey, 0);
