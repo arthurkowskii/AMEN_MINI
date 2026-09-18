@@ -8,6 +8,26 @@
 
 namespace amen {
 
+enum class RampShape : uint8_t {
+    Rise,
+    RiseHold,
+    Swell,
+    Fall
+};
+
+static constexpr uint8_t kRampShapeCount = 4;
+static constexpr uint8_t kNeutralVelocity = 100;
+
+constexpr const char* rampShapeName(RampShape shape) noexcept {
+    switch (shape) {
+        case RampShape::Rise: return "RISE";
+        case RampShape::RiseHold: return "R-HOLD";
+        case RampShape::Swell: return "SWELL";
+        case RampShape::Fall: return "FALL";
+    }
+    return "";
+}
+
 enum class RunShape : uint8_t {
     RunUp,
     RunDown,
@@ -221,6 +241,7 @@ public:
             : (definition.gateSixteenths > 4 ? 4 : definition.gateSixteenths);
         stepStartedAt_ = now;
         stepDurationUs_ = stepDurationUs;
+        rampSteps_ = 0;
         active_ = count_ != 0 && stepDurationUs_ != 0;
         sounding_ = active_ && voiceCounts_[0] != 0;
         index_ = 0;
@@ -234,6 +255,7 @@ public:
             if (shape_ != RunShape::Repeat)
                 index_ = static_cast<uint8_t>((index_ + elapsedSteps % count_) % count_);
             stepStartedAt_ += elapsedSteps * stepDurationUs_;
+            rampSteps_ += elapsedSteps;
         }
         sounding_ = voiceCounts_[index_] != 0 && (now - stepStartedAt_) < gateDurationUs();
     }
@@ -264,6 +286,37 @@ public:
     }
     uint8_t stepVelocity() const noexcept { return stepVelocities_[index_]; }
 
+    void setRamp(RampShape shape, uint8_t depth, uint8_t lengthSteps) noexcept {
+        rampShape_ = shape;
+        rampDepth_ = depth > 127 ? 127 : depth;
+        rampLength_ = lengthSteps == 0 ? 1 : lengthSteps;
+    }
+
+    uint8_t currentVelocity() const noexcept {
+        const int32_t value = static_cast<int32_t>(rampValue()) +
+            (static_cast<int32_t>(stepVelocities_[index_]) - static_cast<int32_t>(kNeutralVelocity));
+        if (value < 1) return 1;
+        if (value > 127) return 127;
+        return static_cast<uint8_t>(value);
+    }
+
+    uint8_t rampValue() const noexcept {
+        if (rampDepth_ == 0) return kNeutralVelocity;
+        const uint8_t floorVelocity = static_cast<uint8_t>(127 - rampDepth_);
+        const uint8_t span = static_cast<uint8_t>(127 - floorVelocity);
+        const uint32_t cycle = rampSteps_ % rampLength_;
+        const uint32_t linear = cycle * 255U / rampLength_;
+        const uint32_t monotonic = (rampSteps_ < rampLength_ ? rampSteps_ : rampLength_) * 255U / rampLength_;
+        uint32_t progress = linear;
+        switch (rampShape_) {
+            case RampShape::Rise: break;
+            case RampShape::RiseHold: progress = monotonic; break;
+            case RampShape::Swell: progress = linear < 128U ? linear * 2U : (255U - linear) * 2U; break;
+            case RampShape::Fall: progress = 255U - linear; break;
+        }
+        return static_cast<uint8_t>(floorVelocity + span * progress / 255U);
+    }
+
 private:
     static int recipeNote(int16_t baseNote, DiatonicMode scale, int sourceDegree,
                           const ChordRecipe& recipe, uint8_t voice) noexcept {
@@ -288,6 +341,10 @@ private:
     uint8_t count_{};
     uint8_t index_{};
     uint8_t gateSixteenths_{4};
+    RampShape rampShape_{RampShape::Rise};
+    uint8_t rampDepth_{};
+    uint8_t rampLength_{4};
+    uint32_t rampSteps_{};
     bool active_{};
     bool sounding_{};
 };

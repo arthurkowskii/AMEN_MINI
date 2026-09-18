@@ -468,6 +468,52 @@ void testPatterns() {
     }
 
     {
+        g_block = "ramp-velocity-lane";
+        SimpleMidiController controller;
+        controller.turnPreset(-5);
+        togglePage(controller);
+        togglePage(controller);
+        press(controller, 12);
+        const auto first = pressUs(controller, 0, 0);
+        assert(first.count == 1 && first.items[0].velocity == 100);
+        release(controller, 0);
+        release(controller, 12);
+        assert(controller.rampDepth() == 0 && controller.rampLength() == 4);
+        assert(std::string(controller.rampShapeNameText()) == "RISE");
+        assert(controller.turnRampDepth(100) && controller.rampDepth() == 100);
+        assert(controller.turnRampShape(-1) && std::string(controller.rampShapeNameText()) == "FALL");
+        assert(controller.turnRampShape(1) && std::string(controller.rampShapeNameText()) == "RISE");
+        assert(controller.turnRampLength(3) && controller.rampLength() == 16);
+        assert(controller.turnRampLength(-3) && controller.rampLength() == 4);
+        assert(controller.turnRampDepth(-100) && controller.rampDepth() == 0);
+    }
+
+    {
+        g_block = "ramp-math-exact";
+        amen::RunPattern run;
+        run.setRamp(amen::RampShape::Rise, 100, 4);
+        run.start(60, amen::DiatonicMode::Ionian, 0, amen::RunShape::Repeat, 125000, 0);
+        assert(run.currentVelocity() == 27);
+        run.tick(125000); assert(run.currentVelocity() == 51);
+        run.tick(250000); assert(run.currentVelocity() == 76);
+        run.tick(375000); assert(run.currentVelocity() == 101);
+        run.tick(500000); assert(run.currentVelocity() == 27);
+        run.setRamp(amen::RampShape::RiseHold, 100, 4);
+        run.start(60, amen::DiatonicMode::Ionian, 0, amen::RunShape::Repeat, 125000, 0);
+        for (uint32_t step = 1; step < 8; ++step) run.tick(step * 125000);
+        assert(run.currentVelocity() == 127);
+        run.setRamp(amen::RampShape::Swell, 100, 4);
+        run.start(60, amen::DiatonicMode::Ionian, 0, amen::RunShape::Repeat, 125000, 0);
+        assert(run.currentVelocity() == 27);
+        run.tick(250000); assert(run.currentVelocity() == 126);
+        run.setRamp(amen::RampShape::Fall, 100, 4);
+        run.start(60, amen::DiatonicMode::Ionian, 0, amen::RunShape::Repeat, 125000, 0);
+        assert(run.currentVelocity() == 127);
+        run.setRamp(amen::RampShape::Fall, 0, 4);
+        assert(run.currentVelocity() == 100);
+    }
+
+    {
         g_block = "repeat-lower-first-restores-from-gap";
         SimpleMidiController controller;
         togglePage(controller);
