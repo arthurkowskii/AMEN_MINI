@@ -162,7 +162,7 @@ void testPatterns() {
         SimpleMidiController controller;
         for (uint8_t slot = 0; slot < 8; ++slot)
             assert(std::string(amen::runShapeName(controller.slotAssignment(slot))) == names[slot]);
-        assert(amen::kRunShapeCount == 36);
+        assert(amen::kRunShapeCount == 44);
         assert(std::string(amen::runShapeName(amen::RunShape::Repeat)) == "REPEAT");
         assert(amen::runShapeName(static_cast<amen::RunShape>(255))[0] == '\0');
     }
@@ -188,7 +188,56 @@ void testPatterns() {
         assert(controller.slotDivision(0) == amen::RateDivision::Quarter);
         assert(std::string(controller.currentDivisionName()) == "1/4");
         assert(controller.nextPatternBank());
+        assert(controller.patternBank() == amen::PatternBank::Noir);
+        assert(controller.slotAssignment(0) == amen::RunShape::NoirPulse);
+        assert(controller.nextPatternBank());
         assert(controller.patternBank() == amen::PatternBank::Orchestral);
+    }
+
+    {
+        g_block = "noir-bank-shapes-and-accents";
+        assert(amen::kRunShapeCount == 44);
+        const char* names[8] = {"N PULSE", "N TRILL", "N 16 BUILD", "N CRAWL",
+                                "N STAB", "N LURCH", "N MARCH", "N CHIME"};
+        for (uint8_t i = 0; i < 8; ++i)
+            assert(std::string(amen::runShapeName(static_cast<amen::RunShape>(36 + i))) == names[i]);
+        assert(amen::kPatternBankCount == 6);
+        assert(amen::kPatternBankFirst[5] == 36 && amen::kPatternBankShapeCount[5] == 8);
+        for (uint8_t i = 0; i < 8; ++i) {
+            const auto& def = amen::kRunShapes[36 + i];
+            assert(def.stepVelocities != nullptr);
+            assert(def.gateSixteenths >= 1 && def.gateSixteenths <= 4);
+            const uint8_t steps = def.degrees != nullptr ? def.degreeCount : def.stepCount;
+            assert(steps > 0 && steps <= amen::RunPattern::kMaxRunSteps);
+            for (uint8_t step = 0; step < steps; ++step) {
+                const bool sounds = def.degrees != nullptr || def.steps[step].voiceCount != 0;
+                if (sounds) assert(def.stepVelocities[step] >= 1 && def.stepVelocities[step] <= 127);
+            }
+        }
+        SimpleMidiController controller;
+        controller.turnPreset(-5);
+        togglePage(controller);
+        togglePage(controller);
+        for (uint8_t i = 0; i < 5; ++i) controller.nextPatternBank();
+        assert(controller.patternBank() == amen::PatternBank::Noir);
+        press(controller, 12);
+        assertEvents(pressUs(controller, 0, 0), {{MidiCommandType::NoteOn, 60, 127}});
+        assertEvents(tickUs(controller, 94000), {{MidiCommandType::NoteOff, 60, 0}});
+        assertEvents(tickUs(controller, 125000), {{MidiCommandType::NoteOn, 60, 86}});
+        assertEvents(release(controller, 12), {});
+        assertEvents(release(controller, 0), {{MidiCommandType::NoteOff, 60, 0}});
+
+        SimpleMidiController build;
+        build.turnPreset(-5);
+        build.turnRampDepth(100);
+        build.turnRampShape(1);
+        togglePage(build);
+        togglePage(build);
+        for (uint8_t i = 0; i < 5; ++i) build.nextPatternBank();
+        press(build, 12);
+        const auto attack0 = pressUs(build, 0, 0);
+        assert(attack0.count == 1 && attack0.items[0].type == amen::MidiCommandType::NoteOn);
+        assert(attack0.items[0].velocity == 54);
     }
 
     {

@@ -64,10 +64,18 @@ enum class RunShape : uint8_t {
     KawaiiDom7Arp,
     KawaiiDomFlatNineChop,
     KawaiiMin9Arp,
-    KawaiiMin6Pulse
+    KawaiiMin6Pulse,
+    NoirPulse,
+    NoirTrill,
+    NoirBuild,
+    NoirCrawl,
+    NoirStab,
+    NoirLurch,
+    NoirMarch,
+    NoirChime
 };
 
-static constexpr uint8_t kRunShapeCount = 36;
+static constexpr uint8_t kRunShapeCount = 44;
 static constexpr uint8_t kMaxPatternVoices = 5;
 
 struct PolyPatternStep {
@@ -146,6 +154,28 @@ static constexpr PolyPatternStep kKawaiiMin6PulseSteps[]{
     {4, {{0, 1, 2, 3}}}, {0, {}}, {4, {{0, 1, 2, 3}}}, {0, {}},
     {0, {}}, {4, {{0, 1, 2, 3}}}, {0, {}}, {0, {}}};
 
+static constexpr int8_t kNoirPulseDegrees[]{0, 0, 0, 0, 0, 0, 0, 0};
+static constexpr uint8_t kNoirPulseVelocities[]{127, 86, 110, 86, 127, 86, 110, 86};
+static constexpr int8_t kNoirTrillDegrees[]{0, 1, 0, 1, 0, 1, 0, 1};
+static constexpr uint8_t kNoirTrillVelocities[]{70, 100, 74, 104, 78, 108, 82, 112};
+static constexpr int8_t kNoirBuildDegrees[]{0, 1, 2, 3, 4, 5, 6, 7};
+static constexpr uint8_t kNoirBuildVelocities[]{40, 52, 64, 76, 88, 100, 112, 124};
+static constexpr int8_t kNoirCrawlDegrees[]{0, -1, -2, -3, -4, -5, -6, -7};
+static constexpr uint8_t kNoirCrawlVelocities[]{110, 100, 92, 86, 80, 74, 68, 62};
+static constexpr PolyPatternStep kNoirStabSteps[]{
+    {3, {{0, 2, 4}}}, {0, {}}, {3, {{0, 2, 4}}}, {0, {}},
+    {0, {}}, {3, {{0, 2, 4}}}, {0, {}}, {0, {}}};
+static constexpr uint8_t kNoirStabVelocities[]{127, 0, 110, 0, 0, 86, 0, 0};
+static constexpr PolyPatternStep kNoirLurchSteps[]{
+    {1, {{0}}}, {0, {}}, {0, {}}, {1, {{0}}}, {0, {}}, {0, {}}, {1, {{0}}}, {0, {}}};
+static constexpr uint8_t kNoirLurchVelocities[]{127, 0, 0, 96, 0, 0, 112, 0};
+static constexpr int8_t kNoirMarchDegrees[]{0, 4, 2, 4};
+static constexpr uint8_t kNoirMarchVelocities[]{127, 72, 88, 72};
+static constexpr PolyPatternStep kNoirChimeSteps[]{
+    {5, {{0, 1, 2, 3, 4}}}, {0, {}}, {0, {}}, {0, {}},
+    {5, {{0, 1, 2, 3, 4}}}, {0, {}}, {0, {}}, {0, {}}};
+static constexpr uint8_t kNoirChimeVelocities[]{70, 0, 0, 0, 88, 0, 0, 0};
+
 static constexpr std::array<RunPatternDefinition, kRunShapeCount> kRunShapes{{
     {"RUN UP", kRunUpDegrees, 8},
     {"RUN DOWN", kRunDownDegrees, 8},
@@ -183,7 +213,19 @@ static constexpr std::array<RunPatternDefinition, kRunShapeCount> kRunShapes{{
     {"K 7b9", nullptr, 0, kKawaiiDomFlatNineChopSteps, 8, &kChordRecipes[28]},
     {"K MIN9", nullptr, 0, kKawaiiMin9ArpSteps, 8, &kChordRecipes[29]},
     {"K MIN6", nullptr, 0, kKawaiiMin6PulseSteps, 8, &kChordRecipes[30]},
+    {"N PULSE", kNoirPulseDegrees, 8, nullptr, 0, nullptr, kNoirPulseVelocities, 3},
+    {"N TRILL", kNoirTrillDegrees, 8, nullptr, 0, nullptr, kNoirTrillVelocities, 3},
+    {"N 16 BUILD", kNoirBuildDegrees, 8, nullptr, 0, nullptr, kNoirBuildVelocities, 2},
+    {"N CRAWL", kNoirCrawlDegrees, 8, nullptr, 0, nullptr, kNoirCrawlVelocities, 4},
+    {"N STAB", nullptr, 0, kNoirStabSteps, 8, &kChordRecipes[33], kNoirStabVelocities, 1},
+    {"N LURCH", nullptr, 0, kNoirLurchSteps, 8, nullptr, kNoirLurchVelocities, 2},
+    {"N MARCH", kNoirMarchDegrees, 4, nullptr, 0, nullptr, kNoirMarchVelocities, 3},
+    {"N CHIME", nullptr, 0, kNoirChimeSteps, 8, &kChordRecipes[20], kNoirChimeVelocities, 2},
 }};
+
+static constexpr uint8_t kPatternBankCount = 6;
+static constexpr std::array<uint8_t, kPatternBankCount> kPatternBankFirst{{0, 12, 20, 28, 0, 36}};
+static constexpr std::array<uint8_t, kPatternBankCount> kPatternBankShapeCount{{12, 8, 8, 8, 1, 8}};
 
 constexpr const char* runShapeName(RunShape shape) noexcept {
     if (static_cast<uint8_t>(shape) >= kRunShapeCount) return "";

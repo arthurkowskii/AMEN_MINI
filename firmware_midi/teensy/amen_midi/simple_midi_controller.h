@@ -49,7 +49,8 @@ enum class PatternBank : uint8_t {
     FutureArp,
     FuturePattern,
     Kawaii,
-    Repeat
+    Repeat,
+    Noir
 };
 
 enum class RateDivision : uint8_t {
@@ -141,7 +142,7 @@ public:
 
     bool nextPatternBank() noexcept {
         if (page_ != PerformancePage::Pattern) return false;
-        patternBank_ = static_cast<PatternBank>(wrap(static_cast<uint8_t>(patternBank_), 1, 5));
+        patternBank_ = static_cast<PatternBank>(wrap(static_cast<uint8_t>(patternBank_), 1, kPatternBankCount));
         return true;
     }
 
@@ -223,10 +224,9 @@ public:
             assignment.division = static_cast<RateDivision>(next);
             return true;
         }
-        const uint8_t first = patternBank_ == PatternBank::Orchestral ? 0
-            : (patternBank_ == PatternBank::FutureArp ? 12
-            : (patternBank_ == PatternBank::FuturePattern ? 20 : 28));
-        const uint8_t count = patternBank_ == PatternBank::Orchestral ? 12 : 8;
+        const uint8_t bank = static_cast<uint8_t>(patternBank_);
+        const uint8_t first = kPatternBankFirst[bank];
+        const uint8_t count = kPatternBankShapeCount[bank];
         const uint8_t current = static_cast<uint8_t>(assignment.shape) - first;
         const uint8_t next = wrap(current, delta, count);
         if (next == current) return false;
@@ -269,6 +269,7 @@ public:
             case PatternBank::FuturePattern: return "FUT. PATTERN";
             case PatternBank::Kawaii: return "KAWAII";
             case PatternBank::Repeat: return "REPEAT";
+            case PatternBank::Noir: return "NOIR";
         }
         return "";
     }
@@ -746,7 +747,7 @@ private:
         return patternAssign_[static_cast<uint8_t>(patternBank_)][slot];
     }
 
-    std::array<std::array<PatternAssignment, kHarmonyKeyCount>, 5> patternAssign_{{
+    std::array<std::array<PatternAssignment, kHarmonyKeyCount>, kPatternBankCount> patternAssign_{{
         {{{RunShape::RunUp, RateDivision::Sixteenth}, {RunShape::RunDown, RateDivision::Sixteenth},
           {RunShape::UpDown, RateDivision::Sixteenth}, {RunShape::DownUp, RateDivision::Sixteenth},
           {RunShape::ThirdsUp, RateDivision::Sixteenth}, {RunShape::ThirdsDown, RateDivision::Sixteenth},
@@ -766,7 +767,11 @@ private:
         {{{RunShape::Repeat, RateDivision::Quarter}, {RunShape::Repeat, RateDivision::Eighth},
           {RunShape::Repeat, RateDivision::Sixteenth}, {RunShape::Repeat, RateDivision::ThirtySecond},
           {RunShape::Repeat, RateDivision::QuarterTriplet}, {RunShape::Repeat, RateDivision::EighthTriplet},
-          {RunShape::Repeat, RateDivision::SixteenthTriplet}, {RunShape::Repeat, RateDivision::ThirtySecondTriplet}}}
+          {RunShape::Repeat, RateDivision::SixteenthTriplet}, {RunShape::Repeat, RateDivision::ThirtySecondTriplet}}},
+        {{{RunShape::NoirPulse, RateDivision::Sixteenth}, {RunShape::NoirTrill, RateDivision::Sixteenth},
+          {RunShape::NoirBuild, RateDivision::Sixteenth}, {RunShape::NoirCrawl, RateDivision::Sixteenth},
+          {RunShape::NoirStab, RateDivision::Sixteenth}, {RunShape::NoirLurch, RateDivision::Sixteenth},
+          {RunShape::NoirMarch, RateDivision::Sixteenth}, {RunShape::NoirChime, RateDivision::Sixteenth}}}
     }};
     int8_t octave_{};
     uint8_t rootPitchClass_{};
