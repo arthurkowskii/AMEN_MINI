@@ -153,6 +153,8 @@ public:
     }
 
     bool smartVoicing() const noexcept { return smartVoicing_; }
+    bool dynamicsEdit() const noexcept { return dynamicsEdit_; }
+    bool toggleDynamicsEdit() noexcept { dynamicsEdit_ = !dynamicsEdit_; return dynamicsEdit_; }
 
     uint8_t rampDepth() const noexcept { return rampDepth_; }
     uint8_t rampLength() const noexcept { return kRampLengths[rampLengthIndex_]; }
@@ -595,6 +597,7 @@ private:
             const int16_t runNote = run_.soundingNote(voice);
             if (runNote >= 0) {
                 const auto note = static_cast<uint8_t>(runNote);
+                // Shared run and pad notes keep the strongest requested attack level.
                 level[note] = std::max<uint8_t>(level[note], run_.currentVelocity());
             }
         }
@@ -797,6 +800,7 @@ private:
     std::array<int16_t, kMaxChordVoices> smartReference_{};
     uint8_t smartReferenceCount_{};
     bool smartVoicing_{};
+    bool dynamicsEdit_{};
     RampShape rampShape_{RampShape::Rise};
     uint8_t rampDepth_{};
     uint8_t rampLengthIndex_{};

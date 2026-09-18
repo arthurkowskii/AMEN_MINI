@@ -1,5 +1,11 @@
 # AMEN MIDI - Plan de refondation musicale
 
+## NOIR / Protocol livré
+
+Le firmware actif comprend cinq presets NOIR, une banque de huit patterns NOIR, une vélocité statique par pas et un gate propre à chaque pattern. Une lane globale module ensuite la vélocité selon quatre courbes (`RISE`, `R-HOLD`, `SWELL`, `FALL`) sur 4 à 64 pas. La page modale `DYNAMIC`, ouverte par le poussoir E6, affecte cette lane à toutes les banques.
+
+La vélocité MIDI est échantillonnée au NoteOn : une note tenue ne peut pas gonfler sans réarticulation. Les patterns de pulse, trill et doubles-croches créent ces nouvelles attaques ; une vraie tenue orchestrale demanderait une future lane CC11. La longueur de ramp est volontairement exprimée en pas, pas en mesures, afin que les divisions binaires et ternaires utilisent le même compteur exact.
+
 Première tranche patterns poussée jusqu'à un catalogue de neuf patterns assignables et cycliques : clic E3 pour les pages persistantes HARMONY/PATTERN, huit slots supérieurs choisissant `RUN UP`, `RUN DOWN`, `UP DOWN`, `DOWN UP`, `THIRDS UP`, `THIRDS DN`, `ARP UP`, `ARP DOWN` ou `REPEAT`, déclenchement dans les deux ordres, arrêt au relâchement de l'un des deux pads, remplacement/restauration transactionnel de la source et édition par rotation E3 sur le pad tenu. E1 alterne OCTAVE/TEMPO/FREQUENCY ; l'horloge interne choisit entre 20–300 BPM en doubles-croches et 0,5–50 Hz sur une course logarithmique. E4 est libre. Ce parcours remplace l'accès principal par Shift envisagé ci-dessous. Horloge externe, expression et autres familles de patterns restent futurs. Validation native effectuée ; écoute et ergonomie du nouveau geste à confirmer sur carte.
 
 Statut au 6 septembre 2026 : socle jouable implémenté et auditionné (six presets, dont `CHROMATIC` ajouté ce jour avec palette d'accords en demi-tons) ; catalogue de patterns compilé et testé nativement, non encore flashé ni écouté. Recherche conservée pour la suite.

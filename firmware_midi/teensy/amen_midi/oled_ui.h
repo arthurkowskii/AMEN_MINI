@@ -176,9 +176,19 @@ public:
         overlayChangedAt_ = now;
     }
 
+    void showDynamics(uint32_t now) noexcept {
+        overlay_ = Overlay::Dynamics;
+        overlayChangedAt_ = now;
+    }
+
     const MonoFramebuffer& render(const SimpleMidiController& controller, E2Page page, uint32_t now) noexcept {
         framebuffer_.clear();
-        if (overlay_ != Overlay::None && now - overlayChangedAt_ < 800U) renderOverlay(controller);
+        const bool pinned = controller.dynamicsEdit();
+        if (pinned && overlay_ != Overlay::Dynamics) {
+            overlay_ = Overlay::Dynamics;
+            overlayChangedAt_ = now;
+        }
+        if (overlay_ != Overlay::None && (pinned || now - overlayChangedAt_ < 800U)) renderOverlay(controller);
         else {
             overlay_ = Overlay::None;
             renderHome(controller, page);
@@ -205,7 +215,8 @@ private:
         PatternEdit,
         Bank,
         Shift,
-        SmartVoicing
+        SmartVoicing,
+        Dynamics
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
@@ -240,6 +251,13 @@ private:
         if (overlay_ == Overlay::SmartVoicing) {
             framebuffer_.drawText(0, 0, "SMART VOICING", 2);
             drawCenteredText(18, controller.smartVoicing() ? "ON" : "OFF", 2);
+            return;
+        }
+        if (overlay_ == Overlay::Dynamics) {
+            framebuffer_.drawText(0, 0, "DYNAMIC", 2);
+            drawCenteredText(12, controller.rampShapeNameText(), 2);
+            std::snprintf(value, sizeof(value), "D %u  L %u", controller.rampDepth(), controller.rampLength());
+            drawCenteredText(22, value, 2);
             return;
         }
         if (overlay_ == Overlay::Page || overlay_ == Overlay::Pattern || overlay_ == Overlay::PatternEdit || overlay_ == Overlay::Bank) {

@@ -163,8 +163,8 @@ static constexpr uint8_t kNoirBuildVelocities[]{40, 52, 64, 76, 88, 100, 112, 12
 static constexpr int8_t kNoirCrawlDegrees[]{0, -1, -2, -3, -4, -5, -6, -7};
 static constexpr uint8_t kNoirCrawlVelocities[]{110, 100, 92, 86, 80, 74, 68, 62};
 static constexpr PolyPatternStep kNoirStabSteps[]{
-    {3, {{0, 2, 4}}}, {0, {}}, {3, {{0, 2, 4}}}, {0, {}},
-    {0, {}}, {3, {{0, 2, 4}}}, {0, {}}, {0, {}}};
+    {4, {{0, 1, 2, 3}}}, {0, {}}, {4, {{0, 1, 2, 3}}}, {0, {}},
+    {0, {}}, {4, {{0, 1, 2, 3}}}, {0, {}}, {0, {}}};
 static constexpr uint8_t kNoirStabVelocities[]{127, 0, 110, 0, 0, 86, 0, 0};
 static constexpr PolyPatternStep kNoirLurchSteps[]{
     {1, {{0}}}, {0, {}}, {0, {}}, {1, {{0}}}, {0, {}}, {0, {}}, {1, {{0}}}, {0, {}}};

@@ -214,6 +214,11 @@ void testPatterns() {
                 if (sounds) assert(def.stepVelocities[step] >= 1 && def.stepVelocities[step] <= 127);
             }
         }
+        amen::RunPattern stab;
+        stab.start(60, amen::DiatonicMode::Chromatic, 0, amen::RunShape::NoirStab, 125000, 0);
+        assert(stab.soundingCount() == 4);
+        assert(stab.soundingNote(0) == 60 && stab.soundingNote(1) == 63 &&
+               stab.soundingNote(2) == 66 && stab.soundingNote(3) == 69);
         SimpleMidiController controller;
         controller.turnPreset(-5);
         togglePage(controller);
@@ -2281,6 +2286,24 @@ int main() {
         expected.drawText(96, 0, "HARM", 2);
         expected.drawText(41, 14, "-1 OCT", 2);
         assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
+    }
+
+    {
+        g_block = "dynamic-overlay-rendering";
+        SimpleMidiController controller;
+        controller.turnRampDepth(100);
+        controller.turnRampLength(3);
+        assert(controller.toggleDynamicsEdit());
+        amen::OledUi ui;
+        ui.showDynamics(10);
+        amen::MonoFramebuffer expected;
+        expected.drawText(0, 0, "DYNAMIC", 2);
+        expected.drawText(96, 0, "NONE", 2);
+        expected.drawText(49, 12, "RISE", 2);
+        expected.drawText(21, 22, "D 100  L 16", 2);
+        assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
+        assert(ui.render(controller, amen::E2Page::Root, 1000).pixels() == expected.pixels());
+        assert(!controller.toggleDynamicsEdit());
     }
 
     testPatterns();
