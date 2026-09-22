@@ -10,10 +10,8 @@
 - E3 règle la fondamentale chromatique. Son poussoir est actuellement sans fonction.
 - E4 sélectionne l'un des quinze presets. Quand SW21 est tenu, E4 sélectionne le mode Shift sans modifier le preset.
 - E5 fait défiler les pages persistantes `HARMONY` → `PATTERN` → `NONE`; son poussoir parcourt les banques de patterns en page `PATTERN`. Le démarrage se fait en `CHROMATIC`, page `NONE`.
-- E6 réassigne le slot du pad supérieur tenu en page `PATTERN`. Son poussoir ouvre ou ferme la page modale `DYNAMIC`.
-- E7 est sans effet en rotation hors de `DYNAMIC`. Son poussoir active ou désactive `SMART VOICING`, désactivé au démarrage. Le premier accord joué fixe la référence ; les accords suivants conservent leurs notes mais choisissent le renversement et l'octave qui minimisent le mouvement dans une fenêtre bornée autour du registre demandé. Le changement ne déplace pas un accord déjà tenu. Désactiver le mode ou changer l'octave avec E1 efface sa mémoire afin que l'accord suivant respecte le nouveau registre.
-
-Dans `DYNAMIC`, E7 règle la profondeur de vélocité de 0 à 127, E2 choisit la longueur parmi 4, 8, 12, 16, 24, 32, 48 ou 64 pas, et E3 choisit `RISE`, `R-HOLD`, `SWELL` ou `FALL`. La page reste affichée jusqu'à un nouveau clic E6.
+- E6 réassigne le slot du pad supérieur tenu en page `PATTERN`. Son poussoir est sans fonction.
+- E7 est sans effet en rotation. Son poussoir active ou désactive `SMART VOICING`, désactivé au démarrage. Le premier accord joué fixe la référence ; les accords suivants conservent leurs notes mais choisissent le renversement et l'octave qui minimisent le mouvement dans une fenêtre bornée autour du registre demandé. Le changement ne déplace pas un accord déjà tenu. Désactiver le mode ou changer l'octave avec E1 efface sa mémoire afin que l'accord suivant respecte le nouveau registre.
 
 `MAJOR` utilise l’ionien, `MINOR` l’éolien et `HARM MIN` le mineur harmonique. Ils partagent, de SW13 à SW20 : `TRIAD`, `SEVENTH`, `NINTH`, `ADD9`, `SUS2`, `SUS4`, `SIXTH`, `SIX9`.
 
@@ -50,7 +48,7 @@ Revenir en `HARMONY` ou passer en `NONE` avec E5 annule le run et restaure la so
 
 L'accueil utilise trois lignes en caractères doubles : octave et fondamentale, preset et dernière note tenue, puis harmonie/description de gamme ou état du pattern courant suivi de `IDLE`, `READY` ou `PLAY`. `HARM`, `PATT` ou `NONE` reste visible en haut à droite, y compris pendant les overlays. Un `*` après le preset indique une ancienne tenue appartenant à un autre preset ; le nom harmonique affiché concerne le preset sélectionné. L'orthographe des notes tenues reste mémorisée.
 
-Tourner E1 ouvre temporairement `OCTAVE`. Tourner E2 ou cliquer son poussoir ouvre `TEMPO` ou `FREQUENCY`; `*` indique l'horloge active. E3 ouvre `ROOT`, E4 ouvre `PRESET`, E5 affiche la page ou la banque, et E6 affiche l'assignation. Appuyer sur SW13–SW20 ouvre temporairement `HARMONY`. SW21 et SW21 + E4 affichent `SHIFT`. Les overlays ordinaires durent 800 ms ; `DYNAMIC` reste épinglé pendant son édition. Le backend transmet l'OLED par fragments afin de ne pas bloquer les patterns rapides.
+Tourner E1 ouvre temporairement `OCTAVE`. Tourner E2 ou cliquer son poussoir ouvre `TEMPO` ou `FREQUENCY`; `*` indique l'horloge active. E3 ouvre `ROOT`, E4 ouvre `PRESET`, E5 affiche la page ou la banque, et E6 affiche l'assignation. Appuyer sur SW13–SW20 ouvre temporairement `HARMONY`. SW21 et SW21 + E4 affichent `SHIFT`. Les overlays durent 800 ms. Le backend transmet l'OLED par fragments afin de ne pas bloquer les patterns rapides.
 
 En page pattern, les pads supérieurs ouvrent `PATTERN` avec l'état du run ; la rotation E6 sur un pad tenu ouvre `ASSIGN` avec l'index et le nom réassigné. E5 ouvre `MODE`. Les points de pagination sont placés en bas à droite pour laisser la page de jeu visible.
 

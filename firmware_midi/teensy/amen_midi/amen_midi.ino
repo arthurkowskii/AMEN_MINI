@@ -33,9 +33,6 @@ uint32_t e3PushChangedAt = 0;
 volatile bool e5Push = false;
 bool e5PushRaw = false;
 uint32_t e5PushChangedAt = 0;
-volatile bool e6Push = false;
-bool e6PushRaw = false;
-uint32_t e6PushChangedAt = 0;
 volatile bool e7Push = false;
 bool e7PushRaw = false;
 uint32_t e7PushChangedAt = 0;
@@ -50,7 +47,6 @@ bool previousE1Push = false;
 bool previousE2Push = false;
 bool previousE3Push = false;
 bool previousE5Push = false;
-bool previousE6Push = false;
 bool previousE7Push = false;
 bool inputReady = false;
 amen::OledUi oledUi;
@@ -118,7 +114,6 @@ void scanInputs() {
     const bool e2PushSample = !digitalRead(PUSH[1]);
     const bool e3PushSample = !digitalRead(PUSH[2]);
     const bool e5PushSample = !digitalRead(PUSH[4]);
-    const bool e6PushSample = !digitalRead(PUSH[5]);
     const bool e7PushSample = !digitalRead(PUSH[6]);
 
     for (uint8_t row = 0; row < 5; ++row) {
@@ -195,15 +190,6 @@ void scanInputs() {
     if (e5Push != e5PushRaw && now - e5PushChangedAt >= DEBOUNCE_US) e5Push = e5PushRaw;
 
     if (firstScan) {
-        e6PushRaw = e6Push = e6PushSample;
-        e6PushChangedAt = now;
-    } else if (e6PushSample != e6PushRaw) {
-        e6PushRaw = e6PushSample;
-        e6PushChangedAt = now;
-    }
-    if (e6Push != e6PushRaw && now - e6PushChangedAt >= DEBOUNCE_US) e6Push = e6PushRaw;
-
-    if (firstScan) {
         e7PushRaw = e7Push = e7PushSample;
         e7PushChangedAt = now;
     } else if (e7PushSample != e7PushRaw) {
@@ -244,7 +230,7 @@ void setup() {
     oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
-    Serial.println("AMEN MIDI E1 OCTAVE, E2 RATE, E3 ROOT, E4 SCALE, E5 MODE/BANK, E6 ASSIGN, E7 SMART VOICING, E6PUSH DYNAMIC");
+    Serial.println("AMEN MIDI E1 OCTAVE, E2 RATE, E3 ROOT, E4 SCALE, E5 MODE/BANK, E6 ASSIGN, E7 SMART VOICING");
     if (!oledReady) Serial.println("OLED unavailable");
 }
 
@@ -255,7 +241,6 @@ void loop() {
     bool e2PushSnapshot;
     bool e3PushSnapshot;
     bool e5PushSnapshot;
-    bool e6PushSnapshot;
     bool e7PushSnapshot;
     uint32_t scans;
 
@@ -266,7 +251,6 @@ void loop() {
     e2PushSnapshot = e2Push;
     e3PushSnapshot = e3Push;
     e5PushSnapshot = e5Push;
-    e6PushSnapshot = e6Push;
     e7PushSnapshot = e7Push;
     scans = scanCount;
     interrupts();
@@ -279,7 +263,6 @@ void loop() {
         previousE2Push = e2PushSnapshot;
         previousE3Push = e3PushSnapshot;
         previousE5Push = e5PushSnapshot;
-        previousE6Push = e6PushSnapshot;
         previousE7Push = e7PushSnapshot;
         inputReady = true;
         return;
@@ -345,24 +328,18 @@ void loop() {
 
     const int32_t e2Delta = encoderSnapshot[1] - previousEncoderPositions[1];
     if (e2Delta != 0) {
-        if (controller.dynamicsEdit()) {
-            if (controller.turnRampLength(e2Delta)) oledUi.showDynamics(millis());
-        } else {
-            const bool changed = controller.clockMode() == amen::ClockMode::Tempo
-                ? controller.turnTempo(e2Delta, clockNow) : controller.turnFrequency(e2Delta, clockNow);
-            if (changed) {
+        const bool changed = controller.clockMode() == amen::ClockMode::Tempo
+            ? controller.turnTempo(e2Delta, clockNow) : controller.turnFrequency(e2Delta, clockNow);
+        if (changed) {
             e1Page = controller.clockMode() == amen::ClockMode::Tempo ? amen::E1Page::Tempo : amen::E1Page::Frequency;
             oledUi.showE1(e1Page, millis());
-            }
         }
         previousEncoderPositions[1] = encoderSnapshot[1];
     }
 
     const int32_t e3Delta = encoderSnapshot[2] - previousEncoderPositions[2];
     if (e3Delta != 0) {
-        if (controller.dynamicsEdit()) {
-            if (controller.turnRampShape(e3Delta)) oledUi.showDynamics(millis());
-        } else if (controller.turnRoot(e3Delta)) oledUi.showRoot(millis());
+        if (controller.turnRoot(e3Delta)) oledUi.showRoot(millis());
         previousEncoderPositions[2] = encoderSnapshot[2];
     }
 
@@ -400,25 +377,13 @@ void loop() {
         previousE7Push = e7PushSnapshot;
     }
 
-    if (e6PushSnapshot != previousE6Push) {
-        if (e6PushSnapshot) {
-            controller.toggleDynamicsEdit();
-            oledUi.showDynamics(inputNow);
-        }
-        previousE6Push = e6PushSnapshot;
-    }
-
     const int32_t e6Delta = encoderSnapshot[5] - previousEncoderPositions[5];
     if (e6Delta != 0) {
         if (controller.turnPattern(e6Delta)) oledUi.showPatternEdit(millis());
         previousEncoderPositions[5] = encoderSnapshot[5];
     }
 
-    const int32_t e7Delta = encoderSnapshot[6] - previousEncoderPositions[6];
-    if (e7Delta != 0) {
-        if (controller.dynamicsEdit() && controller.turnRampDepth(e7Delta)) oledUi.showDynamics(millis());
-        previousEncoderPositions[6] = encoderSnapshot[6];
-    }
+    previousEncoderPositions[6] = encoderSnapshot[6];
 
     if (sent) usbMIDI.send_now();
     while (usbMIDI.read()) {}

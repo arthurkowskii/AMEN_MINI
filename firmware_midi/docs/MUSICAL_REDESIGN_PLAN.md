@@ -2,7 +2,7 @@
 
 ## NOIR / Protocol livré
 
-Le firmware actif comprend cinq presets NOIR, une banque de huit patterns NOIR, une vélocité statique par pas et un gate propre à chaque pattern. Une lane globale module ensuite la vélocité selon quatre courbes (`RISE`, `R-HOLD`, `SWELL`, `FALL`) sur 4 à 64 pas. La page modale `DYNAMIC`, ouverte par le poussoir E6, affecte cette lane à toutes les banques.
+Le firmware actif comprend cinq presets NOIR, une banque de huit patterns NOIR, une vélocité statique par pas et un gate propre à chaque pattern.
 
 La vélocité MIDI est échantillonnée au NoteOn : une note tenue ne peut pas gonfler sans réarticulation. Les patterns de pulse, trill et doubles-croches créent ces nouvelles attaques ; une vraie tenue orchestrale demanderait une future lane CC11. La longueur de ramp est volontairement exprimée en pas, pas en mesures, afin que les divisions binaires et ternaires utilisent le même compteur exact.
 
