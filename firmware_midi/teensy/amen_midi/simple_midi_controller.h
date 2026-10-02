@@ -180,6 +180,14 @@ public:
         return true;
     }
 
+    bool turnVelocity(int delta) noexcept {
+        const int64_t next = static_cast<int64_t>(velocity_) + delta;
+        const uint8_t clamped = next < 1 ? 1 : (next > 127 ? 127 : static_cast<uint8_t>(next));
+        if (clamped == velocity_) return false;
+        velocity_ = clamped;
+        return true;
+    }
+
     bool turnPattern(int delta) noexcept {
         if (page_ != PerformancePage::Pattern) return false;
         const uint8_t key = heldPatternKey();
@@ -216,6 +224,7 @@ public:
 
     PerformancePage page() const noexcept { return page_; }
     uint16_t tempo() const noexcept { return tempo_; }
+    uint8_t velocity() const noexcept { return velocity_; }
     ClockMode clockMode() const noexcept { return clockMode_; }
     uint16_t frequencyTenths() const noexcept {
         return static_cast<uint16_t>((frequencyHundredths() + 5U) / 10U);
@@ -560,8 +569,7 @@ private:
             const int16_t runNote = run_.soundingNote(voice);
             if (runNote >= 0) {
                 const auto note = static_cast<uint8_t>(runNote);
-                // Shared run and pad notes keep the strongest requested attack level.
-                level[note] = std::max<uint8_t>(level[note], run_.stepVelocity());
+                level[note] = std::max<uint8_t>(level[note], velocity_);
             }
         }
         for (const DegreeState& degree : degrees_) {
@@ -570,7 +578,7 @@ private:
             int16_t target[kMaxChordVoices];
             const uint8_t targetCount = soundingTarget(degree, target);
             for (uint8_t i = 0; i < targetCount; ++i)
-                level[target[i]] = std::max<uint8_t>(level[target[i]], kVelocity);
+                level[target[i]] = std::max<uint8_t>(level[target[i]], velocity_);
         }
     }
 
@@ -747,6 +755,7 @@ private:
     MusicalPreset preset_{MusicalPreset::Chromatic};
     PerformancePage page_{PerformancePage::None};
     uint16_t tempo_{120};
+    uint8_t velocity_{kVelocity};
     uint8_t frequencyIndex_{29};
     ClockMode clockMode_{ClockMode::Tempo};
     PatternBank patternBank_{PatternBank::Orchestral};

@@ -125,8 +125,8 @@ void assertNoteOns(const EventList& list, std::initializer_list<uint8_t> notes) 
     }
 }
 
-constexpr MidiCommand on(uint8_t note) {
-    return {MidiCommandType::NoteOn, note, 100};
+constexpr MidiCommand on(uint8_t note, uint8_t velocity = 100) {
+    return {MidiCommandType::NoteOn, note, velocity};
 }
 
 constexpr MidiCommand off(uint8_t note) {
@@ -152,6 +152,207 @@ void walkRun(SimpleMidiController& controller, std::initializer_list<uint8_t> no
     if (first == last) assertEvents(tick(controller, end), {});
     else assertEvents(tick(controller, end), {off(last), on(first)});
     assert(controller.runActive());
+}
+
+void testVelocity() {
+    {
+        g_block = "velocity-default-clamps-and-reversal";
+        SimpleMidiController controller;
+        assert(controller.velocity() == 100 && SimpleMidiController::kVelocity == 100);
+        assert(!controller.turnVelocity(0));
+        assert(controller.turnVelocity(1) && controller.velocity() == 101);
+        assert(controller.turnVelocity(-1) && controller.velocity() == 100);
+        assert(controller.turnVelocity(std::numeric_limits<int>::max()) && controller.velocity() == 127);
+        assert(!controller.turnVelocity(1) && !controller.turnVelocity(0));
+        assertEvents(press(controller, 0), {on(60, 127)});
+        assertEvents(release(controller, 0), {off(60)});
+        assert(controller.turnVelocity(-1) && controller.velocity() == 126);
+        assert(controller.turnVelocity(std::numeric_limits<int>::min()) && controller.velocity() == 1);
+        assert(!controller.turnVelocity(-1) && !controller.turnVelocity(0));
+        assertEvents(press(controller, 0), {on(60, 1)});
+        assertEvents(release(controller, 0), {off(60)});
+        assert(controller.turnVelocity(1) && controller.velocity() == 2);
+        assert(SimpleMidiController{}.velocity() == 100);
+    }
+
+    {
+        g_block = "velocity-none-pads-held-notes-and-cc";
+        SimpleMidiController controller;
+        assertEvents(press(controller, 0), {on(60)});
+        assert(controller.turnVelocity(-27));
+        assertEvents(tick(controller, 0), {});
+        assertEvents(press(controller, 0), {});
+        assert(controller.heldCount() == 1);
+        for (uint8_t key = 1; key < controller.kNoteKeyCount; ++key) {
+            assertEvents(press(controller, key), {on(static_cast<uint8_t>(60 + key), 73)});
+            assertEvents(release(controller, key), {off(static_cast<uint8_t>(60 + key))});
+        }
+        assertEvents(press(controller, controller.kShiftKey, 0), {cc(64, 127)});
+        assert(controller.turnVelocity(-72));
+        assertEvents(tick(controller, 0), {});
+        assertEvents(turnShift(controller, 1, 0), {cc(64, 0)});
+        assertEvents(tick(controller, 500), {cc(1, 63)});
+        assert(controller.turnVelocity(126));
+        assertEvents(tick(controller, 1000), {cc(1, 127)});
+        assertEvents(release(controller, controller.kShiftKey, 1000), {});
+        assertEvents(tick(controller, 1500), {cc(1, 64)});
+        assertEvents(tick(controller, 2000), {cc(1, 0)});
+        assertEvents(release(controller, 0), {off(60)});
+    }
+
+    {
+        g_block = "velocity-harmony-shared-ownership-and-capacity";
+        SimpleMidiController controller;
+        controller.turnPreset(-5);
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0), {on(60), on(64), on(67)});
+        assert(controller.turnVelocity(-27));
+        assertEvents(tick(controller, 0), {});
+        assertEvents(press(controller, 2), {on(71, 73)});
+        assertEvents(release(controller, 0), {off(60)});
+        assertEvents(release(controller, 2), {off(64), off(67), off(71)});
+        MidiCommand buffer[kCap];
+        for (uint8_t capacity = 0; capacity < 3; ++capacity) {
+            std::fill(std::begin(buffer), std::end(buffer), on(127));
+            assert(controller.press(0, buffer, capacity) == 0);
+            assert(controller.heldCount() == 0 && controller.velocity() == 73);
+            for (const auto& event : buffer)
+                assert(event.type == MidiCommandType::NoteOn && event.note == 127 && event.velocity == 100);
+        }
+        assert(controller.press(0, nullptr, kCap) == 0);
+        assertEvents(press(controller, 0), {on(60, 73), on(64, 73), on(67, 73)});
+        assert(controller.turnVelocity(1));
+        assertEvents(tick(controller, 0), {});
+        assertEvents(press(controller, 13), {on(71, 74)});
+        assertEvents(release(controller, 0), {off(60), off(64), off(67), off(71)});
+    }
+
+    {
+        g_block = "velocity-gm-kit-and-roll";
+        SimpleMidiController controller;
+        controller.turnPreset(1);
+        assert(controller.turnVelocity(-58) && controller.midiChannel() == 10);
+        for (uint8_t key = 0; key < controller.kNoteKeyCount; ++key) {
+            assertEvents(press(controller, key), {on(amen::kGmDrumNotes[key], 42)});
+            assertEvents(release(controller, key), {off(amen::kGmDrumNotes[key])});
+        }
+        togglePage(controller);
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(36, 42)});
+        assert(controller.turnVelocity(1));
+        assertEvents(tick(controller, 1), {});
+        assertEvents(tick(controller, 94), {off(36)});
+        assertEvents(tick(controller, 125), {on(36, 43)});
+        assertEvents(release(controller, 0), {off(36)});
+    }
+
+    {
+        g_block = "velocity-all-pattern-banks-ignore-internal-accents";
+        for (uint8_t velocity : {1, 73, 127}) {
+            for (uint8_t bank = 0; bank < amen::kPatternBankCount; ++bank) {
+                for (uint8_t slot = 0; slot < SimpleMidiController::kHarmonyKeyCount; ++slot) {
+                    SimpleMidiController controller;
+                    controller.turnVelocity(static_cast<int>(velocity) - 100);
+                    togglePage(controller);
+                    togglePage(controller);
+                    for (uint8_t i = 0; i < bank; ++i) controller.nextPatternBank();
+                    press(controller, static_cast<uint8_t>(12 + slot));
+                    uint16_t attacks = 0;
+                    const auto check = [&](const EventList& events, uint8_t expectedVelocity) {
+                        for (uint8_t i = 0; i < events.count; ++i) {
+                            const auto& event = events.items[i];
+                            if (event.type == MidiCommandType::NoteOn) {
+                                assert(event.velocity == expectedVelocity);
+                                ++attacks;
+                            } else assert(event.type == MidiCommandType::NoteOff && event.velocity == 0);
+                        }
+                    };
+                    check(pressUs(controller, 0, 0), velocity);
+                    for (uint32_t now = 31250; now <= 2000000; now += 31250)
+                        check(tickUs(controller, now), velocity);
+                    assert(attacks > 0);
+                    const uint8_t next = velocity == 127 ? 126 : static_cast<uint8_t>(velocity + 1);
+                    assert(controller.turnVelocity(static_cast<int>(next) - velocity));
+                    assertEvents(tickUs(controller, 2000000), {});
+                    for (uint32_t now = 2031250; now <= 4000000; now += 31250)
+                        check(tickUs(controller, now), next);
+                    check(release(controller, 0), next);
+                }
+            }
+        }
+    }
+
+    {
+        g_block = "velocity-run-shared-owner-and-transactional-tick";
+        SimpleMidiController controller;
+        assertEvents(press(controller, 1), {on(61)});
+        controller.turnVelocity(-27);
+        togglePage(controller);
+        togglePage(controller);
+        press(controller, 12);
+        assertEvents(press(controller, 0, 0), {on(60, 73)});
+        controller.turnVelocity(1);
+        assertEvents(tick(controller, 1), {});
+        assertEvents(tick(controller, 125), {off(60)});
+        assertEvents(release(controller, 1), {});
+        MidiCommand buffer[kCap];
+        buffer[0] = on(127);
+        assert(controller.tick(us(250), buffer, 1) == 0);
+        assert(buffer[0].type == MidiCommandType::NoteOn && buffer[0].note == 127 && buffer[0].velocity == 100);
+        assert(controller.runNote() == 61 && controller.runSourceKey() == 0 && controller.velocity() == 74);
+        assertEvents(tick(controller, 250), {off(61), on(62, 74)});
+        assertEvents(release(controller, 0), {off(62)});
+    }
+
+    {
+        g_block = "velocity-overlay-render-and-expiry";
+        SimpleMidiController controller;
+        amen::OledUi ui;
+        const auto home = ui.render(controller, amen::E2Page::Root, 0).pixels();
+        for (uint8_t velocity : {100, 1, 127}) {
+            controller.turnVelocity(static_cast<int>(velocity) - controller.velocity());
+            ui.showVelocity(10);
+            amen::MonoFramebuffer expected;
+            expected.drawText(0, 0, "VELOCITY", 2);
+            expected.drawText(96, 0, "NONE", 2);
+            char value[4];
+            std::snprintf(value, sizeof(value), "%u", velocity);
+            expected.drawText((128 - (static_cast<int>(std::strlen(value)) * 16 - 4)) / 2, 12, value, 4);
+            assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
+            assert(ui.render(controller, amen::E2Page::Root, 809).pixels() == expected.pixels());
+            assert(ui.overlayVisible());
+            assert(ui.render(controller, amen::E2Page::Root, 810).pixels() == home);
+            assert(!ui.overlayVisible());
+        }
+    }
+
+    {
+        g_block = "pattern-edit-gating-and-lifo-preserved";
+        SimpleMidiController controller;
+        assert(!controller.turnPattern(1));
+        togglePage(controller);
+        press(controller, 12);
+        assert(!controller.turnPattern(1));
+        release(controller, 12);
+        togglePage(controller);
+        assert(!controller.turnPattern(1));
+        press(controller, 12);
+        press(controller, 13);
+        assert(controller.turnPattern(1));
+        assert(controller.slotAssignment(0) == amen::RunShape::RunUp);
+        assert(controller.slotAssignment(1) == amen::RunShape::UpDown);
+        assert(controller.turnVelocity(1));
+        assert(controller.slotAssignment(1) == amen::RunShape::UpDown);
+        release(controller, 13);
+        assert(controller.patternSlot() == 0 && controller.turnPattern(1));
+        assert(controller.slotAssignment(0) == amen::RunShape::RunDown);
+        assert(controller.slotAssignment(1) == amen::RunShape::UpDown);
+        togglePage(controller);
+        assert(!controller.turnPattern(1));
+        assert(controller.velocity() == 101);
+    }
 }
 
 void testPatterns() {
@@ -226,9 +427,9 @@ void testPatterns() {
         for (uint8_t i = 0; i < 5; ++i) controller.nextPatternBank();
         assert(controller.patternBank() == amen::PatternBank::Noir);
         press(controller, 12);
-        assertEvents(pressUs(controller, 0, 0), {{MidiCommandType::NoteOn, 60, 127}});
+        assertEvents(pressUs(controller, 0, 0), {on(60)});
         assertEvents(tickUs(controller, 94000), {{MidiCommandType::NoteOff, 60, 0}});
-        assertEvents(tickUs(controller, 125000), {{MidiCommandType::NoteOn, 60, 86}});
+        assertEvents(tickUs(controller, 125000), {on(60)});
         assertEvents(release(controller, 12), {});
         assertEvents(release(controller, 0), {{MidiCommandType::NoteOff, 60, 0}});
 
@@ -2231,6 +2432,7 @@ int main() {
         assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
     }
 
+    testVelocity();
     testPatterns();
     std::cout << "AMEN MIDI preset, pattern and ownership tests: PASS\n";
 }

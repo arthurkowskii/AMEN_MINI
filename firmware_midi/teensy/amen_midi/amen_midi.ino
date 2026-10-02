@@ -230,7 +230,7 @@ void setup() {
     oledReady = beginOled();
     scanTimer.begin(scanInputs, SCAN_US);
     scanTimer.priority(64);
-    Serial.println("AMEN MIDI E1 OCTAVE, E2 RATE, E3 ROOT, E4 SCALE, E5 MODE/BANK, E6 ASSIGN, E7 SMART VOICING");
+    Serial.println("AMEN MIDI E1 OCTAVE, E2 RATE, E3 ROOT, E4 SCALE, E5 MODE/BANK, E6 VELOCITY, E7 ASSIGN/SMART VOICING");
     if (!oledReady) Serial.println("OLED unavailable");
 }
 
@@ -379,11 +379,15 @@ void loop() {
 
     const int32_t e6Delta = encoderSnapshot[5] - previousEncoderPositions[5];
     if (e6Delta != 0) {
-        if (controller.turnPattern(e6Delta)) oledUi.showPatternEdit(millis());
+        if (controller.turnVelocity(e6Delta)) oledUi.showVelocity(millis());
         previousEncoderPositions[5] = encoderSnapshot[5];
     }
 
-    previousEncoderPositions[6] = encoderSnapshot[6];
+    const int32_t e7Delta = encoderSnapshot[6] - previousEncoderPositions[6];
+    if (e7Delta != 0) {
+        if (controller.turnPattern(e7Delta)) oledUi.showPatternEdit(millis());
+        previousEncoderPositions[6] = encoderSnapshot[6];
+    }
 
     if (sent) usbMIDI.send_now();
     while (usbMIDI.read()) {}
