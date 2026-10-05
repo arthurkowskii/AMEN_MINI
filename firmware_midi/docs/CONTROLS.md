@@ -10,8 +10,8 @@
 - E3 règle la fondamentale chromatique. Son poussoir est actuellement sans fonction.
 - E4 sélectionne l'un des quinze presets. Quand SW21 est tenu, E4 sélectionne le mode Shift sans modifier le preset.
 - E5 fait défiler les pages persistantes `HARMONY` → `PATTERN` → `NONE`; son poussoir parcourt les banques de patterns en page `PATTERN`. Le démarrage se fait en `CHROMATIC`, page `NONE`.
-- E6 réassigne le slot du pad supérieur tenu en page `PATTERN`. Son poussoir est sans fonction.
-- E7 est sans effet en rotation. Son poussoir active ou désactive `SMART VOICING`, désactivé au démarrage. Le premier accord joué fixe la référence ; les accords suivants conservent leurs notes mais choisissent le renversement et l'octave qui minimisent le mouvement dans une fenêtre bornée autour du registre demandé. Le changement ne déplace pas un accord déjà tenu. Désactiver le mode ou changer l'octave avec E1 efface sa mémoire afin que l'accord suivant respecte le nouveau registre.
+- E6 règle la vélocité de 1 à 127 par pas de 2 ; son poussoir bascule la rotation sur la molette de modulation (CC1), par pas de 5, sans réinitialiser ni la vélocité ni la modulation.
+- E7 réassigne le slot du pad supérieur tenu en page `PATTERN`. Son poussoir active ou désactive `SMART VOICING`, désactivé au démarrage. Le premier accord joué fixe la référence ; les accords suivants conservent leurs notes mais choisissent le renversement et l'octave qui minimisent le mouvement dans une fenêtre bornée autour du registre demandé. Le changement ne déplace pas un accord déjà tenu. Désactiver le mode ou changer l'octave avec E1 efface sa mémoire afin que l'accord suivant respecte le nouveau registre.
 
 `MAJOR` utilise l’ionien, `MINOR` l’éolien et `HARM MIN` le mineur harmonique. Ils partagent, de SW13 à SW20 : `TRIAD`, `SEVENTH`, `NINTH`, `ADD9`, `SUS2`, `SUS4`, `SIXTH`, `SIX9`.
 
@@ -27,7 +27,7 @@ Une hauteur partagée par plusieurs degrés ou le run ne reçoit qu’un NoteOn 
 
 ## Page PATTERN
 
-Les huit pads supérieurs portent chacun un pattern assignable. E5 parcourt six banques : `ORCH`, `FUT. ARP`, `FUT. PATTERN`, `KAWAII`, `REPEAT`, puis `NOIR`. E6 réassigne le slot tenu dans la banque active. `NOIR` fournit `N PULSE`, `N TRILL`, `N 16 BUILD`, `N CRAWL`, `N STAB`, `N LURCH`, `N MARCH` et `N CHIME`. Tous les slots sont actifs ; il n’y a pas de slot `EMPTY`. L’assignation vit en RAM et revient aux valeurs par défaut à chaque démarrage.
+Les huit pads supérieurs portent chacun un pattern assignable. E5 parcourt six banques : `ORCH`, `FUT. ARP`, `FUT. PATTERN`, `KAWAII`, `REPEAT`, puis `NOIR`. E7 réassigne le slot tenu dans la banque active. `NOIR` fournit `N PULSE`, `N TRILL`, `N 16 BUILD`, `N CRAWL`, `N STAB`, `N LURCH`, `N MARCH` et `N CHIME`. Tous les slots sont actifs ; il n’y a pas de slot `EMPTY`. L’assignation vit en RAM et revient aux valeurs par défaut à chaque démarrage.
 
 Deux ordres de déclenchement sont équivalents :
 
@@ -36,7 +36,7 @@ Deux ordres de déclenchement sont équivalents :
 
 Le pattern remplace temporairement la voix manuelle du pad source (l’accord entier s’il tenait un rôle harmonique) et boucle tant que la note source et le pad pattern restent tenus. Relâcher l'un ou l'autre arrête immédiatement le run ; relâcher le pad pattern restaure la source encore tenue, tandis que relâcher la source ne la restaure pas. Un seul run joue à la fois : un nouveau déclenchement transfère la suppression et la restauration de façon transactionnelle. Le pad supérieur tenu le plus récent s’applique aux appuis inférieurs suivants ; hors run, relâcher ce pad restaure le précédent encore tenu.
 
-Chaque contour part de la note choisie : les runs de gamme montent ou descendent de huit notes, les ping-pong `UP DOWN` / `DOWN UP` font quatorze pas et repartent au deuxième pas pour ne pas doubler la note basse à la couture, les tierces montantes jouent les paires explicites 0,2 · 1,3 · 2,4 · 3,5 · 4,6 · 5,7 et les descendantes leur miroir 0,−2 · −1,−3 · −2,−4 · −3,−5 · −4,−6 · −5,−7, et les arpèges déploient la triade aux degrés 0,2,4,7 en montant et 0,−3,−5,−7 en descendant. `REPEAT` rejoue la note source ; chaque impulsion occupe 75 % du pas et laisse 25 % de silence pour produire un vrai retrigger MIDI. Les notes hors MIDI 0–127 sont exclues du cycle, sans repli. La gamme et le départ sont figés au déclenchement ; la rotation E6 pendant le run modifie l’assignation future sans altérer le run actif.
+Chaque contour part de la note choisie : les runs de gamme montent ou descendent de huit notes, les ping-pong `UP DOWN` / `DOWN UP` font quatorze pas et repartent au deuxième pas pour ne pas doubler la note basse à la couture, les tierces montantes jouent les paires explicites 0,2 · 1,3 · 2,4 · 3,5 · 4,6 · 5,7 et les descendantes leur miroir 0,−2 · −1,−3 · −2,−4 · −3,−5 · −4,−6 · −5,−7, et les arpèges déploient la triade aux degrés 0,2,4,7 en montant et 0,−3,−5,−7 en descendant. `REPEAT` rejoue la note source ; chaque impulsion occupe 75 % du pas et laisse 25 % de silence pour produire un vrai retrigger MIDI. Les notes hors MIDI 0–127 sont exclues du cycle, sans repli. La gamme et le départ sont figés au déclenchement ; la rotation E7 pendant le run modifie l’assignation future sans altérer le run actif.
 
 ## Page NONE
 
@@ -48,9 +48,9 @@ Revenir en `HARMONY` ou passer en `NONE` avec E5 annule le run et restaure la so
 
 L'accueil utilise trois lignes en caractères doubles : octave et fondamentale, preset et dernière note tenue, puis harmonie/description de gamme ou état du pattern courant suivi de `IDLE`, `READY` ou `PLAY`. `HARM`, `PATT` ou `NONE` reste visible en haut à droite, y compris pendant les overlays. Un `*` après le preset indique une ancienne tenue appartenant à un autre preset ; le nom harmonique affiché concerne le preset sélectionné. L'orthographe des notes tenues reste mémorisée.
 
-Tourner E1 ouvre temporairement `OCTAVE`. Tourner E2 ou cliquer son poussoir ouvre `TEMPO` ou `FREQUENCY`; `*` indique l'horloge active. E3 ouvre `ROOT`, E4 ouvre `PRESET`, E5 affiche la page ou la banque, et E6 affiche l'assignation. En page `HARMONY`, appuyer sur SW13–SW20 ouvre temporairement `HARMONY`. SW21 et SW21 + E4 affichent `SHIFT`. Les overlays durent 800 ms. Le backend transmet l'OLED par fragments afin de ne pas bloquer les patterns rapides.
+Tourner E1 ouvre temporairement `OCTAVE`. Tourner E2 ou cliquer son poussoir ouvre `TEMPO` ou `FREQUENCY`; `*` indique l'horloge active. E3 ouvre `ROOT`, E4 ouvre `PRESET`, E5 affiche la page ou la banque, E6 affiche la vélocité ou la modulation, et E7 affiche l'assignation. En page `HARMONY`, appuyer sur SW13–SW20 ouvre temporairement `HARMONY`. SW21 et SW21 + E4 affichent `SHIFT`. Les overlays durent 800 ms. Le backend transmet l'OLED par fragments afin de ne pas bloquer les patterns rapides.
 
-En page pattern, les pads supérieurs ouvrent `PATTERN` avec l'état du run ; la rotation E6 sur un pad tenu ouvre `ASSIGN` avec l'index et le nom réassigné. E5 ouvre `MODE`. Les points de pagination sont placés en bas à droite pour laisser la page de jeu visible.
+En page pattern, les pads supérieurs ouvrent `PATTERN` avec l'état du run ; la rotation E7 sur un pad tenu ouvre `ASSIGN` avec l'index et le nom réassigné. E5 ouvre `MODE`. Les points de pagination sont placés en bas à droite pour laisser la page de jeu visible.
 
 ## Teensy 4.1 — mapping issu du netlist réel
 

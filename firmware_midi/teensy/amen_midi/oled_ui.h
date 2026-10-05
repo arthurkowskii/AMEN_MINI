@@ -176,6 +176,11 @@ public:
         overlayChangedAt_ = now;
     }
 
+    void showModulation(uint32_t now) noexcept {
+        overlay_ = Overlay::Modulation;
+        overlayChangedAt_ = now;
+    }
+
     void showSmartVoicing(uint32_t now) noexcept {
         overlay_ = Overlay::SmartVoicing;
         overlayChangedAt_ = now;
@@ -211,7 +216,8 @@ private:
         Bank,
         Shift,
         SmartVoicing,
-        Velocity
+        Velocity,
+        Modulation
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
@@ -238,9 +244,10 @@ private:
 
     void renderOverlay(const SimpleMidiController& controller) noexcept {
         char value[36];
-        if (overlay_ == Overlay::Velocity) {
-            framebuffer_.drawText(0, 0, "VELOCITY", 2);
-            std::snprintf(value, sizeof(value), "%u", controller.velocity());
+        if (overlay_ == Overlay::Velocity || overlay_ == Overlay::Modulation) {
+            framebuffer_.drawText(0, 0, overlay_ == Overlay::Velocity ? "VELOCITY" : "MODULATION", 2);
+            std::snprintf(value, sizeof(value), "%u",
+                          overlay_ == Overlay::Velocity ? controller.velocity() : controller.modulation());
             drawCenteredText(12, value, 4);
             return;
         }

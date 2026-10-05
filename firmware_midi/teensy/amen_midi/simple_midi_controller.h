@@ -222,9 +222,23 @@ public:
         return commit(candidate, out, capacity);
     }
 
+    uint8_t turnModulation(int delta, uint32_t now, MidiCommand* out, uint8_t capacity) noexcept {
+        if (out == nullptr || capacity == 0 || delta == 0) return 0;
+        SimpleMidiController candidate = *this;
+        candidate.advanceModulation(now);
+        const int64_t next = static_cast<int64_t>(candidate.modulationValue_) + delta;
+        const uint8_t clamped = next < 0 ? 0 : (next > 127 ? 127 : static_cast<uint8_t>(next));
+        if (clamped == candidate.modulationValue_) return 0;
+        candidate.modulationValue_ = clamped;
+        candidate.modulationTarget_ = clamped;
+        candidate.modulationStartValue_ = clamped;
+        return commit(candidate, out, capacity);
+    }
+
     PerformancePage page() const noexcept { return page_; }
     uint16_t tempo() const noexcept { return tempo_; }
     uint8_t velocity() const noexcept { return velocity_; }
+    uint8_t modulation() const noexcept { return modulationValue_; }
     ClockMode clockMode() const noexcept { return clockMode_; }
     uint16_t frequencyTenths() const noexcept {
         return static_cast<uint16_t>((frequencyHundredths() + 5U) / 10U);
