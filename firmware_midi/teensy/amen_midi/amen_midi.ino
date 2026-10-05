@@ -412,7 +412,7 @@ void loop() {
             for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
             sent = sent || count > 0;
             if (count > 0) oledUi.showModulation(millis());
-        } else if (controller.turnVelocity(e6Delta * 2)) oledUi.showVelocity(millis());
+        } else if (controller.turnVelocity(e6Delta * 3)) oledUi.showVelocity(millis());
         previousEncoderPositions[5] = encoderSnapshot[5];
     }
 

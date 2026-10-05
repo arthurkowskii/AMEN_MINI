@@ -10,7 +10,7 @@
 - E3 règle la fondamentale chromatique. Son poussoir est actuellement sans fonction.
 - E4 sélectionne l'un des quinze presets. Quand SW21 est tenu, E4 sélectionne le mode Shift sans modifier le preset.
 - E5 fait défiler les pages persistantes `HARMONY` → `PATTERN` → `NONE`; son poussoir parcourt les banques de patterns en page `PATTERN`. Le démarrage se fait en `CHROMATIC`, page `NONE`.
-- E6 règle la vélocité de 1 à 127 par pas de 2 ; son poussoir bascule la rotation sur la molette de modulation (CC1), par pas de 5, sans réinitialiser ni la vélocité ni la modulation.
+- E6 règle la vélocité de 1 à 127 par pas de 3 ; son poussoir bascule la rotation sur la molette de modulation (CC1), par pas de 5, sans réinitialiser ni la vélocité ni la modulation.
 - E7 réassigne le slot du pad supérieur tenu en page `PATTERN`. Son poussoir active ou désactive `SMART VOICING`, désactivé au démarrage. Le premier accord joué fixe la référence ; les accords suivants conservent leurs notes mais choisissent le renversement et l'octave qui minimisent le mouvement dans une fenêtre bornée autour du registre demandé. Le changement ne déplace pas un accord déjà tenu. Désactiver le mode ou changer l'octave avec E1 efface sa mémoire afin que l'accord suivant respecte le nouveau registre.
 
 `MAJOR` utilise l’ionien, `MINOR` l’éolien et `HARM MIN` le mineur harmonique. Ils partagent, de SW13 à SW20 : `TRIAD`, `SEVENTH`, `NINTH`, `ADD9`, `SUS2`, `SUS4`, `SIXTH`, `SIX9`.
