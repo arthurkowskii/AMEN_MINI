@@ -48,7 +48,7 @@ Revenir en `HARMONY` ou passer en `NONE` avec E5 annule le run et restaure la so
 
 L'accueil utilise trois lignes en caractères doubles : octave et fondamentale, preset et dernière note tenue, puis harmonie/description de gamme ou état du pattern courant suivi de `IDLE`, `READY` ou `PLAY`. `HARM`, `PATT` ou `NONE` reste visible en haut à droite, y compris pendant les overlays. Un `*` après le preset indique une ancienne tenue appartenant à un autre preset ; le nom harmonique affiché concerne le preset sélectionné. L'orthographe des notes tenues reste mémorisée.
 
-Tourner E1 ouvre temporairement `OCTAVE`. Tourner E2 ou cliquer son poussoir ouvre `TEMPO` ou `FREQUENCY`; `*` indique l'horloge active. E3 ouvre `ROOT`, E4 ouvre `PRESET`, E5 affiche la page ou la banque, et E6 affiche l'assignation. Appuyer sur SW13–SW20 ouvre temporairement `HARMONY`. SW21 et SW21 + E4 affichent `SHIFT`. Les overlays durent 800 ms. Le backend transmet l'OLED par fragments afin de ne pas bloquer les patterns rapides.
+Tourner E1 ouvre temporairement `OCTAVE`. Tourner E2 ou cliquer son poussoir ouvre `TEMPO` ou `FREQUENCY`; `*` indique l'horloge active. E3 ouvre `ROOT`, E4 ouvre `PRESET`, E5 affiche la page ou la banque, et E6 affiche l'assignation. En page `HARMONY`, appuyer sur SW13–SW20 ouvre temporairement `HARMONY`. SW21 et SW21 + E4 affichent `SHIFT`. Les overlays durent 800 ms. Le backend transmet l'OLED par fragments afin de ne pas bloquer les patterns rapides.
 
 En page pattern, les pads supérieurs ouvrent `PATTERN` avec l'état du run ; la rotation E6 sur un pad tenu ouvre `ASSIGN` avec l'index et le nom réassigné. E5 ouvre `MODE`. Les points de pagination sont placés en bas à droite pour laisser la page de jeu visible.
 

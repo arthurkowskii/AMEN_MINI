@@ -300,7 +300,7 @@ void loop() {
         if (contactSnapshot[key] && key >= amen::SimpleMidiController::kHarmonyStartKey &&
             key < amen::SimpleMidiController::kShiftKey) {
             if (controller.page() == amen::PerformancePage::Pattern) oledUi.showPattern(inputNow);
-            else oledUi.showHarmony(inputNow);
+            else if (controller.page() == amen::PerformancePage::Harmony) oledUi.showHarmony(inputNow);
         }
         previousContacts[key] = contactSnapshot[key];
     }
