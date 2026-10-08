@@ -1,4 +1,4 @@
-SOCIAL
+
 
 # KiCad session and lock files are machine-local and not fabrication inputs.
 hardware/*.kicad_prl
@@ -7,3 +7,5 @@ hardware/.history/
 firmware/test_native/samples
 *.o
 firmware/build/
+SOCIAL/
+VIDEOS DEVLOG/
