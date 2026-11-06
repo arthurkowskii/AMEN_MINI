@@ -16,6 +16,9 @@ constexpr uint8_t kCapacity = SimpleMidiController::kMaxEventsPerAction;
 
 void assertCc(const MidiCommand& event, uint8_t number, uint8_t value) {
     assert(event.type == MidiCommandType::ControlChange);
+    if (event.note != number || event.velocity != value)
+        std::cerr << "CC mismatch: " << int(event.note) << ':' << int(event.velocity)
+                  << " expected " << int(number) << ':' << int(value) << '\n';
     assert(event.note == number && event.velocity == value);
 }
 
@@ -226,7 +229,8 @@ void testMidiCc() {
     for (uint8_t encoder = 4; encoder < 7; ++encoder) {
         const uint8_t slot = encoder - 4;
         assert(panel.midiCcValue(slot) == 0);
-        assert(panel.midiCcMultiplier(slot) == 1);
+        assert(panel.midiCcMultiplier(slot) == 8);
+        panel.click(c, encoder, out, kCapacity); // Select X1 for fine-step routing checks.
         assert(panel.turn(c, encoder, 1, 0, out, kCapacity).count == 1);
         assertCc(out[0], 20 + slot, 1);
         assert(panel.turn(c, encoder, 200, 0, out, kCapacity).count == 1);
@@ -265,6 +269,7 @@ void testE4MidiCcAndNotes() {
     static_assert(FrontPanel::midiCcSlot(6) == 2);
     static_assert(FrontPanel::midiCcSlot(255) == 4);
     assert(panel.midiCcValue(3) == 0);
+    panel.click(c, 3, out, kCapacity); // Select X1 for fine-step routing checks.
     for (int delta : {1, 200, -1, -200}) {
         const int64_t next = static_cast<int64_t>(panel.midiCcValue(3)) + delta;
         const uint8_t value = next < 0 ? 0 : (next > 127 ? 127 : static_cast<uint8_t>(next));
@@ -328,9 +333,9 @@ void testMidiCcMultipliers() {
         FrontPanel panel;
         MidiCommand out[kCapacity]{};
         const uint8_t slot = FrontPanel::midiCcSlot(encoder);
-        assert(panel.midiCcMultiplier(slot) == 1);
-        panel.turn(c, encoder, 64, 0, out, kCapacity);
-        for (uint8_t multiplier : {1, 2, 4, 8}) {
+        assert(panel.midiCcMultiplier(slot) == 8);
+        panel.turn(c, encoder, 8, 0, out, kCapacity);
+        for (uint8_t multiplier : {8, 1, 2, 4}) {
             assert(panel.midiCcMultiplier(slot) == multiplier);
             assert(panel.turn(c, encoder, 1, 0, out, kCapacity).count == 1);
             assertCc(out[0], numbers[encoder - 3], 64 + multiplier);
@@ -384,29 +389,29 @@ void testMidiCcMultipliers() {
             assert(ui.render(c, panel, 20).pixels() == expected.pixels());
             for (uint8_t other = 0; other < 4; ++other) {
                 if (other == slot) continue;
-                assert(panel.midiCcValue(other) == 0 && panel.midiCcMultiplier(other) == 1);
+                assert(panel.midiCcValue(other) == 0 && panel.midiCcMultiplier(other) == 8);
             }
         }
-        assert(panel.midiCcMultiplier(slot) == 1);
+        assert(panel.midiCcMultiplier(slot) == 8);
     }
     SimpleMidiController c;
     FrontPanel panel;
     MidiCommand out[kCapacity]{};
-    panel.click(c, 3, out, kCapacity); // Ordinary E4 click: X2, not Smart Voicing.
-    assert(panel.midiCcMultiplier(3) == 2 && !c.smartVoicing());
+    panel.click(c, 3, out, kCapacity); // Ordinary E4 click: X1, not Smart Voicing.
+    assert(panel.midiCcMultiplier(3) == 1 && !c.smartVoicing());
     c.press(c.kShiftKey, 0, out, kCapacity);
     const auto shortcut = panel.click(c, 3, out, kCapacity);
     assert(shortcut.count == 0 && shortcut.feedback == PanelFeedback::SmartVoicing);
-    assert(c.smartVoicing() && panel.midiCcMultiplier(3) == 2 && panel.midiCcValue(3) == 0);
+    assert(c.smartVoicing() && panel.midiCcMultiplier(3) == 1 && panel.midiCcValue(3) == 0);
     panel.click(c, 3, out, kCapacity);
-    assert(!c.smartVoicing() && panel.midiCcMultiplier(3) == 2);
+    assert(!c.smartVoicing() && panel.midiCcMultiplier(3) == 1);
     panel.click(c, 4, out, kCapacity); // Shift does not steal other CC clicks.
-    assert(panel.midiCcMultiplier(0) == 2);
+    assert(panel.midiCcMultiplier(0) == 1);
     c.release(c.kShiftKey, 0, out, kCapacity);
     assert(panel.turn(c, 3, 1, 0, out, kCapacity).count == 1);
-    assertCc(out[0], 23, 2);
+    assertCc(out[0], 23, 1);
     assert(panel.midiCcMultiplier(255) == 0);
-    for (uint8_t slot = 0; slot < 4; ++slot) assert(FrontPanel{}.midiCcMultiplier(slot) == 1);
+    for (uint8_t slot = 0; slot < 4; ++slot) assert(FrontPanel{}.midiCcMultiplier(slot) == 8);
 }
 
 void testInvalidInputs() {
@@ -427,7 +432,7 @@ void testInvalidInputs() {
     assert(panel.parameterPage() == E1Page::Octave && !panel.modulationSelected());
     assert(panel.midiCcValue(255) == 0 && c.octaveNumber() == 5 && c.velocity() == 100);
     for (uint8_t slot = 0; slot < 4; ++slot) {
-        assert(panel.midiCcValue(slot) == 0 && panel.midiCcMultiplier(slot) == 1);
+        assert(panel.midiCcValue(slot) == 0 && panel.midiCcMultiplier(slot) == 8);
     }
 }
 
@@ -454,7 +459,7 @@ void testFocusedRegressions() {
     }
     for (uint8_t encoder = 4; encoder < 7; ++encoder) {
         assert(runningPanel.turn(running, encoder, 1, 0, out, kCapacity).count == 1);
-        assertCc(out[0], encoder + 16, 1);
+        assertCc(out[0], encoder + 16, 8);
         assert(running.runActive() && running.runNote() == note);
     }
     // Same-pass click then turn must edit the newly selected E1/E3 page.
@@ -517,6 +522,7 @@ void testUi() {
         panel.click(c, 0, out, kCapacity);
     }
     for (uint8_t encoder = 4; encoder < 7; ++encoder) {
+        panel.click(c, encoder, out, kCapacity); // X1 permits exact fixture values.
         for (int value : {0, 1, 127}) {
             panel.turn(c, encoder, value - panel.midiCcValue(encoder - 4), 0, out, kCapacity);
             ui.showPanel(PanelFeedback::MidiCc, panel, encoder, 10);

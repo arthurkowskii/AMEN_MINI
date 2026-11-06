@@ -13,7 +13,7 @@
 
 ### Multiplicateurs des encodeurs MIDI
 
-Chaque encodeur E4 à E7 possède son propre multiplicateur : `×1` → `×2` → `×4` → `×8` → `×1` à chaque clic. Un cran ajoute ou retire respectivement 1, 2, 4 ou 8 unités MIDI. Le clic ne change pas la valeur et n'envoie aucun message MIDI. Les valeurs saturent à 0 ou 127 sans rebouclage ; tourner dans l'autre sens repart immédiatement de la butée avec le pas sélectionné. Les multiplicateurs démarrent à `×1` à chaque boot et ne sont pas sauvegardés. Sur E4, Shift + clic bascule uniquement Smart Voicing, sans changer son multiplicateur. La modulation fixe CC1 sur E3 conserve son pas de 5 et la vélocité son pas de 3.
+Chaque encodeur E4 à E7 possède son propre multiplicateur : `×1` → `×2` → `×4` → `×8` → `×1` à chaque clic. Un cran ajoute ou retire respectivement 1, 2, 4 ou 8 unités MIDI. Le clic ne change pas la valeur et n'envoie aucun message MIDI. Les valeurs saturent à 0 ou 127 sans rebouclage ; tourner dans l'autre sens repart immédiatement de la butée avec le pas sélectionné. Les multiplicateurs démarrent à `×8` à chaque boot et ne sont pas sauvegardés. Sur E4, Shift + clic bascule uniquement Smart Voicing, sans changer son multiplicateur. La modulation fixe CC1 sur E3 conserve son pas de 5 et la vélocité son pas de 3.
 
 ### MIDI Learn dans un instrument
 

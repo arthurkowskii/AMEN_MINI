@@ -148,7 +148,7 @@ private:
     E1Page parameterPage_{E1Page::Octave};
     bool modulationSelected_{};
     std::array<uint8_t, kMidiCcNumbers.size()> midiCcValues_{};
-    std::array<uint8_t, kMidiCcNumbers.size()> midiCcMultiplierIndices_{};
+    std::array<uint8_t, kMidiCcNumbers.size()> midiCcMultiplierIndices_{{3, 3, 3, 3}};
 };
 
 }
