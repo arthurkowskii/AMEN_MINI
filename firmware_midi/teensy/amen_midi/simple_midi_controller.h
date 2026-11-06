@@ -27,7 +27,7 @@ struct MidiCommand {
 enum class PerformancePage : uint8_t {
     Harmony,
     Pattern,
-    None
+    Notes
 };
 
 enum class ClockMode : uint8_t {
@@ -767,7 +767,7 @@ private:
     uint8_t runSourceKey_{kNoRunSource};
     uint8_t runPatternKey_{kNoRunSource};
     MusicalPreset preset_{MusicalPreset::Chromatic};
-    PerformancePage page_{PerformancePage::None};
+    PerformancePage page_{PerformancePage::Notes};
     uint16_t tempo_{120};
     uint8_t velocity_{kVelocity};
     uint8_t frequencyIndex_{29};

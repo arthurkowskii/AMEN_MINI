@@ -316,7 +316,7 @@ void testVelocity() {
             ui.showVelocity(10);
             amen::MonoFramebuffer expected;
             expected.drawText(0, 0, "VELOCITY", 2);
-            expected.drawText(96, 0, "NONE", 2);
+            expected.drawText(88, 0, "NOTES", 2);
             char value[4];
             std::snprintf(value, sizeof(value), "%u", velocity);
             expected.drawText((128 - (static_cast<int>(std::strlen(value)) * 16 - 4)) / 2, 12, value, 4);
@@ -498,7 +498,7 @@ void testPatterns() {
         assert(controller.turnPage(-1, commands, kCap) == 0);
         assert(controller.page() == amen::PerformancePage::Pattern);
         assert(controller.turnPage(1, commands, kCap) == 0);
-        assert(controller.page() == amen::PerformancePage::None);
+        assert(controller.page() == amen::PerformancePage::Notes);
         assert(!controller.nextPatternBank());
         assert(controller.clockMode() == amen::ClockMode::Tempo);
         assert(controller.toggleClockMode(0));
@@ -530,7 +530,7 @@ void testPatterns() {
     {
         g_block = "run-up-timeline";
         SimpleMidiController controller;
-        assert(controller.page() == amen::PerformancePage::None && controller.tempo() == 120);
+        assert(controller.page() == amen::PerformancePage::Notes && controller.tempo() == 120);
         assertEvents(togglePage(controller), {});
         assert(controller.page() == amen::PerformancePage::Harmony);
         assertEvents(togglePage(controller), {});
@@ -1085,7 +1085,7 @@ void testPatterns() {
         press(controller, 12, 0);
         assertEvents(tick(controller, 125), {off(60), on(62)});
         assertEvents(togglePage(controller), {off(62), on(60)});
-        assert(controller.page() == amen::PerformancePage::None && !controller.runActive());
+        assert(controller.page() == amen::PerformancePage::Notes && !controller.runActive());
         assert(controller.runSourceKey() == amen::SimpleMidiController::kNoRunSource);
         assertEvents(togglePage(controller), {});
         assert(controller.page() == amen::PerformancePage::Harmony && !controller.runActive());
@@ -1195,19 +1195,19 @@ void testPatterns() {
     {
         g_block = "page-cycle";
         SimpleMidiController controller;
-        assert(controller.page() == amen::PerformancePage::None);
+        assert(controller.page() == amen::PerformancePage::Notes);
         assertEvents(togglePage(controller), {});
         assert(controller.page() == amen::PerformancePage::Harmony);
         assertEvents(togglePage(controller), {});
         assert(controller.page() == amen::PerformancePage::Pattern);
         assertEvents(togglePage(controller), {});
-        assert(controller.page() == amen::PerformancePage::None);
+        assert(controller.page() == amen::PerformancePage::Notes);
     }
 
     {
         g_block = "none-page-notes";
         SimpleMidiController controller;
-        assert(controller.page() == amen::PerformancePage::None);
+        assert(controller.page() == amen::PerformancePage::Notes);
         assert(!controller.harmonyActive() && !controller.patternHeld());
         for (uint8_t key = amen::SimpleMidiController::kHarmonyStartKey;
              key < controller.kNoteKeyCount; ++key) {
@@ -1220,7 +1220,7 @@ void testPatterns() {
         SimpleMidiController withSlot = controller;
         togglePage(withSlot);
         togglePage(withSlot);
-        assert(withSlot.page() == amen::PerformancePage::None && withSlot.harmonyActive());
+        assert(withSlot.page() == amen::PerformancePage::Notes && withSlot.harmonyActive());
         assertEvents(press(withSlot, 0), {on(60)});
         assertEvents(press(withSlot, 13), {on(73)});
         assertEvents(release(withSlot, 0), {off(60)});
@@ -1238,7 +1238,7 @@ void testPatterns() {
         press(controller, 12, 0);
         assertEvents(tick(controller, 125), {off(60), on(61)});
         assertEvents(togglePage(controller), {off(61), on(60)});
-        assert(controller.page() == amen::PerformancePage::None && !controller.runActive());
+        assert(controller.page() == amen::PerformancePage::Notes && !controller.runActive());
         assertEvents(release(controller, 12), {});
         release(controller, 0);
     }
@@ -1247,18 +1247,18 @@ void testPatterns() {
         g_block = "none-page-exact-ui";
         amen::SimpleMidiController controller;
         amen::OledUi ui;
-        assert(controller.page() == amen::PerformancePage::None);
+        assert(controller.page() == amen::PerformancePage::Notes);
         amen::MonoFramebuffer expected;
         expected.drawText(0, 0, "O5 C", 2);
-        expected.drawText(96, 0, "NONE", 2);
+        expected.drawText(88, 0, "NOTES", 2);
         expected.drawText(0, 11, "CHROMATIC", 2);
         expected.drawText(9, 22, "(12 SEMITONES)", 2);
         assert(ui.render(controller, amen::E2Page::Root, 0).pixels() == expected.pixels());
         ui.showPage(10);
         expected.clear();
         expected.drawText(0, 0, "MODE", 2);
-        expected.drawText(96, 0, "NONE", 2);
-        expected.drawText(49, 18, "NONE", 2);
+        expected.drawText(88, 0, "NOTES", 2);
+        expected.drawText(45, 18, "NOTES", 2);
         assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
     }
 
@@ -2019,18 +2019,19 @@ int main() {
         ui.showE1(amen::E1Page::Tempo, 10);
         amen::MonoFramebuffer expected;
         expected.drawText(0, 0, "TEMPO", 2);
-        expected.drawText(96, 0, "NONE", 2);
-        expected.drawText(84, 0, "*", 2);
-        expected.drawText(42, 12, "120", 4);
-        expected.fillRect(103, 27, 5, 1);
-        expected.fillRect(103, 31, 5, 1);
-        expected.fillRect(103, 28, 1, 3);
-        expected.fillRect(107, 28, 1, 3);
-        expected.fillRect(112, 27, 5, 5);
-        expected.fillRect(121, 27, 5, 1);
-        expected.fillRect(121, 31, 5, 1);
-        expected.fillRect(121, 28, 1, 3);
-        expected.fillRect(125, 28, 1, 3);
+        expected.drawText(88, 0, "NOTES", 2);
+        expected.drawText(76, 0, "*", 2);
+        expected.drawText(47, 12, "120", 3);
+        for (uint8_t index = 0; index < 5; ++index) {
+            const int x = 85 + index * 9;
+            if (index == 1) expected.fillRect(x, 27, 5, 5);
+            else {
+                expected.fillRect(x, 27, 5, 1);
+                expected.fillRect(x, 31, 5, 1);
+                expected.fillRect(x, 28, 1, 3);
+                expected.fillRect(x + 4, 28, 1, 3);
+            }
+        }
         assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
     }
 
@@ -2042,18 +2043,19 @@ int main() {
         ui.showE1(amen::E1Page::Frequency, 10);
         amen::MonoFramebuffer expected;
         expected.drawText(0, 0, "FREQUENCY", 2);
-        expected.drawText(96, 0, "NONE", 2);
-        expected.drawText(84, 0, "*", 2);
+        expected.drawText(88, 0, "NOTES", 2);
+        expected.drawText(76, 0, "*", 2);
         expected.drawText(41, 16, "8.9 HZ", 2);
-        expected.fillRect(103, 27, 5, 1);
-        expected.fillRect(103, 31, 5, 1);
-        expected.fillRect(103, 28, 1, 3);
-        expected.fillRect(107, 28, 1, 3);
-        expected.fillRect(112, 27, 5, 1);
-        expected.fillRect(112, 31, 5, 1);
-        expected.fillRect(112, 28, 1, 3);
-        expected.fillRect(116, 28, 1, 3);
-        expected.fillRect(121, 27, 5, 5);
+        for (uint8_t index = 0; index < 5; ++index) {
+            const int x = 85 + index * 9;
+            if (index == 2) expected.fillRect(x, 27, 5, 5);
+            else {
+                expected.fillRect(x, 27, 5, 1);
+                expected.fillRect(x, 31, 5, 1);
+                expected.fillRect(x, 28, 1, 3);
+                expected.fillRect(x + 4, 28, 1, 3);
+            }
+        }
         assert(ui.render(controller, amen::E2Page::Root, 10).pixels() == expected.pixels());
     }
 
@@ -2322,11 +2324,16 @@ int main() {
         expected.drawText(0, 0, "PRESET", 2);
         expected.drawText(96, 0, "HARM", 2);
         expected.drawText(45, 14, "MAJOR", 2);
-        expected.fillRect(112, 27, 5, 1);
-        expected.fillRect(112, 31, 5, 1);
-        expected.fillRect(112, 28, 1, 3);
-        expected.fillRect(116, 28, 1, 3);
-        expected.fillRect(121, 27, 5, 5);
+        for (uint8_t index = 0; index < 5; ++index) {
+            const int x = 85 + index * 9;
+            if (index == 4) expected.fillRect(x, 27, 5, 5);
+            else {
+                expected.fillRect(x, 27, 5, 1);
+                expected.fillRect(x, 31, 5, 1);
+                expected.fillRect(x, 28, 1, 3);
+                expected.fillRect(x + 4, 28, 1, 3);
+            }
+        }
         assert(ui.render(controller, amen::E2Page::Preset, 1).pixels() == expected.pixels());
         for (uint8_t preset = 0; preset < amen::kMusicalPresetCount; ++preset) {
             if (controller.drums()) {

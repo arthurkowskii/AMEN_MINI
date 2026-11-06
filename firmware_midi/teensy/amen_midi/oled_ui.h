@@ -1,6 +1,6 @@
 #pragma once
 
-#include "simple_midi_controller.h"
+#include "front_panel.h"
 
 #include <array>
 #include <cstddef>
@@ -9,12 +9,6 @@
 #include <cstring>
 
 namespace amen {
-
-enum class E1Page : uint8_t {
-    Octave,
-    Tempo,
-    Frequency
-};
 
 enum class E2Page : uint8_t {
     Root,
@@ -116,9 +110,36 @@ private:
 class OledUi {
 public:
     void showE1(E1Page page, uint32_t now) noexcept {
-        overlay_ = page == E1Page::Octave ? Overlay::Octave
-            : (page == E1Page::Tempo ? Overlay::Tempo : Overlay::Frequency);
+        switch (page) {
+            case E1Page::Octave: overlay_ = Overlay::Octave; break;
+            case E1Page::Tempo: overlay_ = Overlay::Tempo; break;
+            case E1Page::Frequency: overlay_ = Overlay::Frequency; break;
+            case E1Page::Root: overlay_ = Overlay::Root; break;
+            case E1Page::Preset: overlay_ = Overlay::Preset; break;
+        }
         overlayChangedAt_ = now;
+    }
+
+    void showPanel(PanelFeedback feedback, const FrontPanel& panel, uint8_t encoder, uint32_t now) noexcept {
+        switch (feedback) {
+            case PanelFeedback::None: break;
+            case PanelFeedback::Parameter: showE1(panel.parameterPage(), now); break;
+            case PanelFeedback::Shift: showShift(now); break;
+            case PanelFeedback::Mode: showMode(now); break;
+            case PanelFeedback::Bank: showBank(now); break;
+            case PanelFeedback::Velocity: showVelocity(now); break;
+            case PanelFeedback::Modulation: showModulation(now); break;
+            case PanelFeedback::PatternEdit: showPatternEdit(now); break;
+            case PanelFeedback::SmartVoicing: showSmartVoicing(now); break;
+            case PanelFeedback::MidiCc:
+                if (encoder < 3 || encoder >= 7) break;
+                ccEncoder_ = encoder;
+                ccValue_ = panel.midiCcValue(FrontPanel::midiCcSlot(encoder));
+                ccMultiplier_ = panel.midiCcMultiplier(FrontPanel::midiCcSlot(encoder));
+                overlay_ = Overlay::MidiCc;
+                overlayChangedAt_ = now;
+                break;
+        }
     }
 
     void showE2(E2Page page, uint32_t now) noexcept {
@@ -193,9 +214,19 @@ public:
             overlay_ = Overlay::None;
             renderHome(controller, page);
         }
-        framebuffer_.drawText(96, 0,
+        framebuffer_.drawText(controller.page() == PerformancePage::Notes ? 88 : 96, 0,
             controller.page() == PerformancePage::Harmony ? "HARM"
-            : controller.page() == PerformancePage::Pattern ? "PATT" : "NONE", 2);
+            : controller.page() == PerformancePage::Pattern ? "PATT" : "NOTES", 2);
+        return framebuffer_;
+    }
+
+    const MonoFramebuffer& render(const SimpleMidiController& controller, const FrontPanel& panel,
+                                  uint32_t now) noexcept {
+        render(controller, E2Page::Root, now);
+        if (!overlayVisible()) {
+            static constexpr const char* labels[]{"OCT", "BPM", "HZ", "ROOT", "PRESET"};
+            framebuffer_.drawText(64, 2, labels[static_cast<uint8_t>(panel.parameterPage())]);
+        }
         return framebuffer_;
     }
 
@@ -217,7 +248,8 @@ private:
         Shift,
         SmartVoicing,
         Velocity,
-        Modulation
+        Modulation,
+        MidiCc
     };
 
     void renderHome(const SimpleMidiController& controller, E2Page) noexcept {
@@ -244,6 +276,18 @@ private:
 
     void renderOverlay(const SimpleMidiController& controller) noexcept {
         char value[36];
+        if (overlay_ == Overlay::MidiCc) {
+            std::snprintf(value, sizeof(value), "E%u CC%u", ccEncoder_ + 1,
+                          FrontPanel::kMidiCcNumbers[FrontPanel::midiCcSlot(ccEncoder_)]);
+            framebuffer_.drawText(0, 0, value, 2);
+            std::snprintf(value, sizeof(value), "%u", ccValue_);
+            drawCenteredText(12, value, 4);
+            std::snprintf(value, sizeof(value), "CH%u", controller.midiChannel());
+            framebuffer_.drawText(0, 27, value);
+            std::snprintf(value, sizeof(value), "X%u", ccMultiplier_);
+            framebuffer_.drawText(112, 27, value);
+            return;
+        }
         if (overlay_ == Overlay::Velocity || overlay_ == Overlay::Modulation) {
             framebuffer_.drawText(0, 0, overlay_ == Overlay::Velocity ? "VELOCITY" : "MODULATION", 2);
             std::snprintf(value, sizeof(value), "%u",
@@ -257,7 +301,7 @@ private:
             return;
         }
         if (overlay_ == Overlay::SmartVoicing) {
-            framebuffer_.drawText(0, 0, "SMART VOICING", 2);
+            framebuffer_.drawText(0, 0, "SMART VOICING");
             drawCenteredText(18, controller.smartVoicing() ? "ON" : "OFF", 2);
             return;
         }
@@ -268,7 +312,7 @@ private:
             if (overlay_ == Overlay::Page) {
                 drawCenteredText(18,
                     controller.page() == PerformancePage::Harmony ? "HARMONY"
-                    : controller.page() == PerformancePage::Pattern ? "PATTERN" : "NONE", 2);
+                    : controller.page() == PerformancePage::Pattern ? "PATTERN" : "NOTES", 2);
             } else if (overlay_ == Overlay::Bank) {
                 drawCenteredText(18, controller.patternBankName(), 2);
             } else if (overlay_ == Overlay::PatternEdit) {
@@ -294,11 +338,12 @@ private:
                 std::snprintf(value, sizeof(value), "%u.%u HZ", tenths / 10U, tenths % 10U);
             }
             else std::snprintf(value, sizeof(value), "O%u", controller.octaveNumber());
-            drawCenteredText(frequencyPage ? 16 : 12, value, frequencyPage ? 2 : 4);
+            // Keep the tempo above the five navigation dots, with no shared pixels.
+            drawCenteredText(frequencyPage ? 16 : 12, value, frequencyPage ? 2 : (tempoPage ? 3 : 4));
             if ((tempoPage && controller.clockMode() == ClockMode::Tempo) ||
                 (frequencyPage && controller.clockMode() == ClockMode::Frequency))
-                framebuffer_.drawText(84, 0, "*", 2);
-            drawPageDots(frequencyPage ? 2 : (tempoPage ? 1 : 0), 3);
+                framebuffer_.drawText(76, 0, "*", 2);
+            drawPageDots(frequencyPage ? 2 : (tempoPage ? 1 : 0), 5);
             return;
         }
 
@@ -314,7 +359,7 @@ private:
         framebuffer_.drawText(0, 0, rootPage ? "ROOT" : "PRESET", 2);
         if (rootPage) drawCenteredText(12, pitchClassName(controller.rootPitchClass()), 4);
         else drawCenteredText(14, controller.presetName(), 2);
-        drawPageDots(rootPage ? 0 : 1, 2);
+        drawPageDots(rootPage ? 3 : 4, 5);
     }
 
     void drawCenteredText(int y, const char* text, int scale) noexcept {
@@ -325,7 +370,7 @@ private:
     }
 
     void drawPageDots(uint8_t page, uint8_t count) noexcept {
-        const int startX = count == 3 ? 103 : 112;
+        const int startX = MonoFramebuffer::kWidth - count * 9 + 2;
         for (uint8_t index = 0; index < count; ++index) {
             const int x = startX + index * 9;
             const bool active = index == page;
@@ -341,6 +386,9 @@ private:
 
     MonoFramebuffer framebuffer_{};
     uint32_t overlayChangedAt_{};
+    uint8_t ccEncoder_{4};
+    uint8_t ccValue_{};
+    uint8_t ccMultiplier_{1};
     Overlay overlay_{Overlay::None};
 };
 
