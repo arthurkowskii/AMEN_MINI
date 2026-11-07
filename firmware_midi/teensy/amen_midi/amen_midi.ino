@@ -15,7 +15,7 @@ constexpr uint32_t SCAN_US = 500;
 constexpr uint32_t DEBOUNCE_US = 5000;
 constexpr uint8_t SCANNED_KEYS = 21;
 constexpr const char* FIRMWARE_BANNER =
-    "AMEN MIDI PANEL V2.4: NOTES/HARMONY/PATTERN, E1 MUSIC/SHIFT/ASSIGN, E2 MODE/BANK, E3 VELOCITY/MOD, E4 CC23 + SHIFT-SMART, E5-E7 CC20-22, CC CLICK X1/2/4/8, DEFAULT X8";
+    "AMEN MIDI PANEL V2.5: SHIFT-E2 ORIENTATION V/H, BOOT VERTICAL, NOTES/HARMONY/PATTERN, E1 MUSIC/SHIFT/ASSIGN, E2 MODE/BANK, E3 VELOCITY/MOD, E4 CC23 + SHIFT-SMART, E5-E7 CC20-22, CC CLICK X1/2/4/8, DEFAULT X8";
 
 volatile bool contacts[21] = {};
 bool raw[21] = {};
@@ -226,28 +226,33 @@ void loop() {
         previousContacts[amen::SimpleMidiController::kShiftKey] = down;
     }
     for (uint8_t index = 0; index < SCANNED_KEYS - 1; ++index) {
-        const uint8_t key = index < 8 ? index + 12 : (index < 20 ? index - 8 : 20);
-        if (contactSnapshot[key] == previousContacts[key]) continue;
-        const uint8_t count = contactSnapshot[key]
+        const uint8_t key = controller.keyInScanOrder(index);
+        const uint8_t physical = controller.physicalForKey(key);
+        if (contactSnapshot[physical] == previousContacts[physical]) continue;
+        const uint8_t count = contactSnapshot[physical]
             ? controller.press(key, clockNow, commands, amen::SimpleMidiController::kMaxEventsPerAction)
             : controller.release(key, clockNow, commands, amen::SimpleMidiController::kMaxEventsPerAction);
         for (uint8_t i = 0; i < count; ++i) sendMidi(commands[i]);
         sent = sent || count > 0;
-        if (contactSnapshot[key] && key >= amen::SimpleMidiController::kHarmonyStartKey &&
+        if (contactSnapshot[physical] && key >= controller.degreeKeyCount() &&
             key < amen::SimpleMidiController::kShiftKey) {
             if (controller.page() == amen::PerformancePage::Pattern) oledUi.showPattern(inputNow);
             else if (controller.page() == amen::PerformancePage::Harmony) oledUi.showHarmony(inputNow);
         }
-        previousContacts[key] = contactSnapshot[key];
+        previousContacts[physical] = contactSnapshot[physical];
     }
 
     for (uint8_t encoder = 0; encoder < 7; ++encoder) {
         if (pushSnapshot[encoder] != previousEncoderPush[encoder]) {
             if (pushSnapshot[encoder]) {
+                const auto previousOrientation = controller.orientation();
                 const amen::PanelResult result = frontPanel.click(
                     controller, encoder, commands, amen::SimpleMidiController::kMaxEventsPerAction);
                 for (uint8_t i = 0; i < result.count; ++i) sendMidi(commands[i]);
                 sent = sent || result.count > 0;
+                if (controller.orientation() != previousOrientation)
+                    Serial.println(controller.orientation() == amen::Orientation::Horizontal
+                        ? "ORIENTATION HORIZONTAL" : "ORIENTATION VERTICAL");
                 oledUi.showPanel(result.feedback, frontPanel, encoder, inputNow);
             }
             previousEncoderPush[encoder] = pushSnapshot[encoder];

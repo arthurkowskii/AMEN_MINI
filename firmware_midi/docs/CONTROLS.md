@@ -1,6 +1,23 @@
 # Contrôles
 
-## Firmware MIDI actif
+## Orientation horizontale
+
+**Shift + clic E2** bascule vertical / horizontal. Tous les pads SW1 à SW20 doivent être relâchés ; sinon le clic est ignoré, sans bascule différée ni changement de banque. SW21 peut rester tenu. Le démarrage reste vertical et le réglage n’est pas sauvegardé. E2 sans Shift conserve son comportement habituel. L’écran et le scan électrique ne changent pas. Une bascule réussie est signalée sur le port série (`ORIENTATION HORIZONTAL` / `ORIENTATION VERTICAL`).
+
+En tournant le PCB dans le sens horaire pour avoir le Teensy à droite, les rangées physiques deviennent, du haut vers le bas et de gauche à droite :
+
+| Rangée | Pads physiques | Rôle horizontal |
+|---|---|---|
+| Haut | SW1, SW5, SW9, SW13, SW17 | Slots 1 à 5 en HARMONY/PATTERN ; notes 16 à 20 en NOTES |
+| Deuxième | SW2, SW6, SW10, SW14, SW18 | Notes 11 à 15 |
+| Troisième | SW3, SW7, SW11, SW15, SW19 | Notes 6 à 10 |
+| Bas | SW4, SW8, SW12, SW16, SW20 | Notes 1 à 5 |
+
+Les quinze notes participent aux accords et aux patterns. Les cinq slots du haut utilisent les cinq premières recettes / assignations de la palette ou banque actuelle ; pas de pagination. Les huit assignations de chaque banque restent en RAM et redeviennent toutes accessibles en vertical. La priorité LIFO, l’édition du pattern tenu avec E1, les rôles figés jusqu’au relâchement et les contrôles Shift/CC sont conservés. Les snapshots traitent Shift, puis les cinq slots, puis les quinze notes, puis les encodeurs.
+
+Le reste de ce document décrit la disposition verticale, sauf indication contraire.
+
+## Firmware MIDI actif (vertical)
 
 - SW1–SW12 jouent douze degrés consécutifs de la gamme sélectionnée.
 - SW13–SW20 sélectionnent chacun un slot harmonique global tant qu’ils sont tenus : les degrés déjà enfoncés et ceux joués ensuite deviennent des accords. Un autre pad remplace temporairement le slot ; relâcher le pad actif restaure le précédent encore tenu (empilement LIFO). Chaque degré utilise la recette de ce slot dans sa palette d’origine.

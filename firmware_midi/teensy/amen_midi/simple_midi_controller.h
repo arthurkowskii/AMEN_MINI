@@ -30,6 +30,11 @@ enum class PerformancePage : uint8_t {
     Notes
 };
 
+enum class Orientation : uint8_t {
+    Vertical,
+    Horizontal
+};
+
 enum class ClockMode : uint8_t {
     Tempo,
     Frequency
@@ -71,6 +76,7 @@ struct PatternAssignment {
 
 class SimpleMidiController {
 public:
+    // Legacy vertical layout constants; use degreeKeyCount() for the active split.
     static constexpr uint8_t kKeyCount = 12;
     static constexpr uint8_t kHarmonyStartKey = 12;
     static constexpr uint8_t kHarmonyKeyCount = kHarmonySlotCount;
@@ -85,6 +91,40 @@ public:
 
     static constexpr bool isDrumPreset(MusicalPreset preset) noexcept {
         return preset == MusicalPreset::GmKit;
+    }
+
+    Orientation orientation() const noexcept { return orientation_; }
+    uint8_t degreeKeyCount() const noexcept {
+        return orientation_ == Orientation::Horizontal ? 15 : kKeyCount;
+    }
+    uint8_t functionKeyCount() const noexcept { return kNoteKeyCount - degreeKeyCount(); }
+
+    // Switching only at rest preserves physical ownership until every pad is released.
+    bool setOrientation(Orientation next) noexcept {
+        if (next != Orientation::Vertical && next != Orientation::Horizontal) return false;
+        if (next == orientation_) return true;
+        for (const auto role : roles_) if (role != PadRole::None) return false;
+        if (run_.active()) return false;
+        orientation_ = next;
+        smartReferenceCount_ = 0;
+        return true;
+    }
+
+    // Physical IDs are the scan indices SW1-SW20, followed by SW21 (Shift).
+    // Clockwise rotation puts Teensy on the right and SW1 at top-left.
+    uint8_t keyForPhysical(uint8_t physical) const noexcept {
+        if (physical >= kShiftKey || orientation_ == Orientation::Vertical) return physical;
+        return static_cast<uint8_t>((3 - physical % 4) * 5 + physical / 4);
+    }
+    uint8_t physicalForKey(uint8_t key) const noexcept {
+        if (key >= kShiftKey || orientation_ == Orientation::Vertical) return key;
+        return static_cast<uint8_t>((key % 5) * 4 + 3 - key / 5);
+    }
+    uint8_t keyInScanOrder(uint8_t index) const noexcept {
+        if (index >= kNoteKeyCount) return kNoRunSource;
+        const uint8_t upper = functionKeyCount();
+        return index < upper ? static_cast<uint8_t>(degreeKeyCount() + index)
+                             : static_cast<uint8_t>(index - upper);
     }
 
     uint8_t press(uint8_t key, MidiCommand* out, uint8_t capacity) noexcept {
@@ -192,7 +232,7 @@ public:
         if (page_ != PerformancePage::Pattern) return false;
         const uint8_t key = heldPatternKey();
         if (key == kNoRunSource) return false;
-        const uint8_t slot = key - kHarmonyStartKey;
+        const uint8_t slot = key - degreeKeyCount();
         PatternAssignment& assignment = patternAssign_[static_cast<uint8_t>(patternBank_)][slot];
         if (patternBank_ == PatternBank::Repeat) {
             const uint8_t current = static_cast<uint8_t>(assignment.division);
@@ -249,7 +289,7 @@ public:
     bool patternHeld() const noexcept { return patternCount_ > 0; }
     RunShape currentPattern() const noexcept {
         const uint8_t key = heldPatternKey();
-        return currentAssignment(key == kNoRunSource ? 0 : key - kHarmonyStartKey).shape;
+        return currentAssignment(key == kNoRunSource ? 0 : key - degreeKeyCount()).shape;
     }
     RunShape slotAssignment(uint8_t slot) const noexcept { return currentAssignment(slot).shape; }
     RateDivision slotDivision(uint8_t slot) const noexcept { return currentAssignment(slot).division; }
@@ -268,11 +308,11 @@ public:
     const char* currentDivisionName() const noexcept {
         static constexpr const char* names[]{"1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T", "1/32T"};
         const uint8_t key = heldPatternKey();
-        return names[static_cast<uint8_t>(currentAssignment(key == kNoRunSource ? 0 : key - kHarmonyStartKey).division)];
+        return names[static_cast<uint8_t>(currentAssignment(key == kNoRunSource ? 0 : key - degreeKeyCount()).division)];
     }
     uint8_t patternSlot() const noexcept {
         const uint8_t key = heldPatternKey();
-        return key == kNoRunSource ? 0 : key - kHarmonyStartKey;
+        return key == kNoRunSource ? 0 : key - degreeKeyCount();
     }
     uint8_t patternStackSize() const noexcept { return patternCount_; }
     uint8_t runSourceKey() const noexcept { return runSourceKey_; }
@@ -333,13 +373,13 @@ public:
         return false;
     }
     uint8_t rootNote() const noexcept { return noteForKey(0); }
-    uint8_t highestNote() const noexcept { return noteForKey(kKeyCount - 1); }
+    uint8_t highestNote() const noexcept { return noteForKey(degreeKeyCount() - 1); }
 
     bool harmonyActive() const noexcept { return harmonyCount_ > 0; }
     uint8_t harmonyStackSize() const noexcept { return harmonyCount_; }
     const char* harmonyName() const noexcept {
         if (harmonyCount_ == 0) return "";
-        return harmonySlotName(preset_, harmonyStack_[harmonyCount_ - 1] - kHarmonyStartKey);
+        return harmonySlotName(preset_, harmonyStack_[harmonyCount_ - 1] - degreeKeyCount());
     }
 
     uint8_t heldCount() const noexcept { return heldCount_; }
@@ -463,9 +503,9 @@ private:
         return heldCount_ == 0 ? kNoRunSource : heldOrder_[heldCount_ - 1];
     }
 
-    static constexpr bool isLower(uint8_t key) noexcept { return key < kKeyCount; }
-    static constexpr bool isUpper(uint8_t key) noexcept {
-        return key >= kHarmonyStartKey && key < kShiftKey;
+    bool isLower(uint8_t key) const noexcept { return key < degreeKeyCount(); }
+    bool isUpper(uint8_t key) const noexcept {
+        return key >= degreeKeyCount() && key < kShiftKey;
     }
 
     uint16_t frequencyHundredths() const noexcept {
@@ -492,13 +532,13 @@ private:
     uint32_t currentStepDurationUs() const noexcept {
         if (run_.active()) return applyDivision(stepDurationUs(), runDivision_);
         const uint8_t key = heldPatternKey();
-        const uint8_t slot = key == kNoRunSource ? 0 : key - kHarmonyStartKey;
+        const uint8_t slot = key == kNoRunSource ? 0 : key - degreeKeyCount();
         return applyDivision(stepDurationUs(), currentAssignment(slot).division);
     }
 
     void startRun(uint8_t sourceKey, uint8_t patternKey, RunShape shape, uint32_t now) noexcept {
         const DegreeState& degree = degrees_[sourceKey];
-        const PatternAssignment& assignment = currentAssignment(patternKey - kHarmonyStartKey);
+        const PatternAssignment& assignment = currentAssignment(patternKey - degreeKeyCount());
         const RunShape targetShape = isDrumPreset(preset_) ? RunShape::Repeat : shape;
         const uint32_t duration = applyDivision(stepDurationUs(), assignment.division);
         if (run_.active() && runSourceKey_ == sourceKey && run_.shape() == RunShape::Repeat && targetShape == RunShape::Repeat)
@@ -518,7 +558,7 @@ private:
             target[0] = note;
             return 1;
         }
-        const uint8_t slot = static_cast<uint8_t>(harmonyStack_[harmonyCount_ - 1] - kHarmonyStartKey);
+        const uint8_t slot = static_cast<uint8_t>(harmonyStack_[harmonyCount_ - 1] - degreeKeyCount());
         const ChordRecipe& recipe = *harmonySlotRecipe(degree.preset, slot);
         uint8_t count = 0;
         for (uint8_t i = 0; i < recipe.voiceCount; ++i) {
@@ -761,6 +801,7 @@ private:
           {RunShape::NoirStab, RateDivision::Sixteenth}, {RunShape::NoirLurch, RateDivision::Sixteenth},
           {RunShape::NoirMarch, RateDivision::Sixteenth}, {RunShape::NoirChime, RateDivision::Sixteenth}}}
     }};
+    Orientation orientation_{Orientation::Vertical};
     int8_t octave_{};
     uint8_t rootPitchClass_{};
     uint8_t heldCount_{};

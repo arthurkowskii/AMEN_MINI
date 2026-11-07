@@ -65,6 +65,11 @@ public:
                 parameterPage_ = static_cast<E1Page>((static_cast<uint8_t>(parameterPage_) + 1U) % 5U);
                 return {0, PanelFeedback::Parameter};
             case 1:
+                if (controller.shiftHeld()) {
+                    controller.setOrientation(controller.orientation() == Orientation::Vertical
+                        ? Orientation::Horizontal : Orientation::Vertical);
+                    return {}; // OLED orientation/UI intentionally unchanged.
+                }
                 return {0, controller.nextPatternBank() ? PanelFeedback::Bank : PanelFeedback::None};
             case 2:
                 modulationSelected_ = !modulationSelected_;
